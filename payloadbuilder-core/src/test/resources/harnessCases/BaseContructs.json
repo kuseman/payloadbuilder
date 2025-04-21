@@ -304,7 +304,7 @@
       "expectedMessageContains": "d.id cannot be bound"
     },
     {
-      "name": "Like ",
+      "name": "Like",
       "query": [
         "select 'hello' like '%ell%' _like, 'hello' not like '%ell%' _notLike "
       ],
@@ -1328,6 +1328,7 @@
     {
       "name": "Selects with for output and case ",
       "query": [
+        "--set @@debugplan = true ",
         "select ",
         " case when d.row_id = 1 then (select id, data for object_array)  else null end obj",
         "from data d ",
@@ -1793,7 +1794,7 @@
         "    on d.id = s.col2 ",
         "  where s2.col2 = s.col2 ",
         "  for object_array ",
-        ") values",
+        ") \"values\"",
         "from source s"
       ],
       "expectedResultSets": [

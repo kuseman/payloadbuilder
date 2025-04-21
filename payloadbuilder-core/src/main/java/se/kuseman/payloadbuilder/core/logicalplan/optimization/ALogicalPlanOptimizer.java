@@ -24,6 +24,7 @@ import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
+import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ALogicalPlanVisitor;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.Concatenation;
@@ -497,7 +498,25 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
 
     protected ILogicalPlan create(ConstantScan plan, C context)
     {
-        return plan;
+        List<List<IExpression>> expressions;
+
+        if (expressionRewriter != null)
+        {
+            expressions = plan.getRowsExpressions()
+                    .stream()
+                    .map(list -> list.stream()
+                            .map(e -> e.accept(expressionRewriter, context))
+                            .toList())
+                    .toList();
+        }
+        else
+        {
+            expressions = plan.getRowsExpressions()
+                    .stream()
+                    .map(list -> visit(plan, list, context))
+                    .collect(toList());
+        }
+        return new ConstantScan(plan.getSchema(), expressions, plan.getLocation());
     }
 
     protected ILogicalPlan create(MaxRowCountAssert plan, C context)
@@ -511,7 +530,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         return new Concatenation(plan.getChildren()
                 .stream()
                 .map(p -> p.accept(this, context))
-                .collect(toList()));
+                .toList(), plan.getLocation());
     }
 
     /** Extract columns from provided expressions */
@@ -553,7 +572,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     }
 
     /** Collect all table sources from provided plan. */
-    protected Set<TableSourceReference> extractTableSources(ILogicalPlan plan)
+    protected static Set<TableSourceReference> extractTableSources(ILogicalPlan plan)
     {
         Set<TableSourceReference> result = new HashSet<>();
         plan.accept(TableSourceExtractor.INSTANCE, result);
@@ -564,6 +583,34 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     private static class TableSourceExtractor extends ALogicalPlanVisitor<Void, Set<TableSourceReference>>
     {
         private static final TableSourceExtractor INSTANCE = new TableSourceExtractor();
+
+        @Override
+        public Void visit(Aggregate plan, Set<TableSourceReference> context)
+        {
+            for (IExpression e : plan.getProjectionExpressions())
+            {
+                if (e instanceof UnresolvedSubQueryExpression usqe)
+                {
+                    usqe.getInput()
+                            .accept(this, context);
+                }
+            }
+            return super.visit(plan, context);
+        }
+
+        @Override
+        public Void visit(Projection plan, Set<TableSourceReference> context)
+        {
+            for (IExpression e : plan.getExpressions())
+            {
+                if (e instanceof UnresolvedSubQueryExpression usqe)
+                {
+                    usqe.getInput()
+                            .accept(this, context);
+                }
+            }
+            return super.visit(plan, context);
+        }
 
         @Override
         public Void visit(TableScan plan, Set<TableSourceReference> context)

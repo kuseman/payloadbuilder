@@ -48,6 +48,33 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     private final SubQueryExpressionPushDown rule = new SubQueryExpressionPushDown();
 
     @Test
+    public void test_subquery_epxression_within_table_value_ctor()
+    {
+        String q = """
+                SELECT *, (
+                    select col1
+                    from
+                    (
+                        values (1, 2), (3,4)
+                    ) y (col1, col2)
+                )
+                FROM
+                (
+                    VALUES (1, (Select 'hello' col1 for object))
+                    ,      (2, (Select 'world' col2 for object))
+
+                ) x (col1, col2)
+
+                """;
+
+        ILogicalPlan plan = getSchemaResolvedPlan(q);
+        ILogicalPlan actual = optimize(context, plan);
+
+        // System.out.println(expected.print(0));
+        System.out.println(actual.print(0));
+    }
+
+    @Test
     public void test_subquery_epxression_with_multiple_column_references()
     {
         String q = """
@@ -179,7 +206,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         Schema.of(col("__expr0", ResolvedType.of(Type.Any), null, true)),
                         projection(
                             new Join(
-                                ConstantScan.INSTANCE,
+                                ConstantScan.ONE_ROW_EMPTY_SCHEMA,
                                 new OperatorFunctionScan(
                                     Schema.of(col("__expr1", ResolvedType.of(Type.Any), null, true)),
                                     projection(
@@ -252,8 +279,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                        a.col5
                        from (bb) bb
                        for object_array
-                     )
-                   ) values
+                     ) "values1"                        -- Alias that is removed due to being nested
+                   ) "values"
                    from PDProduct_Article a
                    cross populate apply tableB bb
                 """;
@@ -286,57 +313,47 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             asSet(),
                             false,
                             Schema.EMPTY),
-                        projection(
-                            new Join(
-                                ConstantScan.INSTANCE,
-                                new OperatorFunctionScan(
-                                    Schema.of(col("__expr1", ResolvedType.ANY, null, true)),
-                                    projection(
+                        new OperatorFunctionScan(
+                                Schema.of(col("__expr0", ResolvedType.ANY, null, true)),
+                                projection(
+                                   new Join(
                                        new Join(
-                                           new Join(
-                                               new ExpressionScan(
-                                                   e_bb,
-                                                   Schema.EMPTY,
-                                                   uce("bb"),
-                                                   null),
-                                               new MaxRowCountAssert(
-                                                   projection(
-                                                       tableScan(schemaArticle, tableArticle),
-                                                       asList(new AliasExpression(uce("a", "col"), "__expr2", true))),
-                                                   1),
-                                               Join.Type.LEFT,
-                                               null,
-                                               (IExpression) null,
-                                               asSet(),
-                                               false,
-                                               Schema.EMPTY),
+                                           new ExpressionScan(
+                                               e_bb,
+                                               Schema.EMPTY,
+                                               uce("bb"),
+                                               null),
                                            new MaxRowCountAssert(
                                                projection(
-                                                   new Filter(
-                                                       tableScan(schemaProduct, tableProduct),
-                                                       null,
-                                                       eq(uce("a", "col"), uce("p", "col4"))),
-                                                   asList(new AliasExpression(uce("p", "col2"), "__expr3", true))),
+                                                   tableScan(schemaArticle, tableArticle),
+                                                   asList(new AliasExpression(uce("a", "col"), "__expr1", true))),
                                                1),
                                            Join.Type.LEFT,
                                            null,
                                            (IExpression) null,
-                                           Set.of(),
+                                           asSet(),
                                            false,
                                            Schema.EMPTY),
-                                       asList(new AliasExpression(uce("__expr2"), "val"),
-                                               new AliasExpression(uce("__expr3"), "val1"), uce("a", "col5"))
-                                    ),
-                                    "",
-                                    "object_array",
-                                    null),
-                                Join.Type.LEFT,
-                                null,
-                                (IExpression) null,
-                                Set.of(),
-                                false,
-                                Schema.EMPTY),
-                            asList(new AliasExpression(uce("__expr1"), "__expr0", true))),
+                                       new MaxRowCountAssert(
+                                           projection(
+                                               new Filter(
+                                                   tableScan(schemaProduct, tableProduct),
+                                                   null,
+                                                   eq(uce("a", "col"), uce("p", "col4"))),
+                                               asList(new AliasExpression(uce("p", "col2"), "__expr2", true))),
+                                           1),
+                                       Join.Type.LEFT,
+                                       null,
+                                       (IExpression) null,
+                                       Set.of(),
+                                       false,
+                                       Schema.EMPTY),
+                                   asList(new AliasExpression(uce("__expr1"), "val"),
+                                           new AliasExpression(uce("__expr2"), "val1"), uce("a", "col5"))
+                                ),
+                                "",
+                                "object_array",
+                                null),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
@@ -367,7 +384,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "( "
                 + "  select 1 col1, true col2 "
                 + "  for object "
-                + ") values "
+                + ") \"values\" "
                 + "from \"stableA\" a";
         //@formatter:on
         ILogicalPlan plan = getSchemaResolvedPlan(query);
@@ -380,9 +397,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         tableScan(schemaSTableA, sTableA),
                         new OperatorFunctionScan(
                             Schema.of(col("__expr0", ResolvedType.ANY, null, true)),
-                            projection(
-                                ConstantScan.INSTANCE,
-                                asList(new AliasExpression(intLit(1), "col1"), new AliasExpression(LiteralBooleanExpression.TRUE, "col2"))),
+                            new ConstantScan(Schema.of(CoreColumn.of("col1", Type.Int), CoreColumn.of("col2", Type.Boolean)), List.of(List.of(
+                                    new AliasExpression(intLit(1), "col1"), new AliasExpression(LiteralBooleanExpression.TRUE, "col2")
+                            )), null),
                             "",
                             "object",
                             null),
@@ -435,7 +452,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "( "
                 + "  select 1 col1, true col2 "
                 + "  for object "
-                + ") values ";
+                + ") \"values\" ";
         //@formatter:on
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
@@ -443,22 +460,14 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected =
                 projection(
-                    new Join(
-                        ConstantScan.INSTANCE,
-                        new OperatorFunctionScan(
-                                Schema.of(col("__expr0", ResolvedType.ANY, null, true)),
-                                projection(
-                                    ConstantScan.INSTANCE,
-                                    asList(new AliasExpression(intLit(1), "col1"), new AliasExpression(LiteralBooleanExpression.TRUE, "col2"))),
-                                "",
-                                "object",
-                                null),
-                        Join.Type.LEFT,
-                        null,
-                        (IExpression) null,
-                        Set.of(),
-                        false,
-                        Schema.EMPTY),
+                    new OperatorFunctionScan(
+                            Schema.of(col("__expr0", ResolvedType.ANY, null, true)),
+                            new ConstantScan(Schema.of(CoreColumn.of("col1", Type.Int), CoreColumn.of("col2", Type.Boolean)), List.of(List.of(
+                                    new AliasExpression(intLit(1), "col1"), new AliasExpression(LiteralBooleanExpression.TRUE, "col2")
+                            )), null),
+                            "",
+                            "object",
+                            null),
                     asList(new AliasExpression(intLit(1), "col3"), new AliasExpression(uce("__expr0"), "values")));
         //@formatter:on
 
@@ -499,7 +508,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "( "
                 + "  select b.col1 "
                 + "  from tableB b "
-                + ") values "
+                + ") \"values\" "
                 + "from \"table\" ";
 
         ILogicalPlan plan = getSchemaResolvedPlan(query);
@@ -569,7 +578,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                   select b.col1 MyCol
                   from tableB b
                   group by b.col1
-                ) values,
+                ) \"values\",
                 (
                   select max(b.col1) MyCol2
                   from tableB b
@@ -676,7 +685,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "( "
                 + "  select b.col1 "
                 + "  from tableB b "
-                + ") values, "
+                + ") \"values\", "
                 + "( "
                 + "  select c.col2 "
                 + "  from tableC c "
@@ -768,7 +777,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "  select b.col1 "
                 + "  from tableB b "
                 + "  where b.col2 = a.col2 "
-                + ") values, "
+                + ") \"values\", "
                 + "( "
                 + "  select c.col2 "
                 + "  from tableC c "
@@ -861,7 +870,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "  select b.col1 "
                 + "  from tableB b "
                 + "  where b.col2 = a.col2 "          // a.col2 correlated
-                + ") values "
+                + ") \"values\" "
                 + "from \"table\" a ";
 
         ILogicalPlan plan = getSchemaResolvedPlan(query);
@@ -937,7 +946,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "  select b.col1 "
                 + "  from tableB b "
                 + "  where b.col2 = a.col2 "          // a.col2 correlated
-                + ") values "
+                + ") \"values\" "
                 + "from \"table\" a ";
 
         ILogicalPlan plan = getSchemaResolvedPlan(query);
@@ -1010,7 +1019,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "( "
                 + "  select b.col1 "
                 + "  from tableB b "
-                + ") + 1 values "
+                + ") + 1 \"values\" "
                 + "from \"table\" ";
 
         ILogicalPlan plan = getSchemaResolvedPlan(query);
@@ -1064,7 +1073,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "    select b.col1 "
                 + "    from tableB b "
                 + "  ) + 1 innerValues "        // Alias innerValues is removed here since that column is never used
-                + ") values "
+                + ") \"values\" "
                 + "from \"table\" ";
 
         ILogicalPlan plan = getSchemaResolvedPlan(query);
@@ -1080,21 +1089,11 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 projection(
                     new Join(
                         tableScan(schema, table),
-                        projection(
-                            new Join(
-                                ConstantScan.INSTANCE,
-                                new MaxRowCountAssert(
-                                    projection(
-                                        tableScan(schemaB, tableB),
-                                        List.of(new AliasExpression(uce("b", "col1"), "__expr1", true))),
-                                    1),
-                                Join.Type.LEFT,
-                                null,
-                                (IExpression) null,
-                                Set.of(),
-                                false,
-                                Schema.EMPTY),
-                            asList(new AliasExpression(add(uce("__expr1"), intLit(1)), "__expr0", true))),
+                        new MaxRowCountAssert(
+                                projection(
+                                    tableScan(schemaB, tableB),
+                                    List.of(new AliasExpression(uce("b", "col1"), "__expr0", true))),
+                                1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
@@ -1102,7 +1101,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         false,
                         Schema.EMPTY),
                     asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()),
-                            new AliasExpression(uce("__expr0"), "values")));
+                            new AliasExpression(add(uce("__expr0"), intLit(1)), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1126,7 +1125,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "  select b.col1 "
                 + "  from tableB b "
                 + "  where b.col2 > a.col2 "      // a.col2 outer reference
-                + ") values "
+                + ") \"values\" "
                 + "from \"table\" a ";
 
         ILogicalPlan plan = getSchemaResolvedPlan(query);

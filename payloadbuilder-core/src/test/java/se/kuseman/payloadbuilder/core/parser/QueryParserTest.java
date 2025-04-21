@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
+import java.util.List;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
@@ -23,6 +24,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IDatePartExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.ArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
@@ -570,7 +572,8 @@ public class QueryParserTest extends Assert
     public void test_select()
     {
         // Selects without table source
-        assertEquals(new LogicalSelectStatement(new Projection(ConstantScan.INSTANCE, asList(litInt(1))), false), assertSelect("select 1"));
+        assertEquals(new LogicalSelectStatement(new ConstantScan(Schema.of(new CoreColumn("", ResolvedType.of(Type.Int), "1", false)), List.of(asList(litInt(1))), null), false),
+                assertSelect("select 1"));
         assertSelect("select 1 where false");
         assertSelect("select 1 order by 1");
         assertSelect("select top 10 1");
@@ -589,6 +592,37 @@ public class QueryParserTest extends Assert
         assertSelectFail(ParseException.class, "Must specify table source", "select *");
         assertSelectFail(ParseException.class, "Must specify table source", "select (select *)");
         assertSelectFail(ParseException.class, "Must specify table source", "select (select * for object)");
+    }
+
+    @Test
+    public void test_table_value_ctor()
+    {
+        assertSelectFail(ParseException.class, "Rows expressions size must equal column names size", """
+                select *
+                from
+                (
+                    values (1,2,3), (4,5,6)
+                ) x
+                """);
+
+        assertSelectFail(ParseException.class, "All rows expressions must be of equal size", """
+                select *
+                from
+                (
+                    values (1,2,3), (4,6)
+                ) x (a,b,c)
+                """);
+
+        assertSelect("""
+                select *
+                from
+                (
+                    values (1,2,3), (4,5,6)
+                ) x (a,b,c)
+                """);
+
+        assertEquals(ConstantScan.ONE_ROW_EMPTY_SCHEMA, new ConstantScan(Schema.EMPTY, List.of(List.of()), null));
+        assertEquals(ConstantScan.ZERO_ROWS_EMPTY_SCHEMA, new ConstantScan(Schema.EMPTY, List.of(), null));
     }
 
     @Test

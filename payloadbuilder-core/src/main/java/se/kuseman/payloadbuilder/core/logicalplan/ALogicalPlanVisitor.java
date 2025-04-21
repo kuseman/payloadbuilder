@@ -3,6 +3,18 @@ package se.kuseman.payloadbuilder.core.logicalplan;
 /** Base class for logical visitors */
 public abstract class ALogicalPlanVisitor<T, C> implements ILogicalPlanVisitor<T, C>
 {
+    // private final IExpressionVisitor<T, C> expressionVisitor;
+    //
+    // public ALogicalPlanVisitor()
+    // {
+    // this(null);
+    // }
+    //
+    // public ALogicalPlanVisitor(IExpressionVisitor<T, C> expressionVisitor)
+    // {
+    // this.expressionVisitor = expressionVisitor;
+    // }
+
     protected T defaultResult(C context)
     {
         return null;
@@ -27,12 +39,26 @@ public abstract class ALogicalPlanVisitor<T, C> implements ILogicalPlanVisitor<T
     @Override
     public T visit(Projection plan, C context)
     {
+        // if (expressionVisitor != null)
+        // {
+        // for (IExpression e : plan.getExpressions())
+        // {
+        // e.accept(expressionVisitor, context);
+        // }
+        // }
         return visitChildren(context, plan);
     }
 
     @Override
     public T visit(Sort plan, C context)
     {
+        // if (expressionVisitor != null)
+        // {
+        // for (SortItem si : plan.getSortItems())
+        // {
+        // e.accept(expressionVisitor, context);
+        // }
+        // }
         return visitChildren(context, plan);
     }
 

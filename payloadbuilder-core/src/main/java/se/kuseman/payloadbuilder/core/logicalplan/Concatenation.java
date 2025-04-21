@@ -5,28 +5,39 @@ import static java.util.Objects.requireNonNull;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
-/** Logical concat operator. Used to concat inputs into one stream. UNION ALL etc. */
+/**
+ * Logical concat operator. Used to concat inputs into one stream.
+ * Used as UNION ALL, VALUES row constructor etc.
+ */
 public class Concatenation implements ILogicalPlan
 {
     private final List<ILogicalPlan> inputs;
+    private final Schema schema;
+    private final Location location;
 
-    public Concatenation(List<ILogicalPlan> inputs)
+    public Concatenation(List<ILogicalPlan> inputs, Location location)
     {
         this.inputs = requireNonNull(inputs, "inputs");
         if (inputs.size() <= 1)
         {
             throw new IllegalArgumentException("Size of inputs should be 1 or greater");
         }
-        verifySchema();
+        this.location = location;
+        this.schema = verifySchema();
+    }
+
+    public Location getLocation()
+    {
+        return location;
     }
 
     @Override
     public Schema getSchema()
     {
-        // We use the schema from the first input
-        return inputs.get(0)
-                .getSchema();
+        return schema;
     }
 
     @Override
@@ -72,22 +83,24 @@ public class Concatenation implements ILogicalPlan
         return "Concatenation";
     }
 
-    private void verifySchema()
+    private Schema verifySchema()
     {
+        // Any asterisk schema then simply return an asterisk schema since we cannot verify anything
+        if (inputs.stream()
+                .anyMatch(i -> SchemaUtils.isAsterisk(i.getSchema())))
+        {
+            return Schema.EMPTY;
+        }
+
         Schema schema = inputs.get(0)
                 .getSchema();
-
-        // Asterisk schema on first input then we cannot verify
-        if (Schema.EMPTY.equals(schema))
-        {
-            return;
-        }
 
         int size = inputs.size();
         for (int i = 1; i < size; i++)
         {
             Schema s = inputs.get(i)
                     .getSchema();
+
             if (schema.getSize() != s.getSize())
             {
                 throw new IllegalArgumentException("All inputs for concatenation must equal in column count.");
@@ -107,5 +120,7 @@ public class Concatenation implements ILogicalPlan
                 }
             }
         }
+
+        return schema;
     }
 }

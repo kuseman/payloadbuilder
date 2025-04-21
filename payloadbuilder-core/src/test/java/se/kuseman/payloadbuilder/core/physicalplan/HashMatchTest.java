@@ -13,6 +13,7 @@ import java.util.function.BiFunction;
 
 import org.junit.Test;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -20,8 +21,12 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
+import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 
 /** Test of {@link HashMatch} */
 public class HashMatchTest extends AJoinTest
@@ -48,6 +53,134 @@ public class HashMatchTest extends AJoinTest
     protected IPhysicalPlan createIndexLeftJoin(IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> predicate, String populateAlias)
     {
         return new HashMatch(0, outer, inner, List.of(ce("col1")), List.of(ce("col3")), predicate, populateAlias, true, true);
+    }
+
+    @Test
+    public void test_join_integer_against_string_hash_outer()
+    {
+        Schema outerSchema = Schema.of(Column.of("col1", Type.Int));
+        Schema innerSchema = Schema.of(Column.of("col3", Type.String));
+
+        //@formatter:off
+        List<TupleVector> outer = asList(
+                TupleVector.of(outerSchema, asList(vv(Type.Int, 0, 1, 2)))
+                );
+        List<TupleVector> inner = asList(
+                TupleVector.of(innerSchema, asList(vv(Type.String, UTF8String.from("2"), UTF8String.from("2"), null, null))));
+
+        IDatasource dsOuter = schemaLessDS(() -> {}, false, outer.toArray(new TupleVector[0]));
+        IDatasource dsInner = schemaLessDS(() -> {}, false, inner.toArray(new TupleVector[0]));
+        //@formatter:on
+
+        IExpression predicate = new ComparisonExpression(IComparisonExpression.Type.EQUAL, ce("col1"), ce("col3"));
+
+        IPhysicalPlan plan = createInnerJoin(scanVectors(dsOuter, outerSchema), scanVectors(dsInner, innerSchema), (tv, ctx) -> predicate.eval(tv, ctx), null);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), plan.getSchema());
+
+        TupleIterator it = plan.execute(context);
+        TupleVector actual = PlanUtils.concat(context, it);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
+
+        assertVectorsEquals(vv(Type.Int, 2, 2), actual.getColumn(0));
+        assertVectorsEquals(vv(Type.String, UTF8String.from("2"), UTF8String.from("2")), actual.getColumn(1));
+    }
+
+    @Test
+    public void test_join_string_against_integer_hash_outer()
+    {
+        Schema outerSchema = Schema.of(Column.of("col1", Type.String));
+        Schema innerSchema = Schema.of(Column.of("col3", Type.Int));
+
+        //@formatter:off
+        List<TupleVector> outer = asList(
+                TupleVector.of(outerSchema, asList(vv(Type.String, UTF8String.from("0"), UTF8String.from("1"), UTF8String.from("2"))))
+                );
+        List<TupleVector> inner = asList(
+                TupleVector.of(innerSchema, asList(vv(Type.Int, 2, 2, null, null))));
+
+        IDatasource dsOuter = schemaLessDS(() -> {}, false, outer.toArray(new TupleVector[0]));
+        IDatasource dsInner = schemaLessDS(() -> {}, false, inner.toArray(new TupleVector[0]));
+        //@formatter:on
+
+        IExpression predicate = new ComparisonExpression(IComparisonExpression.Type.EQUAL, ce("col1"), ce("col3"));
+
+        IPhysicalPlan plan = createInnerJoin(scanVectors(dsOuter, outerSchema), scanVectors(dsInner, innerSchema), (tv, ctx) -> predicate.eval(tv, ctx), null);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), plan.getSchema());
+
+        TupleIterator it = plan.execute(context);
+        TupleVector actual = PlanUtils.concat(context, it);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
+
+        assertVectorsEquals(vv(Type.String, UTF8String.from("2"), UTF8String.from("2")), actual.getColumn(0));
+        assertVectorsEquals(vv(Type.Int, 2, 2), actual.getColumn(1));
+    }
+
+    @Test
+    public void test_join_integer_against_string_hash_inner()
+    {
+        Schema outerSchema = Schema.of(Column.of("col1", Type.Int));
+        Schema innerSchema = Schema.of(Column.of("col3", Type.String));
+
+        //@formatter:off
+        List<TupleVector> outer = asList(
+                TupleVector.of(outerSchema, asList(vv(Type.Int, 0, 1, 2)))
+                );
+        List<TupleVector> inner = asList(
+                TupleVector.of(innerSchema, asList(vv(Type.String, UTF8String.from("2"), UTF8String.from("2")))));
+
+        IDatasource dsOuter = schemaLessDS(() -> {}, false, outer.toArray(new TupleVector[0]));
+        IDatasource dsInner = schemaLessDS(() -> {}, false, inner.toArray(new TupleVector[0]));
+        //@formatter:on
+
+        IExpression predicate = new ComparisonExpression(IComparisonExpression.Type.EQUAL, ce("col1"), ce("col3"));
+
+        IPhysicalPlan plan = createInnerJoin(scanVectors(dsOuter, outerSchema), scanVectors(dsInner, innerSchema), (tv, ctx) -> predicate.eval(tv, ctx), null);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), plan.getSchema());
+
+        TupleIterator it = plan.execute(context);
+        TupleVector actual = PlanUtils.concat(context, it);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
+
+        assertVectorsEquals(vv(Type.Int, 2, 2), actual.getColumn(0));
+        assertVectorsEquals(vv(Type.String, UTF8String.from("2"), UTF8String.from("2")), actual.getColumn(1));
+    }
+
+    @Test
+    public void test_join_string_against_integer__hash_inner()
+    {
+        Schema outerSchema = Schema.of(Column.of("col1", Type.String));
+        Schema innerSchema = Schema.of(Column.of("col3", Type.Int));
+
+        //@formatter:off
+        List<TupleVector> outer = asList(
+                TupleVector.of(outerSchema, asList(vv(Type.String, UTF8String.from("2"), UTF8String.from("2"))))
+                );
+        List<TupleVector> inner = asList(
+                TupleVector.of(innerSchema, asList(vv(Type.Int, 0, 1, 2))));
+
+        IDatasource dsOuter = schemaLessDS(() -> {}, false, outer.toArray(new TupleVector[0]));
+        IDatasource dsInner = schemaLessDS(() -> {}, false, inner.toArray(new TupleVector[0]));
+        //@formatter:on
+
+        IExpression predicate = new ComparisonExpression(IComparisonExpression.Type.EQUAL, ce("col1"), ce("col3"));
+
+        IPhysicalPlan plan = createInnerJoin(scanVectors(dsOuter, outerSchema), scanVectors(dsInner, innerSchema), (tv, ctx) -> predicate.eval(tv, ctx), null);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), plan.getSchema());
+
+        TupleIterator it = plan.execute(context);
+        TupleVector actual = PlanUtils.concat(context, it);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
+
+        assertVectorsEquals(vv(Type.String, UTF8String.from("2"), UTF8String.from("2")), actual.getColumn(0));
+        assertVectorsEquals(vv(Type.Int, 2, 2), actual.getColumn(1));
     }
 
     /** Empty second batch to verify regression when we tried to execute the inner with an outer empty tuple vector that is not allowed. */

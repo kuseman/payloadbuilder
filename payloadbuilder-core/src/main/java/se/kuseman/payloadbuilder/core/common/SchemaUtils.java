@@ -241,7 +241,7 @@ public class SchemaUtils
     }
 
     /** Create a schema from provided expressions. */
-    public static Schema getSchema(Schema schema, List<? extends IExpression> expressions, boolean aggregate)
+    public static Schema getSchema(List<? extends IExpression> expressions, boolean aggregate)
     {
         List<Column> columns = new ArrayList<>(expressions.size());
         for (IExpression expression : expressions)

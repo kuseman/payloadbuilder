@@ -536,7 +536,25 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     @Override
     public IPhysicalPlan visit(ConstantScan plan, Context context)
     {
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId()));
+        if (ConstantScan.ONE_ROW_EMPTY_SCHEMA.equals(plan))
+        {
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.CONSTANT));
+        }
+        else if (ConstantScan.ZERO_ROWS_EMPTY_SCHEMA.equals(plan))
+        {
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.EMPTY));
+        }
+
+        // Zero row scan with a schema
+        if (plan.getRowsExpressions()
+                .isEmpty())
+        {
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.of(plan.getSchema())));
+        }
+
+        // TODO: Check expressions for constants and convert to TupleVector
+
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), plan.getSchema(), plan.getRowsExpressions()));
     }
 
     @Override

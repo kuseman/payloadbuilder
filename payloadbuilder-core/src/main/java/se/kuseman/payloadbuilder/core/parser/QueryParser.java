@@ -54,6 +54,7 @@ import se.kuseman.payloadbuilder.core.CompiledQuery;
 import se.kuseman.payloadbuilder.core.CompiledQuery.Warning;
 import se.kuseman.payloadbuilder.core.cache.CacheType;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
@@ -108,6 +109,7 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheName
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheRemoveContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CastExpressionContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnAliasListContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CountExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DateAddExpressionContext;
@@ -634,16 +636,6 @@ public class QueryParser
                 boolean tempTable = ctx.tableName().tempHash != null;
                 return new TableScan(TableSchema.EMPTY, tableSourceRef, emptyList(), tempTable, options, Location.from(ctx.tableName()));
             }
-            else if (ctx.selectStatement() != null)
-            {
-                boolean prevInsideSubQuery = insideSubQuery;
-                insideSubQuery = true;
-                LogicalSelectStatement stm = (LogicalSelectStatement) visit(ctx.selectStatement());
-                insideSubQuery = prevInsideSubQuery;
-
-                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of(alias), alias);
-                return new SubQuery(stm.getSelect(), tableSourceRef, Location.from(ctx.selectStatement()));
-            }
             else if (ctx.variable() != null)
             {
                 if (ctx.variable().system != null)
@@ -657,16 +649,67 @@ public class QueryParser
                 TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of(variable), alias);
                 return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.variable()));
             }
-            else if (ctx.expression() != null)
+            else if (ctx.derivedTable() != null)
             {
-                if (!options.isEmpty())
+                ColumnAliasListContext columnAliasList = ctx.columnAliasList();
+
+                if (ctx.derivedTable()
+                        .selectStatement() != null)
                 {
-                    throw new ParseException("Expression scans cannot have options", ctx.tableSourceOptions());
+                    if (columnAliasList != null)
+                    {
+                        throw new ParseException("Columns alias not supported on select statements", columnAliasList);
+                    }
+
+                    boolean prevInsideSubQuery = insideSubQuery;
+                    insideSubQuery = true;
+                    LogicalSelectStatement stm = (LogicalSelectStatement) visit(ctx.derivedTable()
+                            .selectStatement());
+                    insideSubQuery = prevInsideSubQuery;
+
+                    TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of(alias), alias);
+                    return new SubQuery(stm.getSelect(), tableSourceRef, Location.from(ctx.derivedTable()
+                            .selectStatement()));
+                }
+                else if (ctx.derivedTable()
+                        .expression() != null)
+                {
+                    if (!options.isEmpty())
+                    {
+                        throw new ParseException("Expression scans cannot have options", ctx.tableSourceOptions());
+                    }
+                    if (columnAliasList != null)
+                    {
+                        throw new ParseException("Columns alias not supported on expression select statements", columnAliasList);
+                    }
+
+                    IExpression expression = getExpression(ctx.derivedTable()
+                            .expression());
+                    TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of(expression.toString()), alias);
+                    return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.derivedTable()
+                            .expression()));
                 }
 
-                IExpression expression = getExpression(ctx.expression());
-                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of(expression.toString()), alias);
-                return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.expression()));
+                boolean prevInsideProjection = insideProjection;
+                insideProjection = true;
+                List<List<IExpression>> expressions = ctx.derivedTable()
+                        .tableValueConstructor()
+                        .expr_list()
+                        .stream()
+                        .map(this::getExpressionList)
+                        .toList();
+                insideProjection = prevInsideProjection;
+
+                List<Column> columns = emptyList();
+                if (columnAliasList != null)
+                {
+                    columns = columnAliasList.identifier()
+                            .stream()
+                            .map(c -> new Column(getIdentifier(c), ResolvedType.ANY))
+                            .toList();
+                }
+                return new ConstantScan(new Schema(columns), expressions, Location.from(ctx.derivedTable()
+                        .tableValueConstructor()));
             }
 
             FunctionCallContext functionCall = ctx.functionCall();
@@ -1042,7 +1085,6 @@ public class QueryParser
             }
             else
             {
-
                 if (!insideProjection)
                 {
                     throw new ParseException("Sub query expressions are only supported in projections", ctx.bracket_expression()
@@ -1418,6 +1460,14 @@ public class QueryParser
                 insideProjection = prevInsideProjection;
 
                 validateAssignmentProjection(expressions, ctx);
+                // No table source => create a constant scan of the expressions
+                if (!containsAsterisks
+                        && plan instanceof ConstantScan cs
+                        && ConstantScan.ONE_ROW_EMPTY_SCHEMA.equals(cs))
+                {
+                    Schema schema = SchemaUtils.getSchema(expressions, false);
+                    return new ConstantScan(schema, List.of(expressions), Location.from(ctx.SELECT()));
+                }
 
                 plan = new Projection(plan, expressions);
             }
@@ -1512,7 +1562,7 @@ public class QueryParser
             else
             {
                 // Fallback to constant scan to always have an operator to scan
-                return ConstantScan.INSTANCE;
+                return ConstantScan.ONE_ROW_EMPTY_SCHEMA;
             }
         }
 
@@ -1520,7 +1570,8 @@ public class QueryParser
         {
             if (ctx.where != null)
             {
-                plan = new Filter(plan, null, getExpression(ctx.where));
+                IExpression expression = getExpression(ctx.where);
+                plan = new Filter(plan, null, expression);
             }
             return plan;
         }
