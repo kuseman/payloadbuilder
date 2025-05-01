@@ -10,6 +10,7 @@ import java.util.NoSuchElementException;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -79,6 +80,7 @@ public class TemporaryTable
 
         final int valuesSzie = vectors[0].size();
         final int rowCount = valuesSzie * data.averageRowCount;
+        final Column.Type[] types = data.columnTypes;
 
         return new TupleIterator()
         {
@@ -124,7 +126,7 @@ public class TemporaryTable
                         return false;
                     }
 
-                    IntList list = table.get(new IndexKey(vectors, index++));
+                    IntList list = table.get(new IndexKey(vectors, index++, types));
                     if (list == null)
                     {
                         continue;
@@ -163,14 +165,18 @@ public class TemporaryTable
                     : ArrayUtils.EMPTY_INT_ARRAY;
             int ordinalsSize = ordinals.length;
             ValueVector[] vectors = new ValueVector[ordinalsSize];
+            Column.Type[] types = new Column.Type[ordinalsSize];
             for (int j = 0; j < ordinalsSize; j++)
             {
-                vectors[j] = vector.getColumn(ordinals[j]);
+                ValueVector column = vector.getColumn(ordinals[j]);
+                vectors[j] = column;
+                types[j] = column.type()
+                        .getType();
             }
             // Index all rows for current index
             for (int j = 0; j < rowCount; j++)
             {
-                table.computeIfAbsent(new IndexKey(vectors, j), k -> new IntArrayList())
+                table.computeIfAbsent(new IndexKey(vectors, j, null), k -> new IntArrayList())
                         .add(j);
             }
 
@@ -183,7 +189,7 @@ public class TemporaryTable
             int averageRowCount = table.size() > 0 ? total / table.size()
                     : 0;
 
-            result.put(currentIndex, new IndicesData(table, averageRowCount));
+            result.put(currentIndex, new IndicesData(table, averageRowCount, types));
         }
 
         return result;
@@ -262,7 +268,7 @@ public class TemporaryTable
             {
                 return 0;
             }
-            return VectorUtils.hash(o.vectors, o.index);
+            return VectorUtils.hash(o.vectors, o.types, o.index);
         }
 
         @Override
@@ -279,11 +285,14 @@ public class TemporaryTable
     {
         final ValueVector[] vectors;
         final int index;
+        final Column.Type[] types;
 
-        IndexKey(ValueVector[] vectors, int index)
+        IndexKey(ValueVector[] vectors, int index, Column.Type[] types)
         {
             this.vectors = vectors;
             this.index = index;
+            this.types = ArrayUtils.isEmpty(types) ? null
+                    : types;
         }
     }
 
@@ -292,8 +301,9 @@ public class TemporaryTable
      *
      * @param map Map with data
      * @param averageRowCount The average row count for index entries in map. Is used to estimate the number of rows an index iterator will return.
+     * @param columnTypes The types that the index was hashed with to get properly hash keys when seeking.
      */
-    private record IndicesData(Object2ObjectMap<IndexKey, IntList> map, int averageRowCount)
+    private record IndicesData(Object2ObjectMap<IndexKey, IntList> map, int averageRowCount, Column.Type[] columnTypes)
     {
     }
 }
