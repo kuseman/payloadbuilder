@@ -20,6 +20,7 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
@@ -234,5 +235,77 @@ public class TemporaryTableTest extends APhysicalPlanTest
         catch (NoSuchElementException e)
         {
         }
+    }
+
+    @Test
+    public void test_index_scanning_with_different_seek_key_type_than_index_type()
+    {
+        //@formatter:off
+        TupleVector tv = TupleVector.of(Schema.of(Column.of("col1", Type.Int)), asList(
+                vv(Type.Int, 1,2,3,1,5,6,7,2)
+                ));
+        //@formatter:on
+
+        Index index = new Index(QualifiedName.of("temp"), asList("col1"), ColumnsType.ALL);
+        TemporaryTable tempTable = new TemporaryTable(tv, asList(index));
+
+        ISeekPredicate predicate = mock(ISeekPredicate.class);
+        ISeekPredicate.ISeekKey seekKey1 = mock(ISeekPredicate.ISeekKey.class);
+        when(seekKey1.getValue()).thenReturn(vv(Type.String, UTF8String.from("1")));
+        when(predicate.getIndex()).thenReturn(index);
+        when(predicate.getSeekKeys(any())).thenReturn(asList(seekKey1));
+
+        TupleIterator iterator = tempTable.getIndexIterator(context, predicate);
+        assertEquals(1, iterator.estimatedBatchCount());
+        assertEquals(1, iterator.estimatedRowCount());
+
+        assertTrue(iterator.hasNext());
+        TupleVector actual = iterator.next();
+
+        VectorTestUtils.assertTupleVectorsEquals(
+        //@formatter:off
+        TupleVector.of(Schema.of(Column.of("col1", Type.Int)), asList(
+                vv(Type.Int, 1, 1)
+                ))
+        , actual);
+        //@formatter:on
+
+        assertFalse(iterator.hasNext());
+    }
+
+    @Test
+    public void test_index_scanning_with_different_seek_key_type_than_index_type_2()
+    {
+        //@formatter:off
+        TupleVector tv = TupleVector.of(Schema.of(Column.of("col1", Type.String)), asList(
+                vv(Type.String, "1","2","3","1","5","6","7","2")
+                ));
+        //@formatter:on
+
+        Index index = new Index(QualifiedName.of("temp"), asList("col1"), ColumnsType.ALL);
+        TemporaryTable tempTable = new TemporaryTable(tv, asList(index));
+
+        ISeekPredicate predicate = mock(ISeekPredicate.class);
+        ISeekPredicate.ISeekKey seekKey1 = mock(ISeekPredicate.ISeekKey.class);
+        when(seekKey1.getValue()).thenReturn(vv(Type.Int, 1));
+        when(predicate.getIndex()).thenReturn(index);
+        when(predicate.getSeekKeys(any())).thenReturn(asList(seekKey1));
+
+        TupleIterator iterator = tempTable.getIndexIterator(context, predicate);
+        assertEquals(1, iterator.estimatedBatchCount());
+        assertEquals(1, iterator.estimatedRowCount());
+
+        assertTrue(iterator.hasNext());
+        TupleVector actual = iterator.next();
+
+        VectorTestUtils.assertTupleVectorsEquals(
+        //@formatter:off
+        TupleVector.of(Schema.of(Column.of("col1", Type.String)), asList(
+                vv(Type.String, "1", "1")
+                ))
+        , actual);
+        //@formatter:on
+
+        assertFalse(iterator.hasNext());
     }
 }
