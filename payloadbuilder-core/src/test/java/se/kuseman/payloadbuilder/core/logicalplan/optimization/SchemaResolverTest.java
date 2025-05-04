@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 
+import java.util.List;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
@@ -152,9 +153,9 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("schema", Type.String, tableSource), col("indices", Type.String, tableSource), col("rows", Type.Int, tableSource));
 
         //@formatter:off
-        ILogicalPlan expected = projection(
-                ConstantScan.INSTANCE,
-                asList(
+        ILogicalPlan expected = new ConstantScan(
+                Schema.of(new CoreColumn("", ResolvedType.INT, "12345", false), CoreColumn.of("tables", ResolvedType.ANY)),
+                List.of(asList(
                         intLit(12345),
                         new AliasExpression(
                             new UnresolvedSubQueryExpression(
@@ -165,7 +166,8 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
                                    "object_array",
                                    null
                                 ), null),
-                            "tables"))
+                            "tables"))),
+                null
                 );
         //@formatter:on
 

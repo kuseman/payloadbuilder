@@ -34,6 +34,8 @@ import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedFunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
+import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
+import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
@@ -107,6 +109,53 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
 
         context.resolvingAggregateProjectionExpression = false;
         return new Aggregate(input, aggregateExpressions, projectionExpressions);
+    }
+
+    @Override
+    protected ILogicalPlan create(ConstantScan plan, Ctx context)
+    {
+        if (Schema.EMPTY.equals(plan.getSchema())
+                || plan.getRowsExpressions()
+                        .isEmpty())
+        {
+            return super.create(plan, context);
+        }
+
+        // Re-create the constant scan after we have resolved schemas/functions
+        List<List<IExpression>> rowsExpressions = plan.getRowsExpressions()
+                .stream()
+                .map(list -> list.stream()
+                        .map(e -> e.accept(ExpressionResolver.INSTANCE, context))
+                        .toList())
+                .toList();
+
+        Schema schema = SchemaUtils.getSchema(rowsExpressions.get(0), false);
+        return new ConstantScan(schema, rowsExpressions, plan.getLocation());
+    }
+
+    @Override
+    protected ILogicalPlan create(Filter plan, Ctx context)
+    {
+        ILogicalPlan input = plan.getInput()
+                .accept(this, context);
+
+        // If there is a constant filter then either remove the filter if true
+        // or return a constant scan with zero rows if false
+        if (plan.getPredicate()
+                .isConstant())
+        {
+            boolean result = plan.getPredicate()
+                    .eval(null)
+                    .getPredicateBoolean(0);
+            if (result)
+            {
+                return input;
+            }
+
+            return new ConstantScan(input.getSchema(), emptyList(), null);
+        }
+
+        return super.create(plan, context);
     }
 
     @Override

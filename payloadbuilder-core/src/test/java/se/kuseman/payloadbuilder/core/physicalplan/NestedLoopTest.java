@@ -159,7 +159,7 @@ public class NestedLoopTest extends AJoinTest
         AtomicInteger innerClosed = new AtomicInteger();
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6))));
 
-        IPhysicalPlan plan = NestedLoop.innerJoin(2, new ConstantScan(0), scan(dsInner, tableB, innerSchemaLess), null, false);
+        IPhysicalPlan plan = NestedLoop.innerJoin(2, new ConstantScan(0, TupleVector.CONSTANT), scan(dsInner, tableB, innerSchemaLess), null, false);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -198,7 +198,7 @@ public class NestedLoopTest extends AJoinTest
         AtomicInteger innerClosed = new AtomicInteger();
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), new TupleVector[0]);
 
-        IPhysicalPlan plan = NestedLoop.leftJoin(2, new ConstantScan(0), scan(dsInner, tableB, innerSchemaLess), null, false);
+        IPhysicalPlan plan = NestedLoop.leftJoin(2, new ConstantScan(0, TupleVector.CONSTANT), scan(dsInner, tableB, innerSchemaLess), null, false);
 
         assertEquals(innerSchemaLess, plan.getSchema());
 
@@ -217,7 +217,7 @@ public class NestedLoopTest extends AJoinTest
         AtomicInteger innerClosed = new AtomicInteger();
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), new TupleVector[0]);
 
-        IPhysicalPlan plan = NestedLoop.leftJoin(2, new ConstantScan(0), scan(dsInner, tableB, innerSchemaLess), null, false);
+        IPhysicalPlan plan = NestedLoop.leftJoin(2, new ConstantScan(0, TupleVector.CONSTANT), scan(dsInner, tableB, innerSchemaLess), null, false);
 
         assertEquals(innerSchemaLess, plan.getSchema());
 

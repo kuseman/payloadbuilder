@@ -144,7 +144,13 @@ tableSource
  : tableName                                    identifier? tableSourceOptions?
  | functionCall                                 identifier? tableSourceOptions?
  | variable                                     identifier?
- | PARENO (selectStatement | expression) PARENC identifier  tableSourceOptions?
+ | PARENO derivedTable PARENC                   identifier columnAliasList? tableSourceOptions?
+ ;
+
+derivedTable
+ : selectStatement
+ | tableValueConstructor
+ | expression
  ;
 
 tableSourceOptions
@@ -170,6 +176,15 @@ sortItem
  : expression order=(ASC | DESC)?
    (NULLS nullOrder=(FIRST | LAST))?
  ;
+
+tableValueConstructor
+    : VALUES PARENO expr_list PARENC (COMMA PARENO expr_list PARENC)*
+    ;
+
+columnAliasList
+    : PARENO identifier (COMMA identifier)* PARENC
+    ;
+
 
 // ---------------------- Expressions ----------------------------------
 
