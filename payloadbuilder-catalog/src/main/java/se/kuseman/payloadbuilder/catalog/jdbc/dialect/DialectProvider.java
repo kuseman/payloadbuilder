@@ -11,10 +11,12 @@ import se.kuseman.payloadbuilder.catalog.jdbc.JdbcCatalog;
 public final class DialectProvider
 {
     private static final String ORACLE_KEY = "oracle";
+    private static final String SQLSERVER_KEY = "sqlserver";
     private static final SqlDialect BASE = new SqlDialect()
     {
     };
     private static final OracleDialect ORACLE = new OracleDialect();
+    private static final SqlServerDialect SQLSERVER = new SqlServerDialect();
 
     /** Return a {@link SqlDialect} from provided jdbc url and driver class */
     public static SqlDialect getDialect(String url, String driverClass)
@@ -28,6 +30,11 @@ public final class DialectProvider
                 || StringUtils.containsAnyIgnoreCase(url, ORACLE_KEY))
         {
             return ORACLE;
+        }
+        else if (StringUtils.containsIgnoreCase(driverClass, SQLSERVER_KEY)
+                || StringUtils.containsAnyIgnoreCase(url, SQLSERVER_KEY))
+        {
+            return SQLSERVER;
         }
 
         return BASE;
