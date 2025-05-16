@@ -497,7 +497,25 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
 
     protected ILogicalPlan create(ConstantScan plan, C context)
     {
-        return plan;
+        List<List<IExpression>> expressions;
+
+        if (expressionRewriter != null)
+        {
+            expressions = plan.getRowsExpressions()
+                    .stream()
+                    .map(list -> list.stream()
+                            .map(e -> e.accept(expressionRewriter, context))
+                            .toList())
+                    .toList();
+        }
+        else
+        {
+            expressions = plan.getRowsExpressions()
+                    .stream()
+                    .map(list -> visit(plan, list, context))
+                    .collect(toList());
+        }
+        return plan.reCreate(expressions);
     }
 
     protected ILogicalPlan create(MaxRowCountAssert plan, C context)
@@ -508,10 +526,10 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
 
     protected ILogicalPlan create(Concatenation plan, C context)
     {
-        return new Concatenation(plan.getChildren()
+        return new Concatenation(plan.getColumnNames(), plan.getChildren()
                 .stream()
                 .map(p -> p.accept(this, context))
-                .collect(toList()));
+                .toList(), plan.getLocation());
     }
 
     /** Extract columns from provided expressions */
@@ -553,7 +571,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     }
 
     /** Collect all table sources from provided plan. */
-    protected Set<TableSourceReference> extractTableSources(ILogicalPlan plan)
+    protected static Set<TableSourceReference> extractTableSources(ILogicalPlan plan)
     {
         Set<TableSourceReference> result = new HashSet<>();
         plan.accept(TableSourceExtractor.INSTANCE, result);
@@ -590,6 +608,17 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         public Void visit(SubQuery plan, Set<TableSourceReference> context)
         {
             context.add(plan.getTableSource());
+            return super.visit(plan, context);
+        }
+
+        @Override
+        public Void visit(ConstantScan plan, Set<TableSourceReference> context)
+        {
+            TableSourceReference tableSource = plan.getTableSource();
+            if (tableSource != null)
+            {
+                context.add(tableSource);
+            }
             return super.visit(plan, context);
         }
     }
