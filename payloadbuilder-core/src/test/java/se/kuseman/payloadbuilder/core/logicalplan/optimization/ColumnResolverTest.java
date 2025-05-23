@@ -379,23 +379,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected =
                 projection(
-                    new Join(
-                        tableScan(schemaA, tableA),
-                        projection(
-                            ConstantScan.INSTANCE,
-                            asList(new AliasExpression(DereferenceExpression.create(ocre("multi", tableA), QualifiedName.of(asList("part", "qualifier")), null), "__expr0", true))
-                        ),
-                        Join.Type.LEFT,
-                        null,
-                        null,
-                        Set.of(
-                            nast("multi", ResolvedType.of(Type.Any), tableA)
-                        ),
-                        false,
-                        Schema.of(
-                            ast("a", ResolvedType.ANY, tableA)
-                        )),
-                    asList(new AliasExpression(cre("__expr0", tableA), "val")));
+                    tableScan(schemaA, tableA),
+                    asList(new AliasExpression(DereferenceExpression.create(cre("multi", tableA), QualifiedName.of(asList("part", "qualifier")), null), "val"))
+                );
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -532,7 +518,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                         new OperatorFunctionScan(
                             Schema.of(col("__expr0", ResolvedType.table(Schema.of(ast("", "b.*", Type.Any, tableB))), null, true)),
                             projection(
-                                ConstantScan.INSTANCE,
+                                ConstantScan.ONE_ROW_EMPTY_SCHEMA,
                                 List.of(new AsteriskExpression(QualifiedName.of("b"), null, Set.of(tableB)))),
                             "",
                             "object_array",
@@ -918,7 +904,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         + "               c "                           // Here we should have a match on a populated column (c) in outer scope
                                                         // which has higher precedence than an asterisk column in current scope (b)
         + "               from (b) b "
-        + "               for object_array) values "
+        + "               for object_array) \"values\" "
         + "from tableA a "
         + "inner populate join tableB b "
         + "  on b.col1 = a.col1 "
@@ -1901,7 +1887,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "select col, "
                 + "( "
                 + "  select col2 "
-                + ") values "
+                + ") \"values\" "
                 + "from tableA a ";
         //@formatter:on
 
@@ -1912,24 +1898,11 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
 
         //@formatter:off
-        ILogicalPlan expected =  projection(
-                new Join(
+        ILogicalPlan expected = 
+                projection(
                     tableScan(schemaA, tableA),
-                    projection(
-                        ConstantScan.INSTANCE,
-                        asList(new AliasExpression(ocre("col2", tableA), "__expr0", true))),
-                    Join.Type.LEFT,
-                    null,
-                    null,
-                    Set.of(
-                        nast("col2", Type.Any, tableA)
-                    ),
-                    false,
-                    Schema.of(
-                        ast("a", ResolvedType.ANY, tableA)
-                    )),
-                asList(cre("col", tableA), new AliasExpression(cre("__expr0", tableA), "values")
-                ));
+                    asList(cre("col", tableA), new AliasExpression(cre("col2", tableA), "values"))
+                );
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -2026,7 +1999,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "( "
                 + "  select b.col2 "
                 + "  from tableB b "
-                + ") values "
+                + ") \"values\" "
                 + "from tableA a ";
         //@formatter:on
 
@@ -2084,7 +2057,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "  ) keys "
                 + "  from tableB b "
                 + "  where b.col3 > a.col4 "              // a.col4 outer reference
-                + ") values "
+                + ") \"values\" "
                 + "from tableA a ";
         //@formatter:on
 
