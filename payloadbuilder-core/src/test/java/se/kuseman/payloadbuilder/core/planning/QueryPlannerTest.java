@@ -1484,7 +1484,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         SeekPredicate expectedSeekPredicate = new SeekPredicate(
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
-        
+
         IPhysicalPlan expected = new HashMatch(
                 3,
                 new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
@@ -1500,6 +1500,74 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 null,
                 true,
                 true);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_force_no_index_join()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableA a "
+                + "left join tableB b with (forceNoIndex=true) "
+                + "  on b.col = a.col "
+                + "  and a.active "
+                + "  and b.active ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap())
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
+
+        //@formatter:off
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+        
+        IPhysicalPlan expected = new HashMatch(
+                3,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new Filter(
+                    2,
+                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), List.of(new Option(QueryPlanner.FORCE_NO_INDEX, LiteralBooleanExpression.TRUE))),
+                    new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
+                List.of(cre("col", tableA)),
+                List.of(cre("col", tableB)),
+                new ExpressionPredicate(
+                    and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("active", tableA), LiteralBooleanExpression.TRUE))
+                ),
+                null,
+                true,
+                false);
         //@formatter:on
 
         // System.out.println(actual.print(0));

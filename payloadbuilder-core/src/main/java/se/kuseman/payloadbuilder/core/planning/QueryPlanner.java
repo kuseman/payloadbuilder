@@ -83,6 +83,8 @@ import se.kuseman.payloadbuilder.core.planning.StatementPlanner.TableSourcePushD
 /** Class that transform a {@link ILogicalPlan} to a {@link IPhysicalPlan} */
 class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanner.Context>
 {
+    static final QualifiedName FORCE_NO_INDEX = QualifiedName.of("forceNoIndex");
+
     @Override
     public IPhysicalPlan visit(Projection plan, Context context)
     {
@@ -458,7 +460,23 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             }
 
             Result analyzeResult = ConditionAnalyzer.analyze(tableSources, condition, context.schemaByTableSource);
-            seekPredicate = analyzeResult.seekPredicate();
+
+            boolean forceNoJoinIndex = false;
+            if (tableSource instanceof TableScan ts)
+            {
+                forceNoJoinIndex = ts.getOptions()
+                        .stream()
+                        .filter(o -> FORCE_NO_INDEX.equalsIgnoreCase(o.getOption()))
+                        .map(e -> e.getValueExpression()
+                                .eval(context.context))
+                        .map(v -> v.getPredicateBoolean(0))
+                        .findAny()
+                        .orElse(false);
+            }
+            if (!forceNoJoinIndex)
+            {
+                seekPredicate = analyzeResult.seekPredicate();
+            }
             outerEquiExpressions = analyzeResult.outerValueExpressions();
             innerEquiExpressions = analyzeResult.innerValueExpressions();
         }

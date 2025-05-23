@@ -39,6 +39,7 @@ import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.Index;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
@@ -48,6 +49,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.catalog.TestUtils;
+import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.test.ExpressionTestUtils;
 import se.kuseman.payloadbuilder.test.IPredicateMock;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
@@ -276,11 +278,58 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
+    public void test_datasource_table_scan_with_projection_option()
+    {
+        IExecutionContext context = mockExecutionContext();
+
+        List<Option> options = List.of(new Option(JdbcDatasource.PROJECTION, new LiteralStringExpression("col2")));
+
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), options));
+        TupleIterator it = ds.execute(context, mockOptions(500));
+
+        List<String> col2Expected = asList("one", "two", "three", "four", "five");
+        int expectedSize = col2Expected.size();
+
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector v = it.next();
+
+            assertEquals(Schema.of(Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
+
+            for (int i = 0; i < expectedSize; i++)
+            {
+                for (int j = 0; j < expectedSize; j++)
+                {
+                    if (col2Expected.get(i)
+                            .equals(v.getColumn(0)
+                                    .getAny(j)))
+                    {
+                        rowCount++;
+                    }
+                }
+            }
+        }
+        it.close();
+
+        assertEquals(expectedSize, rowCount);
+    }
+
+    @Test
     public void test_datasource_table_scan_asterisk()
     {
         IExecutionContext context = mockExecutionContext();
+
+        List<Option> options = emptyList();
+        // Test table hints option
+        if (jdbcUrl.contains("sqlserver"))
+        {
+            options = List.of(new Option(JdbcDatasource.TABLE_HINTS, new LiteralStringExpression("WITH(NOLOCK)")));
+        }
+
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), options));
         TupleIterator it = ds.execute(context, mockOptions(500));
 
         List<Integer> col1Expected = asList(1, 2, 3, 4, 5);
