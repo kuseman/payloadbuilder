@@ -3,7 +3,7 @@
     <parent>
         <groupId>se.kuseman</groupId>
         <artifactId>payloadbuilder</artifactId>
-        <version>1.9.4-SNAPSHOT</version>
+        <version>1.9.4</version>
     </parent>
     <groupId>se.kuseman.payloadbuilder</groupId>
     <artifactId>payloadbuilder-api</artifactId>
