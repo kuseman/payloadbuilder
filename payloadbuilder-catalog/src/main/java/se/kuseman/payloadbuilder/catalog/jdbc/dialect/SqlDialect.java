@@ -43,7 +43,7 @@ public interface SqlDialect
         {
             if (i > 0)
             {
-                sb.append(" UNION ");
+                sb.append(" UNION ALL ");
             }
 
             sb.append("SELECT ");

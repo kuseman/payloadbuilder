@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.catalog.jdbc;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 
@@ -18,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.apache.commons.lang3.StringUtils;
+
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -26,6 +29,7 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
@@ -44,6 +48,9 @@ import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 /** Jdbc datasource */
 class JdbcDatasource implements IDatasource
 {
+    static final QualifiedName TABLE_HINTS = QualifiedName.of("tableHints");
+    static final QualifiedName PROJECTION = QualifiedName.of("projection");
+
     private final JdbcCatalog catalog;
     private final String catalogAlias;
     private final QualifiedName table;
@@ -51,8 +58,11 @@ class JdbcDatasource implements IDatasource
     private final List<IPredicate> predicates;
     private final List<ISortItem> sortItems;
     private final ISeekPredicate indexPredicate;
+    private final IExpression tableHintsOption;
+    private final IExpression projectionOption;
 
-    JdbcDatasource(JdbcCatalog catalog, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, List<String> projection, List<IPredicate> predicates, List<ISortItem> sortItems)
+    JdbcDatasource(JdbcCatalog catalog, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, List<String> projection, List<IPredicate> predicates, List<ISortItem> sortItems,
+            List<Option> options)
     {
         this.catalog = catalog;
         this.catalogAlias = catalogAlias;
@@ -61,6 +71,22 @@ class JdbcDatasource implements IDatasource
         this.predicates = predicates;
         this.sortItems = sortItems;
         this.projection = projection;
+
+        IExpression tableHintsOption = null;
+        IExpression projectionOption = null;
+        for (Option o : options)
+        {
+            if (TABLE_HINTS.equalsIgnoreCase(o.getOption()))
+            {
+                tableHintsOption = o.getValueExpression();
+            }
+            else if (PROJECTION.equalsIgnoreCase(o.getOption()))
+            {
+                projectionOption = o.getValueExpression();
+            }
+        }
+        this.tableHintsOption = tableHintsOption;
+        this.projectionOption = projectionOption;
     }
 
     @Override
@@ -100,14 +126,39 @@ class JdbcDatasource implements IDatasource
     private String buildSql(SqlDialect dialect, IExecutionContext context, boolean describe)
     // CSON
     {
+        String tableHints = "";
+        if (tableHintsOption != null)
+        {
+            tableHints = tableHintsOption.eval(context)
+                    .valueAsString(0);
+        }
+
+        String projection = "y.*";
+        if (!this.projection.isEmpty())
+        {
+            projection = this.projection.stream()
+                    .map(c -> "y." + c)
+                    .collect(joining(","));
+        }
+        else if (projectionOption != null)
+        {
+            projection = Arrays.stream(StringUtils.split(projectionOption.eval(context)
+                    .valueAsString(0), ','))
+                    .map(StringUtils::trim)
+                    .map(c -> "y." + c)
+                    .collect(joining(","));
+        }
+
         StringBuilder sb = new StringBuilder("SELECT ");
-        sb.append(projection.isEmpty() ? "y.*"
-                : projection.stream()
-                        .map(c -> "y." + c)
-                        .collect(joining(",")));
+        sb.append(projection);
         sb.append(" FROM ");
         sb.append(table.toString())
                 .append(" y");
+        if (!isBlank(tableHints))
+        {
+            sb.append(' ')
+                    .append(tableHints);
+        }
 
         if (indexPredicate != null)
         {

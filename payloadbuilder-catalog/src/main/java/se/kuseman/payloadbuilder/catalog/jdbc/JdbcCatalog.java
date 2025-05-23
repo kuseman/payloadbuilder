@@ -149,7 +149,7 @@ public class JdbcCatalog extends Catalog
     {
         List<IPredicate> predicates = getPredicates(data);
         List<ISortItem> sortItems = getSortItems(data);
-        return new JdbcDatasource(this, catalogAlias, table, seekPredicate, data.getProjection(), predicates, sortItems);
+        return new JdbcDatasource(this, catalogAlias, table, seekPredicate, data.getProjection(), predicates, sortItems, data.getOptions());
     }
 
     private List<IPredicate> getPredicates(DatasourceData data)
