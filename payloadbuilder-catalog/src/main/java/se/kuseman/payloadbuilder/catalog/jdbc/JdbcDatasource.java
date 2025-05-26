@@ -19,8 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import org.apache.commons.lang3.StringUtils;
-
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -29,7 +27,6 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
-import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
@@ -48,45 +45,28 @@ import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 /** Jdbc datasource */
 class JdbcDatasource implements IDatasource
 {
-    static final QualifiedName TABLE_HINTS = QualifiedName.of("tableHints");
-    static final QualifiedName PROJECTION = QualifiedName.of("projection");
-
     private final JdbcCatalog catalog;
     private final String catalogAlias;
+    private final Schema schema;
     private final QualifiedName table;
     private final List<String> projection;
     private final List<IPredicate> predicates;
     private final List<ISortItem> sortItems;
     private final ISeekPredicate indexPredicate;
     private final IExpression tableHintsOption;
-    private final IExpression projectionOption;
 
-    JdbcDatasource(JdbcCatalog catalog, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, List<String> projection, List<IPredicate> predicates, List<ISortItem> sortItems,
-            List<Option> options)
+    JdbcDatasource(JdbcCatalog catalog, String catalogAlias, Schema schema, QualifiedName table, ISeekPredicate indexPredicate, List<String> projection, List<IPredicate> predicates,
+            List<ISortItem> sortItems, IExpression tableHintsOption)
     {
         this.catalog = catalog;
         this.catalogAlias = catalogAlias;
+        this.schema = schema;
         this.table = table;
         this.indexPredicate = indexPredicate;
         this.predicates = predicates;
         this.sortItems = sortItems;
         this.projection = projection;
-
-        IExpression tableHintsOption = null;
-        IExpression projectionOption = null;
-        for (Option o : options)
-        {
-            if (TABLE_HINTS.equalsIgnoreCase(o.getOption()))
-            {
-                tableHintsOption = o.getValueExpression();
-            }
-            else if (PROJECTION.equalsIgnoreCase(o.getOption()))
-            {
-                projectionOption = o.getValueExpression();
-            }
-        }
         this.tableHintsOption = tableHintsOption;
-        this.projectionOption = projectionOption;
     }
 
     @Override
@@ -119,7 +99,7 @@ class JdbcDatasource implements IDatasource
     {
         SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
         String sql = buildSql(dialect, context, false);
-        return getIterator(dialect, catalog, context, catalogAlias, sql, null, options.getBatchSize(context));
+        return getIterator(dialect, catalog, context, catalogAlias, schema, sql, null, options.getBatchSize(context));
     }
 
     // CSOFF
@@ -137,14 +117,6 @@ class JdbcDatasource implements IDatasource
         if (!this.projection.isEmpty())
         {
             projection = this.projection.stream()
-                    .map(c -> "y." + c)
-                    .collect(joining(","));
-        }
-        else if (projectionOption != null)
-        {
-            projection = Arrays.stream(StringUtils.split(projectionOption.eval(context)
-                    .valueAsString(0), ','))
-                    .map(StringUtils::trim)
                     .map(c -> "y." + c)
                     .collect(joining(","));
         }
@@ -334,7 +306,8 @@ class JdbcDatasource implements IDatasource
     }
 
     /** Returns a row iterator with provided query and parameters */
-    static TupleIterator getIterator(SqlDialect dialect, JdbcCatalog catalog, IExecutionContext context, String catalogAlias, String query, List<Object> parameters, int batchSize)
+    static TupleIterator getIterator(SqlDialect dialect, JdbcCatalog catalog, IExecutionContext context, String catalogAlias, Schema plannedSchema, String query, List<Object> parameters,
+            int batchSize)
     {
         final String database = context.getSession()
                 .getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
@@ -414,9 +387,13 @@ class JdbcDatasource implements IDatasource
                     JdbcUtils.printWarnings(connection, context.getSession()
                             .getPrintWriter());
 
-                    Schema schema = new Schema(Arrays.stream(columns)
-                            .map(c -> Column.of(c, Type.Any))
-                            .collect(toList()));
+                    Schema schema = plannedSchema;
+                    if (schema == null)
+                    {
+                        schema = new Schema(Arrays.stream(columns)
+                                .map(c -> Column.of(c, Type.Any))
+                                .collect(toList()));
+                    }
                     return new ObjectTupleVector(schema, batch.size(), (row, col) -> batch.get(row)[col]);
                 }
                 catch (Exception e)

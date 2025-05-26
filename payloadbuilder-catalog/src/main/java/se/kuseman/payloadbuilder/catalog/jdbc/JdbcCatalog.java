@@ -23,6 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,7 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Option;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
@@ -62,6 +64,8 @@ public class JdbcCatalog extends Catalog
     public static final String USERNAME = "username";
     public static final String PASSWORD = "password";
     public static final String DATABASE = "database";
+    static final QualifiedName PROJECTION = QualifiedName.of("projection");
+    static final QualifiedName TABLE_HINTS = QualifiedName.of("tableHints");
 
     private final Map<String, DatasourceHolder> dataSourceByURL = new ConcurrentHashMap<>();
     private final ScheduledFuture<?> houseKeepingFuture;
@@ -79,7 +83,15 @@ public class JdbcCatalog extends Catalog
     @Override
     public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
     {
-        return new TableSchema(Schema.EMPTY, singletonList(new Index(table, emptyList(), Index.ColumnsType.WILDCARD)));
+        Schema schema = Schema.EMPTY;
+        List<String> projection = getOptionProjection(options);
+        if (!projection.isEmpty())
+        {
+            schema = new Schema(projection.stream()
+                    .map(p -> new Column(p, ResolvedType.ANY))
+                    .toList());
+        }
+        return new TableSchema(schema, singletonList(new Index(table, emptyList(), Index.ColumnsType.WILDCARD)));
     }
 
     @Override
@@ -149,7 +161,38 @@ public class JdbcCatalog extends Catalog
     {
         List<IPredicate> predicates = getPredicates(data);
         List<ISortItem> sortItems = getSortItems(data);
-        return new JdbcDatasource(this, catalogAlias, table, seekPredicate, data.getProjection(), predicates, sortItems, data.getOptions());
+        List<String> projection = data.getProjection();
+        if (projection.isEmpty())
+        {
+            projection = getOptionProjection(data.getOptions());
+        }
+        IExpression tableHintsOption = data.getOptions()
+                .stream()
+                .filter(o -> TABLE_HINTS.equalsIgnoreCase(o.getOption()))
+                .map(Option::getValueExpression)
+                .findAny()
+                .orElse(null);
+
+        return new JdbcDatasource(this, catalogAlias, data.getSchema()
+                .orElse(null), table, seekPredicate, projection, predicates, sortItems, tableHintsOption);
+    }
+
+    private List<String> getOptionProjection(List<Option> options)
+    {
+        Option projection = options.stream()
+                .filter(o -> PROJECTION.equalsIgnoreCase(o.getOption()))
+                .findAny()
+                .orElse(null);
+
+        if (projection == null)
+        {
+            return emptyList();
+        }
+        return Arrays.stream(StringUtils.split(projection.getValueExpression()
+                .eval(null)
+                .valueAsString(0), ','))
+                .map(StringUtils::trim)
+                .toList();
     }
 
     private List<IPredicate> getPredicates(DatasourceData data)

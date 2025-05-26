@@ -282,7 +282,7 @@ abstract class BaseJDBCTest extends Assert
     {
         IExecutionContext context = mockExecutionContext();
 
-        List<Option> options = List.of(new Option(JdbcDatasource.PROJECTION, new LiteralStringExpression("col2")));
+        List<Option> options = List.of(new Option(JdbcCatalog.PROJECTION, new LiteralStringExpression("col2")));
 
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
                 new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), options));
@@ -325,7 +325,7 @@ abstract class BaseJDBCTest extends Assert
         // Test table hints option
         if (jdbcUrl.contains("sqlserver"))
         {
-            options = List.of(new Option(JdbcDatasource.TABLE_HINTS, new LiteralStringExpression("WITH(NOLOCK)")));
+            options = List.of(new Option(JdbcCatalog.TABLE_HINTS, new LiteralStringExpression("WITH(NOLOCK)")));
         }
 
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
