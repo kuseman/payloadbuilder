@@ -108,8 +108,35 @@ public interface TupleVector
         }
     };
 
+    /** Create a zero rows {@link TupleVector} with provided schema. */
+    static TupleVector of(final Schema schema)
+    {
+        return new TupleVector()
+        {
+            @Override
+            public Schema getSchema()
+            {
+                return schema;
+            }
+
+            @Override
+            public int getRowCount()
+            {
+                return 0;
+            }
+
+            @Override
+            public ValueVector getColumn(int column)
+            {
+                return ValueVector.empty(schema.getColumns()
+                        .get(column)
+                        .getType());
+            }
+        };
+    }
+
     /** Construct a {@link TupleVector} from provided columns and schema */
-    static TupleVector of(final Schema schema, final ValueVector... columns)
+    static TupleVector of(Schema schema, ValueVector... columns)
     {
         return of(schema, List.of(columns));
     }

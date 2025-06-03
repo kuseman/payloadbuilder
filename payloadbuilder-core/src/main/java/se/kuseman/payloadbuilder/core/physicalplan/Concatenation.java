@@ -10,16 +10,19 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 
 /** Concat inputs into a single output stream. UNION ALL etc. */
 public class Concatenation implements IPhysicalPlan
 {
     private final int nodeId;
+    private final Schema schema;
     private final List<IPhysicalPlan> inputs;
 
-    public Concatenation(int nodeId, List<IPhysicalPlan> inputs)
+    public Concatenation(int nodeId, Schema schema, List<IPhysicalPlan> inputs)
     {
         this.nodeId = nodeId;
+        this.schema = requireNonNull(schema, "schema");
         this.inputs = requireNonNull(inputs, "inputs");
         if (inputs.size() <= 1)
         {
@@ -36,9 +39,7 @@ public class Concatenation implements IPhysicalPlan
     @Override
     public Schema getSchema()
     {
-        // We use the schema from the first input
-        return inputs.get(0)
-                .getSchema();
+        return schema;
     }
 
     @Override
@@ -63,7 +64,9 @@ public class Concatenation implements IPhysicalPlan
                 if (schema == null)
                 {
                     // TODO: might be weird since we will also get the columnreferences which if wrong for other vectors than form the first input
-                    schema = result.getSchema();
+                    schema = SchemaUtils.isAsterisk(Concatenation.this.schema) ? result.getSchema()
+                            : Concatenation.this.schema;
+
                 }
                 next = null;
                 return new TupleVector()
@@ -157,7 +160,8 @@ public class Concatenation implements IPhysicalPlan
         }
         else if (obj instanceof Concatenation that)
         {
-            return inputs.equals(that.inputs);
+            return schema.equals(that.schema)
+                    && inputs.equals(that.inputs);
         }
         return false;
     }

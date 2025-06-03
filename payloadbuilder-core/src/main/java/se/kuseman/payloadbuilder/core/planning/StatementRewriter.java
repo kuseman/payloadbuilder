@@ -153,13 +153,15 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
 
                     //@formatter:off
                     return new LogicalSelectStatement(
-                            new Concatenation(asList(
+                            new Concatenation(
+                                    emptyList(),
+                                    asList(
                                     new Sort(catalogFunctionsScan, sortItems),
-                                    new Projection(ConstantScan.INSTANCE,
+                                    new Projection(ConstantScan.ONE_ROW_EMPTY_SCHEMA,
                                             asList(new LiteralStringExpression("System functions"),
                                                    new LiteralStringExpression(UTF8String.EMPTY),
                                                    new LiteralStringExpression(UTF8String.EMPTY))),
-                                    new Sort(systemFunctionsScan, sortItems))), false).accept(this, context);
+                                    new Sort(systemFunctionsScan, sortItems)), null), false).accept(this, context);
                     //@formatter:on
 
                 }

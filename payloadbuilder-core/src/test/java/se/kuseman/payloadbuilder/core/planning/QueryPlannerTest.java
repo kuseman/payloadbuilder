@@ -1305,7 +1305,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 + "select *, ("
                 + "  select col1 "
                 + "  from tableB b "
-                + ") values "
+                + ") \"values\" "
                 + "from tableA a ";
         //@formatter:on
 
@@ -1364,7 +1364,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 + "  select col1, col2 "
                 + "  from (b) b "
                 + "  for object_array "
-                + ") values "
+                + ") \"values\" "
                 + "from tableA a "
                 + "inner populate join tableB b "
                 + "  on b.col = a.col";
