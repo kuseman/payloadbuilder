@@ -74,7 +74,7 @@ public class SortTest extends APhysicalPlanTest
         assertVectorsEquals(vv(Type.Int, null, null, 10, 20, 20, 30), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 4, -1, 1, 3, 0, 2), actual.getColumn(1));
 
-        assertTrue(closed.getValue());
+        assertTrue(closed.get());
     }
 
     @Test
@@ -100,7 +100,7 @@ public class SortTest extends APhysicalPlanTest
         assertVectorsEquals(vv(Type.Long, null, null, 10L, 20L, 20L, 30L), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 4, -1, 1, 3, 0, 2), actual.getColumn(1));
 
-        assertTrue(closed.getValue());
+        assertTrue(closed.get());
     }
 
     @Test
@@ -127,7 +127,7 @@ public class SortTest extends APhysicalPlanTest
         assertVectorsEquals(vv(Type.Float, 10F, 20F, 20F, 30F, null, null), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 1, 3, 0, 2, 4, -1), actual.getColumn(1));
 
-        assertTrue(closed.getValue());
+        assertTrue(closed.get());
     }
 
     @Test
@@ -155,7 +155,7 @@ public class SortTest extends APhysicalPlanTest
         assertVectorsEquals(vv(Type.Double, 10D, 20D, 20D, 30D), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 2, 1, 4, 3), actual.getColumn(1));
 
-        assertTrue(closed.getValue());
+        assertTrue(closed.get());
     }
 
     @Test
@@ -179,7 +179,7 @@ public class SortTest extends APhysicalPlanTest
         assertVectorsEquals(vv(Type.Boolean, false, true), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 2, 1), actual.getColumn(1));
 
-        assertTrue(closed.getValue());
+        assertTrue(closed.get());
     }
 
     @Test
@@ -207,7 +207,7 @@ public class SortTest extends APhysicalPlanTest
         assertVectorsEquals(vv(Type.String, UTF8String.from("abcåäö"), UTF8String.from("åäöabc")), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 1, 2), actual.getColumn(1));
 
-        assertTrue(closed.getValue());
+        assertTrue(closed.get());
     }
 
     @Test
@@ -235,7 +235,7 @@ public class SortTest extends APhysicalPlanTest
         assertVectorsEquals(vv(Type.String, UTF8String.from("abcåäö"), UTF8String.from("åäöabc")), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 1, 2), actual.getColumn(1));
 
-        assertTrue(closed.getValue());
+        assertTrue(closed.get());
     }
 
     @Test

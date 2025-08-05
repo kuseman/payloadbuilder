@@ -2,7 +2,7 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -68,7 +68,7 @@ class CharIndexFunction extends ScalarFunctionInfo
                 String findString = find.getString(i)
                         .toString();
 
-                long index = StringUtils.indexOf(string, findString, startLocation);
+                long index = Strings.CS.indexOf(string, findString, startLocation);
 
                 resultVector.setLong(i, index);
             }

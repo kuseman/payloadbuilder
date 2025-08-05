@@ -46,7 +46,7 @@ public class FilterTest extends APhysicalPlanTest
         TupleIterator it = plan.execute(context);
         assertFalse(it.hasNext());
         it.close();
-        assertTrue(closed.getValue());
+        assertTrue(closed.get());
 
         try
         {
@@ -80,7 +80,7 @@ public class FilterTest extends APhysicalPlanTest
         assertEquals(3, actual.getRowCount());
         assertVectorsEquals(vv(Type.Any, 3, 4, 5), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 3, 2, 1), actual.getColumn(1));
-        assertTrue(closed.getValue());
+        assertTrue(closed.get());
     }
 
     @Test

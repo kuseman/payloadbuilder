@@ -4,12 +4,11 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
+import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-
-import org.apache.commons.lang3.ObjectUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -42,9 +41,9 @@ public class Join implements ILogicalPlan
         this.type = requireNonNull(type, "type");
         this.populateAlias = populateAlias;
         this.condition = condition;
-        this.outerReferences = ObjectUtils.defaultIfNull(outerReferences, emptySet());
+        this.outerReferences = getIfNull(outerReferences, emptySet());
         this.switchedInputs = switchedInputs;
-        this.outerSchema = ObjectUtils.defaultIfNull(outerSchema, Schema.EMPTY);
+        this.outerSchema = getIfNull(outerSchema, Schema.EMPTY);
     }
 
     public ILogicalPlan getOuter()

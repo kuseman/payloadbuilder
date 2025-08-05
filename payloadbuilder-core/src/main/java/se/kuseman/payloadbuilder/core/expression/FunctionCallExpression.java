@@ -3,11 +3,10 @@ package se.kuseman.payloadbuilder.core.expression;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
+import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
 import java.util.List;
 import java.util.Objects;
-
-import org.apache.commons.lang3.ObjectUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
@@ -32,7 +31,7 @@ public class FunctionCallExpression implements IFunctionCallExpression, IAggrega
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.function = requireNonNull(function, "function");
         this.aggregateMode = aggregateMode;
-        this.arguments = ObjectUtils.defaultIfNull(arguments, emptyList());
+        this.arguments = getIfNull(arguments, emptyList());
     }
 
     @Override

@@ -2,7 +2,7 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringUtils.equalsAnyIgnoreCase;
+import static org.apache.commons.lang3.Strings.CI;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -17,7 +17,6 @@ import java.util.Objects;
 import java.util.Set;
 
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -1253,7 +1252,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
 
                     // If we have a match with an alias we don't need to search any more
                     if (alias != null
-                            && StringUtils.equalsIgnoreCase(alias, columnAlias))
+                            && CI.equals(alias, columnAlias))
                     {
                         break;
                     }
@@ -1484,7 +1483,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         {
             if (!"".equalsIgnoreCase(aliasSchema.alias)
                     && schemas.stream()
-                            .anyMatch(s -> equalsAnyIgnoreCase(s.alias, aliasSchema.alias)))
+                            .anyMatch(s -> CI.equals(s.alias, aliasSchema.alias)))
             {
                 throw new ParseException("Alias '" + aliasSchema.alias + "' is specified multiple times.", location);
             }

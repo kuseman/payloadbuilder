@@ -4,7 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
-import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
+import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -118,7 +118,7 @@ public class NestedLoop implements IPhysicalPlan
         this.inner = requireNonNull(inner, "innter");
         this.condition = condition;
         this.populateAlias = populateAlias;
-        this.outerReferences = defaultIfNull(outerReferences, emptySet());
+        this.outerReferences = getIfNull(outerReferences, emptySet());
         this.pushOuterReference = pushOuterReference
                 || this.outerReferences.size() > 0;
         this.emitEmptyOuterRows = emitEmptyOuterRows;

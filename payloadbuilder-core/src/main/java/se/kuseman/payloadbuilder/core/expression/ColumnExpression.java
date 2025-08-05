@@ -1,11 +1,10 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.Strings.CI;
 
 import java.util.List;
 import java.util.Objects;
-
-import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -202,7 +201,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
                 continue;
             }
 
-            if (StringUtils.equalsIgnoreCase(column, schemaColumn.getName()))
+            if (CI.equals(column, schemaColumn.getName()))
             {
                 // TODO: lenient setting that returns first match of column
                 if (indexMatch != -1)

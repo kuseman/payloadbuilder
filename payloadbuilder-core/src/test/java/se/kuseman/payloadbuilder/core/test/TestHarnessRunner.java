@@ -4,9 +4,8 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringUtils.containsIgnoreCase;
-import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.Strings.CI;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
@@ -206,7 +205,7 @@ public class TestHarnessRunner
                 if (!isBlank(testCase.getExpectedMessageContains()))
                 {
                     Assert.assertTrue("Expected message to contain " + testCase.getExpectedMessageContains() + ", but got " + e.getMessage(),
-                            containsIgnoreCase(e.getMessage(), testCase.getExpectedMessageContains()));
+                            CI.contains(e.getMessage(), testCase.getExpectedMessageContains()));
                 }
 
                 return;
@@ -413,7 +412,7 @@ public class TestHarnessRunner
             String tableName = table.getLast();
             for (TestTable testTable : catalog.getTables())
             {
-                if (equalsIgnoreCase(testTable.getName(), tableName))
+                if (CI.contains(testTable.getName(), tableName))
                 {
                     return testTable;
                 }

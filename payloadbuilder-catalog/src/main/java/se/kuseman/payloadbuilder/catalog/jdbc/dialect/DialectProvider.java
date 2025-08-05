@@ -1,8 +1,7 @@
 package se.kuseman.payloadbuilder.catalog.jdbc.dialect;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
-
-import org.apache.commons.lang3.StringUtils;
+import static org.apache.commons.lang3.Strings.CI;
 
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.catalog.jdbc.JdbcCatalog;
@@ -24,8 +23,8 @@ public final class DialectProvider
         {
             return BASE;
         }
-        else if (StringUtils.containsIgnoreCase(driverClass, ORACLE_KEY)
-                || StringUtils.containsAnyIgnoreCase(url, ORACLE_KEY))
+        else if (CI.contains(driverClass, ORACLE_KEY)
+                || CI.contains(url, ORACLE_KEY))
         {
             return ORACLE;
         }

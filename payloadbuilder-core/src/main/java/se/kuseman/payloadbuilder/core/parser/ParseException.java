@@ -1,7 +1,8 @@
 package se.kuseman.payloadbuilder.core.parser;
 
+import static org.apache.commons.lang3.ObjectUtils.getIfNull;
+
 import org.antlr.v4.runtime.ParserRuleContext;
-import org.apache.commons.lang3.ObjectUtils;
 
 /** Parse exception */
 public class ParseException extends RuntimeException
@@ -17,7 +18,7 @@ public class ParseException extends RuntimeException
     public ParseException(String message, Location location)
     {
         super(message);
-        this.location = ObjectUtils.defaultIfNull(location, Location.EMPTY);
+        this.location = getIfNull(location, Location.EMPTY);
     }
 
     public Location getLocation()

@@ -4,10 +4,9 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
+import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
 import java.util.List;
-
-import org.apache.commons.lang3.ObjectUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
@@ -27,7 +26,7 @@ public class Aggregate implements ILogicalPlan
     public Aggregate(ILogicalPlan input, List<IExpression> aggregateExpressions, List<IAggregateExpression> projectionExpressions)
     {
         this.input = requireNonNull(input, "input");
-        this.aggregateExpressions = ObjectUtils.defaultIfNull(aggregateExpressions, emptyList());
+        this.aggregateExpressions = getIfNull(aggregateExpressions, emptyList());
         this.projectionExpressions = requireNonNull(projectionExpressions, "projectionExpressions");
     }
 
