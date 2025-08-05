@@ -81,7 +81,7 @@ public class OperatorFunctionScanTest extends APhysicalPlanTest
         assertEquals(1, vv.size());
 
         TupleVector sv = vv.getTable(0);
-        assertTrue(closed.getValue());
+        assertTrue(closed.get());
         return sv;
     }
 

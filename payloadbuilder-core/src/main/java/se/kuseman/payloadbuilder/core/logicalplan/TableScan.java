@@ -2,10 +2,9 @@ package se.kuseman.payloadbuilder.core.logicalplan;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
 import java.util.List;
-
-import org.apache.commons.lang3.ObjectUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -28,7 +27,7 @@ public class TableScan extends TableSource
     {
         super(tableSource);
         this.tableSchema = requireNonNull(tableSchema, "tableSchema");
-        this.projection = ObjectUtils.defaultIfNull(projection, emptyList());
+        this.projection = getIfNull(projection, emptyList());
         this.tempTable = tempTable;
         this.options = requireNonNull(options, "options");
         this.location = location;

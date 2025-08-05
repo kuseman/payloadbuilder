@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.core.planning;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static org.apache.commons.lang3.Strings.CI;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -10,7 +11,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.IntStream;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
@@ -152,7 +152,7 @@ class ConditionAnalyzer
         if (index.getColumnsType() == ColumnsType.ALL
                 && index.getColumns()
                         .size() == 1
-                && StringUtils.equalsIgnoreCase(pairColumn, index.getColumns()
+                && CI.equals(pairColumn, index.getColumns()
                         .get(0)))
         {
             return true;
@@ -160,7 +160,7 @@ class ConditionAnalyzer
 
         return IN_EXPRESSION_PUSH_DOWN_COLUMNS_TYPES.contains(index.getColumnsType())
                 && (index.getColumnsType() == ColumnsType.WILDCARD
-                        || StringUtils.equalsIgnoreCase(pairColumn, index.getColumns()
+                        || CI.equals(pairColumn, index.getColumns()
                                 .get(0)));
     }
 

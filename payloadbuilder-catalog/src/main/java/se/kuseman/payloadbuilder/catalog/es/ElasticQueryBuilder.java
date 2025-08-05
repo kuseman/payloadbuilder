@@ -2,7 +2,7 @@ package se.kuseman.payloadbuilder.catalog.es;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
-import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
+import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.time.LocalDateTime;
@@ -939,7 +939,7 @@ class ElasticQueryBuilder
                 }
             }
 
-            context.result.put(qname, new ResolvedProperty(property.name.toDotDelimited(), defaultIfNull(property.nestedPath, QualifiedName.EMPTY).toDotDelimited()));
+            context.result.put(qname, new ResolvedProperty(property.name.toDotDelimited(), getIfNull(property.nestedPath, QualifiedName.EMPTY).toDotDelimited()));
             return true;
         }
 
@@ -1026,7 +1026,7 @@ class ElasticQueryBuilder
                     return false;
                 }
             }
-            context.result.put(qname, new ResolvedProperty(property.name.toDotDelimited(), defaultIfNull(property.nestedPath, QualifiedName.EMPTY).toDotDelimited()));
+            context.result.put(qname, new ResolvedProperty(property.name.toDotDelimited(), getIfNull(property.nestedPath, QualifiedName.EMPTY).toDotDelimited()));
             return true;
         }
 

@@ -353,10 +353,10 @@ class ESDatasource implements IDatasource
                 doRequest.setFalse();
                 return post;
             }
-            else if (scrollId.getValue() != null)
+            else if (scrollId.get() != null)
             {
                 data.scrollCount++;
-                String id = scrollId.getValue();
+                String id = scrollId.get();
                 data.bytesSent += scrollUrl.length() + body.length();
                 scrollId.setValue(null);
                 return strategy.getScrollRequest(scrollUrl, id);
@@ -429,11 +429,11 @@ class ESDatasource implements IDatasource
                 context.getSession()
                         .unregisterAbortListener(abortListener);
 
-                if (!isBlank(scrollId.getValue()))
+                if (!isBlank(scrollId.get()))
                 {
                     data.requestCount++;
 
-                    ClassicHttpRequest delete = strategy.getDeleteScrollRequest(endpoint, scrollId.getValue());
+                    ClassicHttpRequest delete = strategy.getDeleteScrollRequest(endpoint, scrollId.get());
                     try
                     {
                         HttpClientUtils.execute(context.getSession(), catalogAlias, delete, response ->

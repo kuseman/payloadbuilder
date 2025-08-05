@@ -2,7 +2,7 @@ package se.kuseman.payloadbuilder.core.execution;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
+import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -78,7 +78,7 @@ public class ExecutionContext implements IExecutionContext
     /** Get variables map */
     public Map<String, ValueVector> getVariables()
     {
-        return defaultIfNull(variables, emptyMap());
+        return getIfNull(variables, emptyMap());
     }
 
     /** Set variable to context */

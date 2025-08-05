@@ -1,13 +1,12 @@
 package se.kuseman.payloadbuilder.core.execution.vector;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.Strings.CI;
 
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 import java.util.function.IntPredicate;
-
-import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -297,7 +296,7 @@ class TupleVectorBuilder implements ITupleVectorBuilder
             // For example when having a left join with no matching inner rows we use the compile time schema
             // for the inner and those will be ANY and if combined with a vector with rows we will have the real runtime
             // type and we will end up with a wrong resulting vector.
-            if (!StringUtils.equalsIgnoreCase(existingColumns.get(i)
+            if (!CI.equals(existingColumns.get(i)
                     .getName(),
                     schemaColumns.get(i)
                             .getName()))

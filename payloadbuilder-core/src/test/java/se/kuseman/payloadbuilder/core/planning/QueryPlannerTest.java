@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
+import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
@@ -17,7 +18,6 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.tuple.Triple;
 import org.assertj.core.api.Assertions;
 import org.junit.Before;
@@ -2881,8 +2881,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
             while (it.hasNext())
             {
                 IPredicate pair = it.next();
-                String col = ObjectUtils.defaultIfNull(pair.getQualifiedColumn(), QualifiedName.EMPTY)
-                        .toString();
+                String col = getIfNull(pair.getQualifiedColumn(), QualifiedName.EMPTY).toString();
                 if (predicateColumnsToConsume.contains(col))
                 {
                     List<IExpression> value = null;

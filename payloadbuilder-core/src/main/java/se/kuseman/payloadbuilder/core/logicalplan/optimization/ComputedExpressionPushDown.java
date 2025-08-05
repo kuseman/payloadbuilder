@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.Strings.CI;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -451,7 +452,7 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                     .getAlias();
             if (!isBlank(alias1))
             {
-                return !StringUtils.equalsIgnoreCase(alias1, alias2);
+                return !CI.equals(alias1, alias2);
             }
         }
 
