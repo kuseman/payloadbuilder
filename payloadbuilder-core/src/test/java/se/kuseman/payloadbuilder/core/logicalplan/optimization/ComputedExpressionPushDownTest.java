@@ -234,8 +234,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected =
-                new Projection(
-                        ConstantScan.INSTANCE,
+                ConstantScan.create(
                         asList(new AliasExpression(new UnresolvedSubQueryExpression(
                             new Sort(
                                 new Aggregate(
@@ -250,7 +249,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                                 new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("min"), null, asList(uce("__expr0"))), "__expr1"), false, true)
                                     )),
                             asList(sortItem(uce("__expr1"), Order.ASC))),
-                            null), "x")));
+                            null), "x")), null);
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -282,7 +281,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "   from stableA a "
                 + "   order by a.col2 "
                 + "   for object_array "
-                + ") values ";
+                + ") \"values\" ";
         //@formatter:on
 
         ILogicalPlan plan = getSchemaResolvedPlan(query);
@@ -301,8 +300,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected =
-                new Projection(
-                        ConstantScan.INSTANCE,
+                ConstantScan.create(
                         asList(new AliasExpression(new UnresolvedSubQueryExpression(
                                 new OperatorFunctionScan(
                                     Schema.of(Column.of("output", Type.Any)),
@@ -330,7 +328,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                     null),
                                 null
                                 ),
-                            "values")));
+                            "values")), null);
         //@formatter:on
 
         // System.out.println(expected.print(0));

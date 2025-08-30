@@ -18,6 +18,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
@@ -37,6 +38,7 @@ import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
+import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
@@ -114,6 +116,26 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
         List<SortItem> result = planData.sortItems;
         planData.sortItems = emptyList();
         return new Sort(sortInput, result);
+    }
+
+    @Override
+    public ILogicalPlan visit(ConstantScan plan, Ctx context)
+    {
+        if (Schema.EMPTY.equals(plan.getSchema())
+                || plan.getRowsExpressions()
+                        .isEmpty())
+        {
+            return super.create(plan, context);
+        }
+
+        List<List<IExpression>> rowsExpressions = plan.getRowsExpressions()
+                .stream()
+                .map(list -> list.stream()
+                        .map(e -> UnresolvedSubQueryExpressionVisitor.INSTANCE.visit(e, context))
+                        .toList())
+                .toList();
+
+        return plan.reCreate(rowsExpressions);
     }
 
     @Override

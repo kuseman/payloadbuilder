@@ -108,6 +108,7 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheName
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheRemoveContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CastExpressionContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnAliasListContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CountExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DateAddExpressionContext;
@@ -634,16 +635,6 @@ public class QueryParser
                 boolean tempTable = ctx.tableName().tempHash != null;
                 return new TableScan(TableSchema.EMPTY, tableSourceRef, emptyList(), tempTable, options, Location.from(ctx.tableName()));
             }
-            else if (ctx.selectStatement() != null)
-            {
-                boolean prevInsideSubQuery = insideSubQuery;
-                insideSubQuery = true;
-                LogicalSelectStatement stm = (LogicalSelectStatement) visit(ctx.selectStatement());
-                insideSubQuery = prevInsideSubQuery;
-
-                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of(alias), alias);
-                return new SubQuery(stm.getSelect(), tableSourceRef, Location.from(ctx.selectStatement()));
-            }
             else if (ctx.variable() != null)
             {
                 if (ctx.variable().system != null)
@@ -657,16 +648,87 @@ public class QueryParser
                 TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of(variable), alias);
                 return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.variable()));
             }
-            else if (ctx.expression() != null)
+            else if (ctx.derivedTable() != null)
             {
-                if (!options.isEmpty())
+                ColumnAliasListContext columnAliasList = ctx.columnAliasList();
+
+                if (ctx.derivedTable()
+                        .selectStatement() != null)
                 {
-                    throw new ParseException("Expression scans cannot have options", ctx.tableSourceOptions());
+                    if (columnAliasList != null)
+                    {
+                        throw new ParseException("Columns alias(es) is not supported on sub query statements", columnAliasList);
+                    }
+
+                    boolean prevInsideSubQuery = insideSubQuery;
+                    insideSubQuery = true;
+                    LogicalSelectStatement stm = (LogicalSelectStatement) visit(ctx.derivedTable()
+                            .selectStatement());
+                    insideSubQuery = prevInsideSubQuery;
+
+                    // If this was a derived table with a simple projection that was turned into a constant scan
+                    // unwrap the plan with a new schema according to a unique tablesource ref.
+                    //
+                    // select *
+                    // from (
+                    // select 10 col, 20 col2
+                    // )
+                    if (stm.getSelect() instanceof ConstantScan cs)
+                    {
+                        TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.CONSTANTSCAN, "", QualifiedName.of(alias), alias);
+                        List<String> columns = cs.getSchema()
+                                .getColumns()
+                                .stream()
+                                .map(Column::getName)
+                                .toList();
+                        return ConstantScan.create(tableSourceRef, columns, cs.getRowsExpressions(), cs.getLocation());
+                    }
+
+                    TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of(alias), alias);
+                    return new SubQuery(stm.getSelect(), tableSourceRef, Location.from(ctx.derivedTable()
+                            .selectStatement()));
+                }
+                else if (ctx.derivedTable()
+                        .expression() != null)
+                {
+                    if (!options.isEmpty())
+                    {
+                        throw new ParseException("Expression scans cannot have options", ctx.tableSourceOptions());
+                    }
+                    if (columnAliasList != null)
+                    {
+                        throw new ParseException("Columns alias(es) is not supported on expression selects", columnAliasList);
+                    }
+
+                    IExpression expression = getExpression(ctx.derivedTable()
+                            .expression());
+                    TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of(expression.toString()), alias);
+                    return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.derivedTable()
+                            .expression()));
                 }
 
-                IExpression expression = getExpression(ctx.expression());
-                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of(expression.toString()), alias);
-                return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.expression()));
+                boolean prevInsideProjection = insideProjection;
+                insideProjection = true;
+                List<List<IExpression>> expressions = ctx.derivedTable()
+                        .tableValueConstructor()
+                        .expr_list()
+                        .stream()
+                        .map(this::getExpressionList)
+                        .toList();
+                insideProjection = prevInsideProjection;
+
+                List<String> columns = emptyList();
+                if (columnAliasList != null)
+                {
+                    columns = columnAliasList.identifier()
+                            .stream()
+                            .map(this::getIdentifier)
+                            .toList();
+                }
+
+                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.CONSTANTSCAN, "", QualifiedName.of(alias), alias);
+                return ConstantScan.create(tableSourceRef, columns, expressions, Location.from(ctx.derivedTable()
+                        .tableValueConstructor()));
             }
 
             FunctionCallContext functionCall = ctx.functionCall();
@@ -1042,7 +1104,6 @@ public class QueryParser
             }
             else
             {
-
                 if (!insideProjection)
                 {
                     throw new ParseException("Sub query expressions are only supported in projections", ctx.bracket_expression()
@@ -1418,9 +1479,21 @@ public class QueryParser
                 insideProjection = prevInsideProjection;
 
                 validateAssignmentProjection(expressions, ctx);
+                // No table source => create a constant scan of the expressions
+                if (!containsAsterisks
+                        && plan instanceof ConstantScan cs
+                        && ConstantScan.ONE_ROW_EMPTY_SCHEMA.equals(cs))
+                {
+                    return ConstantScan.create(expressions, Location.from(ctx.SELECT()));
+                }
 
                 plan = new Projection(plan, expressions);
             }
+            // TODO: mark all table source references with an asterisk to properly push down projections
+            // else
+            // {
+            //
+            // }
 
             return plan;
         }
@@ -1512,7 +1585,7 @@ public class QueryParser
             else
             {
                 // Fallback to constant scan to always have an operator to scan
-                return ConstantScan.INSTANCE;
+                return ConstantScan.ONE_ROW_EMPTY_SCHEMA;
             }
         }
 

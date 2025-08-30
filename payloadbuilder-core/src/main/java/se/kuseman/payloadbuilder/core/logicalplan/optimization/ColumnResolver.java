@@ -54,6 +54,7 @@ import se.kuseman.payloadbuilder.core.expression.UnresolvedFunctionCallExpressio
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
+import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
@@ -464,6 +465,38 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         context.planSchema.push(new ResolveSchema(plan.getSchema(), plan.getAlias()));
 
         return new TableScan(plan.getTableSchema(), plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
+    }
+
+    @Override
+    public ILogicalPlan visit(ConstantScan plan, Ctx context)
+    {
+        // Empty schema or zero row => nothing to resolve
+        if (Schema.EMPTY.equals(plan.getSchema())
+                || plan.getRowsExpressions()
+                        .isEmpty())
+        {
+            context.planSchema.push(new ResolveSchema(plan.getSchema()));
+            return plan;
+        }
+
+        // Constant scans doesn't have any input so clear the schema while resolving
+        ResolveSchema prevSchema = context.schema;
+        context.schema = null;
+
+        List<List<IExpression>> rowsExpressions = plan.getRowsExpressions()
+                .stream()
+                .map(list -> ColumnResolverVisitor.rewrite(context, list))
+                .toList();
+
+        context.schema = prevSchema;
+
+        ILogicalPlan result = plan.reCreate(rowsExpressions);
+
+        TableSourceReference tableSource = plan.getTableSource();
+        context.planSchema.push(new ResolveSchema(result.getSchema(), tableSource != null ? tableSource.getAlias()
+                : ""));
+
+        return result;
     }
 
     @Override
