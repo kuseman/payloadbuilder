@@ -172,7 +172,7 @@ class JdbcDatasource implements IDatasource
                 switch (predicate.getType())
                 {
                     case COMPARISION:
-                        Object value = convertValue(predicate.getComparisonExpression()
+                        Object value = dialect.convert(predicate.getComparisonExpression()
                                 .eval(context)
                                 .valueAsObject(0));
                         sb.append("y.")
@@ -196,7 +196,7 @@ class JdbcDatasource implements IDatasource
                                 .map(e -> e.eval(context)
                                         .valueAsObject(0))
                                 .filter(Objects::nonNull)
-                                .map(o -> convertValue(o))
+                                .map(o -> String.valueOf(dialect.convert(o)))
                                 .collect(joining(",")));
                         sb.append(")");
                         break;
@@ -212,7 +212,7 @@ class JdbcDatasource implements IDatasource
                         sb.append("y.")
                                 .append(qname.toString());
                         sb.append(" LIKE ");
-                        sb.append(convertValue(valueSupplier.eval(context)
+                        sb.append(dialect.convert(valueSupplier.eval(context)
                                 .valueAsObject(0)));
                         break;
                     case NULL:
@@ -260,22 +260,6 @@ class JdbcDatasource implements IDatasource
         }
 
         return sb.toString();
-    }
-
-    private String convertValue(Object value)
-    {
-        if (value instanceof Boolean)
-        {
-            value = (Boolean) value ? 1
-                    : 0;
-        }
-
-        if (!(value instanceof Number))
-        {
-            return "'" + String.valueOf(value) + "'";
-        }
-
-        return String.valueOf(value);
     }
 
     private void appendComparisonValue(StringBuilder sb, IPredicate predicate)
@@ -362,7 +346,7 @@ class JdbcDatasource implements IDatasource
                             {
                                 break;
                             }
-                            values[i] = JdbcUtils.getAndConvertValue(rs, i + 1, jdbcTypes[i]);
+                            values[i] = dialect.getJdbcValue(rs, i + 1, jdbcTypes[i]);
                         }
 
                         if (abort)

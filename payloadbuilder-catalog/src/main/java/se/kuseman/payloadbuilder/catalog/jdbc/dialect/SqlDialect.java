@@ -1,6 +1,10 @@
 package se.kuseman.payloadbuilder.catalog.jdbc.dialect;
 
+import java.io.Reader;
+import java.sql.ResultSet;
 import java.util.List;
+
+import org.apache.commons.io.IOUtils;
 
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
@@ -100,5 +104,23 @@ public interface SqlDialect
         }
 
         return value;
+    }
+
+    /**
+     * Returns a value for a result set ordinal.
+     */
+    default Object getJdbcValue(ResultSet rs, int ordinal, int jdbcType) throws Exception
+    {
+        if (jdbcType == java.sql.Types.CLOB)
+        {
+            Reader reader = rs.getCharacterStream(ordinal);
+            if (rs.wasNull())
+            {
+                return null;
+            }
+            return IOUtils.toString(reader);
+        }
+
+        return rs.getObject(ordinal);
     }
 }
