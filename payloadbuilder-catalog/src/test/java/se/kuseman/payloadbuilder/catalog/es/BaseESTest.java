@@ -41,6 +41,7 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
@@ -151,7 +152,7 @@ abstract class BaseESTest extends Assert
 
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("key"))));
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"),
-                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Projection.ALL, emptyList()));
 
         // Verify that sort items are consumed
         assertTrue(sortItems.isEmpty());
@@ -196,7 +197,7 @@ abstract class BaseESTest extends Assert
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
         IDatasource ds = catalog.getSystemTableDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("tables"),
-                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL, emptyList()));
 
         TupleIterator it = ds.execute(context);
         int rowCount = 0;
@@ -241,7 +242,7 @@ abstract class BaseESTest extends Assert
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
         IDatasource ds = catalog.getSystemTableDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("indices"),
-                new DatasourceData(0, Optional.of(ESCatalog.INDICES_SCHEMA.getSchema()), emptyList(), emptyList(), emptyList(), emptyList()));
+                new DatasourceData(0, Optional.of(ESCatalog.INDICES_SCHEMA.getSchema()), emptyList(), emptyList(), Projection.ALL, emptyList()));
 
         TupleIterator it = ds.execute(context);
         int rowCount = 0;
@@ -301,7 +302,7 @@ abstract class BaseESTest extends Assert
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
         IDatasource ds = catalog.getSystemTableDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("columns"),
-                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL, emptyList()));
 
         TupleIterator it = ds.execute(context);
         int rowCount = 0;
@@ -626,7 +627,7 @@ abstract class BaseESTest extends Assert
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(version.getStrategy()
                 .supportsTypes() ? type
                         : ESCatalog.SINGLE_TYPE_TABLE_NAME),
-                new DatasourceData(0, Optional.empty(), predicates, sortItems, emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), predicates, sortItems, Projection.ALL, emptyList()));
 
         assertTrue(sortItems.isEmpty());
 
@@ -658,7 +659,7 @@ abstract class BaseESTest extends Assert
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
         // Test non matching case of index field
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, "KEY", 123, null); // Null values should be excluded
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), emptyList()));
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL, emptyList()));
 
         TupleIterator it = ds.execute(context);
         int rowCount = 0;
@@ -702,7 +703,7 @@ abstract class BaseESTest extends Assert
         ESDatasource.Data data = new ESDatasource.Data();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, "__id", "001", null); // Null values should be excluded
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), emptyList()));
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL, emptyList()));
 
         TupleIterator it = ds.execute(context);
         int rowCount = 0;
@@ -746,7 +747,7 @@ abstract class BaseESTest extends Assert
         ESDatasource.Data data = new ESDatasource.Data();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, "key", 123, 456);
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), List.of(
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL, List.of(
                 // Size 1 => 2 batches
                 new Option(IExecutionContext.BATCH_SIZE, ExpressionTestUtils.createIntegerExpression(1)))));
 
@@ -809,7 +810,7 @@ abstract class BaseESTest extends Assert
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", "test*")), 0, data);
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("__index"), Order.DESC)));
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(ESCatalog.SINGLE_TYPE_TABLE_NAME),
-                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Projection.ALL, emptyList()));
 
         // Verify that sort items are consumed
         assertTrue(sortItems.isEmpty());
@@ -851,7 +852,7 @@ abstract class BaseESTest extends Assert
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", "*")), 0, data);
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(ESCatalog.SINGLE_TYPE_TABLE_NAME),
-                new DatasourceData(0, Optional.empty(), predicates, emptyList(), emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), predicates, emptyList(), Projection.ALL, emptyList()));
 
         // Verify that predicates are consumed
         assertTrue(predicates.isEmpty());
@@ -890,7 +891,7 @@ abstract class BaseESTest extends Assert
 
         List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.eq("__type", "type2")));
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"),
-                new DatasourceData(0, Optional.empty(), predicates, emptyList(), emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), predicates, emptyList(), Projection.ALL, emptyList()));
 
         // Verify that predicates are consumed
         assertTrue(predicates.isEmpty());
@@ -937,7 +938,7 @@ abstract class BaseESTest extends Assert
 
         List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.eq("__id", "002")));
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"),
-                new DatasourceData(0, Optional.empty(), predicates, emptyList(), emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), predicates, emptyList(), Projection.ALL, emptyList()));
 
         // Verify that predicates are consumed
         assertTrue(predicates.isEmpty());
@@ -987,7 +988,7 @@ abstract class BaseESTest extends Assert
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("key"))));
         List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.in("__id", asList("002", "004"))));
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"),
-                new DatasourceData(0, Optional.empty(), predicates, sortItems, emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), predicates, sortItems, Projection.ALL, emptyList()));
 
         // Verify that predicates/sort items are consumed
         assertTrue(predicates.isEmpty());
@@ -1038,7 +1039,7 @@ abstract class BaseESTest extends Assert
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("key"))));
         List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.notIn("__id", asList("001", "003"))));
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"),
-                new DatasourceData(0, Optional.empty(), predicates, sortItems, emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), predicates, sortItems, Projection.ALL, emptyList()));
 
         // Verify that predicates/sort items are consumed
         assertTrue(predicates.isEmpty());
@@ -1086,7 +1087,7 @@ abstract class BaseESTest extends Assert
         ESDatasource.Data data = new ESDatasource.Data();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, "__id", "001", "002", "003");
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), List.of(
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL, List.of(
                 // Size 2 => 2 batches
                 new Option(IExecutionContext.BATCH_SIZE, ExpressionTestUtils.createIntegerExpression(2)))));
 
@@ -1163,7 +1164,7 @@ abstract class BaseESTest extends Assert
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(version.getStrategy()
                 .supportsTypes() ? type
                         : ESCatalog.SINGLE_TYPE_TABLE_NAME),
-                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Projection.ALL, emptyList()));
 
         // Verify that sort items are consumed
         assertTrue(sortItems.isEmpty());
@@ -1201,7 +1202,7 @@ abstract class BaseESTest extends Assert
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(version.getStrategy()
                 .supportsTypes() ? type
                         : ESCatalog.SINGLE_TYPE_TABLE_NAME),
-                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList(), List.of(
+                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Projection.ALL, List.of(
                         // Size 2 => 2 batches
                         new Option(IExecutionContext.BATCH_SIZE, ExpressionTestUtils.createIntegerExpression(2)))));
 
@@ -1286,7 +1287,7 @@ abstract class BaseESTest extends Assert
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(version.getStrategy()
                 .supportsTypes() ? type
                         : ESCatalog.SINGLE_TYPE_TABLE_NAME),
-                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL, emptyList()));
 
         TupleIterator it = ds.execute(context);
         int rowCount = 0;

@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -40,6 +41,8 @@ public class EpochDateTimeOffsetTest extends Assert
                 .getZonedDateTime();
 
         assertEquals(EpochDateTimeOffset.from("2010-10-10T00:10:00.00Z"), EpochDateTimeOffset.from(o));
+
+        assertEquals(EpochDateTimeOffset.from("2010-10-10T00:10:00.00Z"), EpochDateTimeOffset.from(OffsetDateTime.parse("2010-10-10T00:10:00.00Z")));
 
         o = EpochDateTimeOffset.from("2010-10-10T00:10:00.00Z")
                 .getZonedDateTime()

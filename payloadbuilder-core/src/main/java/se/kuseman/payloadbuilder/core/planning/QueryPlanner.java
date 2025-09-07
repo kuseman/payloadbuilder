@@ -91,6 +91,13 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         IPhysicalPlan input = plan.getInput()
                 .accept(this, context);
 
+        // Asterisk projection, then return the input since that projection isn't needed
+        // runtime. It practically means return the whole input
+        if (plan.isAsteriskProjection())
+        {
+            return input;
+        }
+
         List<IExpression> expressions = plan.getExpressions();
         if (input instanceof se.kuseman.payloadbuilder.core.physicalplan.Projection p)
         {

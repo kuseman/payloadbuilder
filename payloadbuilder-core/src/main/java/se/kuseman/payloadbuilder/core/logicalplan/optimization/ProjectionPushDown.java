@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 
 import java.util.ArrayList;
@@ -10,15 +11,27 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn.Type;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 
 /** Gathers projection columns and pushes them down to scan operators */
 class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProjectionPushDown.class);
+
     ProjectionPushDown()
     {
         // No expression rewrite here
@@ -27,11 +40,16 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
 
     static class Ctx extends ALogicalPlanOptimizer.Context
     {
+        /** Marker for qualified asterisk references. */
+        private static final Set<String> ASTERISK_PROJECTION = emptySet();
+
         Ctx(IExecutionContext context)
         {
             super(context);
         }
 
+        /** Collect phase, first run we collect columns only and don't re-create table scans */
+        boolean collect = true;
         Map<TableSourceReference, Set<String>> columnsByAlias = new HashMap<>();
     }
 
@@ -44,7 +62,14 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
     @Override
     ILogicalPlan optimize(Context context, ILogicalPlan plan)
     {
-        return plan.accept(this, (Ctx) context);
+        Ctx ctx = (Ctx) context;
+
+        // First we only traverse and collect columns
+        plan.accept(this, ctx);
+
+        ctx.collect = false;
+
+        return plan.accept(this, ctx);
     }
 
     /*
@@ -85,6 +110,10 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
     @Override
     protected IExpression visit(ILogicalPlan plan, IExpression expression, Ctx context)
     {
+        if (!context.collect)
+        {
+            return expression;
+        }
         visit(plan, singletonList(expression), context);
         return expression;
     }
@@ -92,27 +121,123 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
     @Override
     protected List<IExpression> visit(ILogicalPlan plan, List<IExpression> expressions, Ctx context)
     {
-        Map<TableSourceReference, Set<String>> columns = collectColumns(expressions);
-
-        for (Entry<TableSourceReference, Set<String>> e : columns.entrySet())
+        if (!context.collect)
         {
-            context.columnsByAlias.computeIfAbsent(e.getKey(), k -> new HashSet<>())
-                    .addAll(e.getValue());
+            return expressions;
+        }
+
+        for (IExpression expression : expressions)
+        {
+            if (expression instanceof AggregateWrapperExpression awe)
+            {
+                expression = awe.getExpression();
+            }
+
+            // Asterisk projection, mark table sources
+            if (expression instanceof AsteriskExpression ae)
+            {
+                for (TableSourceReference tsr : ae.getTableSourceReferences())
+                {
+                    TableSourceReference sr = tsr;
+                    while (sr != null)
+                    {
+                        context.columnsByAlias.put(sr, Ctx.ASTERISK_PROJECTION);
+                        sr = sr.getParent();
+                    }
+                }
+            }
+        }
+
+        Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> columns = collectColumns(expressions);
+        for (Entry<TableSourceReference, Set<ColumnReferenceExtractorResult>> e : columns.entrySet())
+        {
+            for (ColumnReferenceExtractorResult ce : e.getValue())
+            {
+                TableSourceReference tableSource = ce.columnReference()
+                        .tableTypeTableSource();
+                if (tableSource == null)
+                {
+                    tableSource = ce.columnReference()
+                            .tableSourceReference();
+                }
+
+                // Populated column should not be projected since they are not real columns
+                // But instead go into the populated schema and add those columns if they are static
+                if (ce.columnReference()
+                        .columnType() == Type.POPULATED)
+                {
+                    Schema schema = null;
+                    if (ce.expression()
+                            .getType()
+                            .getType() == Column.Type.Table)
+                    {
+                        schema = ce.expression()
+                                .getType()
+                                .getSchema();
+                    }
+
+                    if (schema != null)
+                    {
+                        for (Column col : ce.expression()
+                                .getType()
+                                .getSchema()
+                                .getColumns())
+                        {
+                            if (SchemaUtils.isAsterisk(col))
+                            {
+                                // Mark this table source as an asterisk projection
+                                context.columnsByAlias.put(tableSource, Ctx.ASTERISK_PROJECTION);
+                                continue;
+                            }
+                            appendColumn(tableSource, col.getName(), context);
+                        }
+                    }
+
+                    continue;
+                }
+
+                String column = ce.column();
+                appendColumn(tableSource, column, context);
+            }
         }
 
         return expressions;
     }
 
+    private void appendColumn(TableSourceReference tableSource, String column, Ctx context)
+    {
+        Set<String> projectionColumns = context.columnsByAlias.computeIfAbsent(tableSource, k -> new HashSet<>());
+        // If the table source is already tagged with ALL (asterisks)
+        // then it doesn't matter if there is a real column reference, we need every thing anyway
+        if (projectionColumns != Ctx.ASTERISK_PROJECTION)
+        {
+            projectionColumns.add(column);
+        }
+    }
+
     @Override
     protected TableScan create(TableScan plan, Ctx context)
     {
+        // Wrong phase
+        if (context.collect)
+        {
+            return plan;
+        }
+
         Set<String> columns = context.columnsByAlias.get(plan.getTableSource());
-        if (columns != null)
+        Projection projection = Projection.NONE;
+        if (columns == Ctx.ASTERISK_PROJECTION)
+        {
+            projection = Projection.ALL;
+        }
+        else if (columns != null)
         {
             List<String> tableColumns = new ArrayList<>(columns);
             tableColumns.sort(String::compareTo);
-            return new TableScan(plan.getTableSchema(), plan.getTableSource(), tableColumns, plan.isTempTable(), plan.getOptions(), plan.getLocation());
+            projection = Projection.columns(tableColumns);
         }
-        return plan;
+
+        LOGGER.debug("Projected columns for {}: {}", plan.getTableSource(), projection);
+        return new TableScan(plan.getTableSchema(), plan.getTableSource(), projection, plan.isTempTable(), plan.getOptions(), plan.getLocation());
     }
 }

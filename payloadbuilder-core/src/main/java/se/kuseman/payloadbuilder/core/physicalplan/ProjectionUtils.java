@@ -125,7 +125,13 @@ public class ProjectionUtils
                     {
                         Column innerColumn = innerSchema.getColumns()
                                 .get(j);
-                        result.add(new DereferenceExpression(columnExpression, innerColumn.getName(), j, ResolvedType.array(innerColumn.getType())));
+
+                        IExpression dereference = new DereferenceExpression(columnExpression, innerColumn.getName(), j, ResolvedType.array(innerColumn.getType()));
+                        if (aggregate)
+                        {
+                            dereference = new AggregateWrapperExpression(dereference, aggregateSingleValue, false);
+                        }
+                        result.add(dereference);
                     }
                 }
                 else

@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.stream.Collectors.toList;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
+import java.util.List;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
@@ -50,25 +51,32 @@ public class ColumnOrdinalResolverTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected =
-                new Filter(
-                    new Join(
-                        new Filter(
-                            tableScan(resolvedSchemaStableA, sTableA),
-                            sTableA,
-                            eq(cre("col2", sTableA, 1, ResolvedType.of(Type.String)), new LiteralStringExpression("test"))),
-                        new Filter(
-                            tableScan(resolvedSchemaStableB, sTableB),
-                            sTableB,
-                            gt(cre("col2", sTableB, 1 /*4*/, ResolvedType.of(Type.String)), intLit(100))),        // This has ordinal 4 before running rule
-                        Join.Type.INNER,
+                projection(
+                    new Filter(
+                        new Join(
+                            new Filter(
+                                tableScan(resolvedSchemaStableA, sTableA),
+                                sTableA,
+                                eq(cre("col2", sTableA, 1, ResolvedType.of(Type.String)), new LiteralStringExpression("test"))),
+                            new Filter(
+                                tableScan(resolvedSchemaStableB, sTableB),
+                                sTableB,
+                                gt(cre("col2", sTableB, 1 /*4*/, ResolvedType.of(Type.String)), intLit(100))),        // This has ordinal 4 before running rule
+                            Join.Type.INNER,
+                            null,
+                            eq(cre("col3", sTableA, 2, ResolvedType.of(Type.Float)), cre("col3", sTableB, 5, ResolvedType.of(Type.Float))),
+                            asSet(),
+                            false,
+                            Schema.EMPTY),
                         null,
-                        eq(cre("col3", sTableA, 2, ResolvedType.of(Type.Float)), cre("col3", sTableB, 5, ResolvedType.of(Type.Float))),
-                        asSet(),
-                        false,
-                        Schema.EMPTY),
-                    null,
-                    gt(cre("col1", sTableA, 0, ResolvedType.of(Type.Int)), cre("col1", sTableB, 3, ResolvedType.of(Type.Boolean)))
-                );
+                        gt(cre("col1", sTableA, 0, ResolvedType.of(Type.Int)), cre("col1", sTableB, 3, ResolvedType.of(Type.Boolean)))),
+                List.of(cre("col1", sTableA, 0, ResolvedType.INT),
+                        cre("col2", sTableA, 1, ResolvedType.STRING),
+                        cre("col3", sTableA, 2, ResolvedType.FLOAT),
+                        cre("col1", sTableB, 3, ResolvedType.BOOLEAN),
+                        cre("col2", sTableB, 4, ResolvedType.STRING),
+                        cre("col3", sTableB, 5, ResolvedType.FLOAT)
+                        ));
         //@formatter:on
 
         // System.out.println(expected.print(0));

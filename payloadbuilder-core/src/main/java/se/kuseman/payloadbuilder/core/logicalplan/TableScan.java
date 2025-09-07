@@ -2,10 +2,10 @@ package se.kuseman.payloadbuilder.core.logicalplan;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
@@ -17,17 +17,17 @@ import se.kuseman.payloadbuilder.core.parser.Location;
 public class TableScan extends TableSource
 {
     /** List of projected columns */
-    private final List<String> projection;
+    private final Projection projection;
     private final TableSchema tableSchema;
     private final boolean tempTable;
     private final List<Option> options;
     private final Location location;
 
-    public TableScan(TableSchema tableSchema, TableSourceReference tableSource, List<String> projection, boolean tempTable, List<Option> options, Location location)
+    public TableScan(TableSchema tableSchema, TableSourceReference tableSource, Projection projection, boolean tempTable, List<Option> options, Location location)
     {
         super(tableSource);
         this.tableSchema = requireNonNull(tableSchema, "tableSchema");
-        this.projection = getIfNull(projection, emptyList());
+        this.projection = requireNonNull(projection, "projection");
         this.tempTable = tempTable;
         this.options = requireNonNull(options, "options");
         this.location = location;
@@ -38,7 +38,7 @@ public class TableScan extends TableSource
 
     }
 
-    public List<String> getProjection()
+    public Projection getProjection()
     {
         return projection;
     }

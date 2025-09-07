@@ -4,6 +4,7 @@ import static java.util.Collections.emptyList;
 
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -18,12 +19,17 @@ public abstract class ALogicalPlanTest extends AExpressionTest
 {
     protected TableScan tableScan(Schema schema, TableSourceReference tableSource)
     {
-        return new TableScan(new TableSchema(schema), tableSource, emptyList(), false, emptyList(), null);
+        return new TableScan(new TableSchema(schema), tableSource, Projection.ALL, false, emptyList(), null);
     }
 
     protected TableScan tableScan(Schema schema, TableSourceReference tableSource, List<String> projection)
     {
-        return new TableScan(new TableSchema(schema), tableSource, projection, false, emptyList(), null);
+        return new TableScan(new TableSchema(schema), tableSource, Projection.columns(projection), false, emptyList(), null);
+    }
+
+    protected TableScan tableScanNoProjection(Schema schema, TableSourceReference tableSource)
+    {
+        return new TableScan(new TableSchema(schema), tableSource, Projection.NONE, false, emptyList(), null);
     }
 
     protected SubQuery subQuery(ILogicalPlan input, TableSourceReference tableSource)
@@ -31,14 +37,14 @@ public abstract class ALogicalPlanTest extends AExpressionTest
         return new SubQuery(input, tableSource, null);
     }
 
-    protected Projection projection(ILogicalPlan input, List<IExpression> expressions)
+    protected se.kuseman.payloadbuilder.core.logicalplan.Projection projection(ILogicalPlan input, List<IExpression> expressions)
     {
-        return new Projection(input, expressions, null);
+        return new se.kuseman.payloadbuilder.core.logicalplan.Projection(input, expressions, null);
     }
 
-    protected Projection projection(ILogicalPlan input, List<IExpression> expressions, TableSourceReference parentTableSource)
+    protected se.kuseman.payloadbuilder.core.logicalplan.Projection projection(ILogicalPlan input, List<IExpression> expressions, TableSourceReference parentTableSource)
     {
-        return new Projection(input, expressions, parentTableSource);
+        return new se.kuseman.payloadbuilder.core.logicalplan.Projection(input, expressions, parentTableSource);
     }
 
     protected SortItem sortItem(IExpression expression, Order order)

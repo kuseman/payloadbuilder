@@ -94,7 +94,19 @@ public abstract class AExpressionTest extends Assert
     }
 
     /** Create an {@link ColumnExpression} */
+    protected ColumnExpression cre(String alias, TableSourceReference tr, TableSourceReference ttr, int ordinal, ResolvedType type)
+    {
+        return cre(alias, tr, ttr, ordinal, type, CoreColumn.Type.REGULAR);
+    }
+
+    /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String alias, TableSourceReference tr, int ordinal, ResolvedType type, CoreColumn.Type columnType)
+    {
+        return cre(alias, tr, null, ordinal, type, columnType);
+    }
+
+    /** Create an {@link ColumnExpression} */
+    protected ColumnExpression cre(String alias, TableSourceReference tr, TableSourceReference ttr, int ordinal, ResolvedType type, CoreColumn.Type columnType)
     {
         if (ordinal < 0)
         {
@@ -102,7 +114,7 @@ public abstract class AExpressionTest extends Assert
         }
         return ColumnExpression.Builder.of(alias, type)
                 .withOrdinal(ordinal)
-                .withColumnReference(new ColumnReference(tr, columnType))
+                .withColumnReference(new ColumnReference(tr, columnType, ttr))
                 .build();
     }
 
@@ -124,7 +136,13 @@ public abstract class AExpressionTest extends Assert
     /** Create an {@link ColumnExpression} with no ordinal */
     protected ColumnExpression cre(String column, TableSourceReference tr)
     {
-        return cre(column, tr, ResolvedType.of(Type.Any));
+        return cre(column, tr, (TableSourceReference) null, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR);
+    }
+
+    /** Create an {@link ColumnExpression} with no ordinal */
+    protected ColumnExpression cre(String column, TableSourceReference tr, TableSourceReference ttr)
+    {
+        return cre(column, tr, ttr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR);
     }
 
     /** Create an {@link ColumnExpression} with no ordinal */
@@ -142,9 +160,15 @@ public abstract class AExpressionTest extends Assert
     /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String column, TableSourceReference tr, ResolvedType type, CoreColumn.Type columnType)
     {
+        return cre(column, tr, (TableSourceReference) null, type, columnType);
+    }
+
+    /** Create an {@link ColumnExpression} */
+    protected ColumnExpression cre(String column, TableSourceReference tr, TableSourceReference ttr, ResolvedType type, CoreColumn.Type columnType)
+    {
         return ColumnExpression.Builder.of(column, type)
                 .withColumn(column)
-                .withColumnReference(new ColumnReference(tr, columnType))
+                .withColumnReference(new ColumnReference(tr, columnType, ttr))
                 .build();
     }
 

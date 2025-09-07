@@ -35,6 +35,8 @@ import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.ProjectionType;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
@@ -85,10 +87,12 @@ public class JdbcCatalog extends Catalog
     public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
     {
         Schema schema = Schema.EMPTY;
-        List<String> projection = getOptionProjection(options);
-        if (!projection.isEmpty())
+        Projection projection = getOptionProjection(options);
+        if (projection != null
+                && projection.type() == ProjectionType.COLUMNS)
         {
-            schema = new Schema(projection.stream()
+            schema = new Schema(projection.columns()
+                    .stream()
                     .map(p -> new Column(p, ResolvedType.ANY))
                     .toList());
         }
@@ -162,10 +166,11 @@ public class JdbcCatalog extends Catalog
     {
         List<IPredicate> predicates = getPredicates(data);
         List<ISortItem> sortItems = getSortItems(data);
-        List<String> projection = data.getProjection();
-        if (projection.isEmpty())
+        Projection projection = getOptionProjection(data.getOptions());
+        // JDBC catalog table hint projection has precedence of over PLB projection
+        if (projection == null)
         {
-            projection = getOptionProjection(data.getOptions());
+            projection = data.getProjection();
         }
         IExpression tableHintsOption = data.getOptions()
                 .stream()
@@ -178,7 +183,7 @@ public class JdbcCatalog extends Catalog
                 .orElse(null), table, seekPredicate, projection, predicates, sortItems, tableHintsOption, data.getOptions());
     }
 
-    private List<String> getOptionProjection(List<Option> options)
+    private Projection getOptionProjection(List<Option> options)
     {
         Option projection = options.stream()
                 .filter(o -> PROJECTION.equalsIgnoreCase(o.getOption()))
@@ -187,13 +192,21 @@ public class JdbcCatalog extends Catalog
 
         if (projection == null)
         {
-            return emptyList();
+            return null;
         }
-        return Arrays.stream(StringUtils.split(projection.getValueExpression()
+
+        String columns = StringUtils.trim(projection.getValueExpression()
                 .eval(null)
-                .valueAsString(0), ','))
+                .valueAsString(0));
+
+        if ("*".equals(columns))
+        {
+            return Projection.ALL;
+        }
+
+        return Projection.columns(Arrays.stream(StringUtils.split(columns, ','))
                 .map(StringUtils::trim)
-                .toList();
+                .toList());
     }
 
     private List<IPredicate> getPredicates(DatasourceData data)
