@@ -33,6 +33,7 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.CompileException;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
@@ -104,7 +105,7 @@ public class HttpCatalogTest
     public void test_getSeekDataSource_get()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL,
                 List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}"))));
 
         QualifiedName table = QualifiedName.of("http://localhost:" + mockServer.getPort());
@@ -141,8 +142,9 @@ public class HttpCatalogTest
     public void test_getSeekDataSource_post()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), List.of(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("post")),
-                new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{\"keys\":[{{id}}]}"))));
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL,
+                List.of(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("post")),
+                        new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{\"keys\":[{{id}}]}"))));
 
         QualifiedName table = QualifiedName.of("http://localhost:" + mockServer.getPort());
 
@@ -179,7 +181,7 @@ public class HttpCatalogTest
     public void test_getSeekDataSource_post_with_json_response_path()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL,
                 List.of(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("post")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{\"keys\":[{{key}}]}")),
                         new Option(QualifiedName.of("jsonpath"), ExpressionTestUtils.createStringExpression("/ids"))));
@@ -220,7 +222,7 @@ public class HttpCatalogTest
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         //@formatter:off
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), List.of(
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL, List.of(
                 new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("post")),
                 new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{\"keys\":[{{id}}]}"))));
         //@formatter:on
@@ -260,7 +262,7 @@ public class HttpCatalogTest
     public void test_getScanDataSource_invalid_table_name()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL,
                 List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}"))));
 
         try
@@ -281,7 +283,7 @@ public class HttpCatalogTest
 
         List<IPredicate> predicates = new ArrayList<>(List.of(IPredicateMock.eq("id", "id_value"), IPredicateMock.eq("id2", "value2")));
 
-        DatasourceData data = new DatasourceData(0, Optional.empty(), predicates, emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), predicates, emptyList(), Projection.ALL,
                 List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}"))));
 
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost:" + mockServer.getPort()), data);
@@ -319,7 +321,7 @@ public class HttpCatalogTest
 
         List<IPredicate> predicates = new ArrayList<>(List.of(IPredicateMock.in("id", List.of("value1", " value2")), IPredicateMock.eq("id2", "value2")));
 
-        DatasourceData data = new DatasourceData(0, Optional.empty(), predicates, emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), predicates, emptyList(), Projection.ALL,
                 List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}"))));
 
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost:" + mockServer.getPort()), data);
@@ -357,7 +359,7 @@ public class HttpCatalogTest
 
         List<IPredicate> predicates = new ArrayList<>(List.of(IPredicateMock.notIn("id", List.of("value1", " value2")), IPredicateMock.eq("id2", "value2")));
 
-        DatasourceData data = new DatasourceData(0, Optional.empty(), predicates, emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), predicates, emptyList(), Projection.ALL,
                 List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}"))));
 
         try
@@ -783,7 +785,7 @@ public class HttpCatalogTest
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL,
                 asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("put")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), ExpressionTestUtils.createStringExpression("x-value"))));
@@ -823,7 +825,7 @@ public class HttpCatalogTest
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL,
                 asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("patch")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), ExpressionTestUtils.createStringExpression("x-value"))));
@@ -857,7 +859,7 @@ public class HttpCatalogTest
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL,
                 asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("patch")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), ExpressionTestUtils.createStringExpression("x-value")),
@@ -877,7 +879,7 @@ public class HttpCatalogTest
         String body = "{\"json\":\"value\"}";
         IExecutionContext context = TestUtils.mockExecutionContext("http", Map.of(), 0, null);
 
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL,
                 asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("put")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "Content-Type"), ExpressionTestUtils.createStringExpression("text/plain"))));
@@ -902,7 +904,7 @@ public class HttpCatalogTest
         String body = "{\"json\":\"value\"}";
         IExecutionContext context = TestUtils.mockExecutionContext("http", Map.of("endpoint", "http://localhost"), 0, null);
 
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL,
                 asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("put")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "Content-Type"), ExpressionTestUtils.createStringExpression("text/plain"))));
