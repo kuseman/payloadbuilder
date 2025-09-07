@@ -7,9 +7,11 @@ import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
 import java.util.List;
+import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
@@ -22,12 +24,14 @@ public class Aggregate implements ILogicalPlan
     private final List<IExpression> aggregateExpressions;
     /** The output expressions from this aggregate */
     private final List<IAggregateExpression> projectionExpressions;
+    private TableSourceReference parentTableSource;
 
-    public Aggregate(ILogicalPlan input, List<IExpression> aggregateExpressions, List<IAggregateExpression> projectionExpressions)
+    public Aggregate(ILogicalPlan input, List<IExpression> aggregateExpressions, List<IAggregateExpression> projectionExpressions, TableSourceReference parentTableSource)
     {
         this.input = requireNonNull(input, "input");
         this.aggregateExpressions = getIfNull(aggregateExpressions, emptyList());
         this.projectionExpressions = requireNonNull(projectionExpressions, "projectionExpressions");
+        this.parentTableSource = parentTableSource;
     }
 
     public ILogicalPlan getInput()
@@ -45,6 +49,11 @@ public class Aggregate implements ILogicalPlan
         return projectionExpressions;
     }
 
+    public TableSourceReference getParentTableSource()
+    {
+        return parentTableSource;
+    }
+
     @Override
     public Schema getSchema()
     {
@@ -53,7 +62,7 @@ public class Aggregate implements ILogicalPlan
             return input.getSchema();
         }
 
-        return SchemaUtils.getSchema(projectionExpressions, true);
+        return SchemaUtils.getSchema(parentTableSource, projectionExpressions, true);
     }
 
     @Override
@@ -85,12 +94,12 @@ public class Aggregate implements ILogicalPlan
         {
             return true;
         }
-        else if (obj instanceof Aggregate)
+        else if (obj instanceof Aggregate that)
         {
-            Aggregate that = (Aggregate) obj;
             return input.equals(that.input)
                     && aggregateExpressions.equals(that.aggregateExpressions)
-                    && projectionExpressions.equals(that.projectionExpressions);
+                    && projectionExpressions.equals(that.projectionExpressions)
+                    && Objects.equals(parentTableSource, that.parentTableSource);
         }
         return false;
     }

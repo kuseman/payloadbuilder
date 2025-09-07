@@ -99,7 +99,6 @@ public class TableSourceReference
         TABLE,
         FUNCTION,
         EXPRESSION,
-        SUBQUERY,
-        CONSTANTSCAN
+        SUBQUERY
     }
 }

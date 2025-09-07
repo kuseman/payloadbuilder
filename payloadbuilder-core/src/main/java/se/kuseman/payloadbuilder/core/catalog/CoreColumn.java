@@ -58,15 +58,9 @@ public class CoreColumn extends Column
     }
 
     /** Copy ctor. New type of column */
-    public CoreColumn(CoreColumn source, ResolvedType type)
+    public CoreColumn(CoreColumn source, ResolvedType type, TableSourceReference tableSource)
     {
-        this(source.getName(), type, source.outputName, source.internal, source.tableSourceReference, source.columnType);
-    }
-
-    /** Copy ctor. New tablesource of column */
-    public CoreColumn(CoreColumn source, TableSourceReference tableSource)
-    {
-        this(source.getName(), source.getType(), source.outputName, source.internal, tableSource, source.columnType);
+        this(source.getName(), type, source.outputName, source.internal, tableSource, source.columnType);
     }
 
     public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, TableSourceReference tableSourceReference, Type columnType)

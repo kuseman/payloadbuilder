@@ -79,7 +79,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             emptySet(),
                             false,
                             Schema.EMPTY),
-                        List.of(e("b.col1"), new AliasExpression(e("t.col1"), "col1", true))),
+                        List.of(e("b.col1"), new AliasExpression(e("t.col1"), "col1", true)),
+                        null),
                 List.of(sortItem(e("t.col1"), Order.ASC))
                 );
         //CSON
@@ -116,7 +117,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     new Projection(
                         tableScan(Schema.of(ast("t", table)), table),
                         List.of(new AliasExpression(new SubscriptExpression(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("concat"), null,
-                                asList(uce("col"), intLit(1))), intLit(0)), "__expr0", "concat(col, 1)[0]", false))),
+                                asList(uce("col"), intLit(1))), intLit(0)), "__expr0", "concat(col, 1)[0]", false)),
+                        null),
                 List.of(sortItem(uce("__expr0"), Order.ASC))
                 );
         //CSON
@@ -157,7 +159,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new AggregateWrapperExpression(e("col1"), false, false),
                             new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("max"), null, asList(e("col2"))),
                             new AggregateWrapperExpression(e("col3"), false, true)
-                        )),
+                        ),
+                        null),
                 asList(sortItem(add(e("col1"), e("col3")), Order.ASC))
                 );
         //@formatter:on
@@ -194,7 +197,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("max"), null, asList(e("col2"))),
                             new AggregateWrapperExpression(new AliasExpression(
                                     new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("min"), null, asList(uce("__expr0"))), "__expr1"), false, true)
-                        )),
+                        ),
+                        null),
                 asList(sortItem(uce("__expr1"), Order.ASC))
                 );
         
@@ -247,7 +251,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                         new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("max"), null, asList(e("col2"))),
                                         new AggregateWrapperExpression(new AliasExpression(
                                                 new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("min"), null, asList(uce("__expr0"))), "__expr1"), false, true)
-                                    )),
+                                    ),
+                                    null),
                             asList(sortItem(uce("__expr1"), Order.ASC))),
                             null), "x")), null);
         //@formatter:on
@@ -314,14 +319,16 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                                         new Projection(
                                                             tableScan(resolvedSchemaSTableB, sTableB),
                                                             asList(uce("b", "col1"),
-                                                            new AliasExpression(uce("b", "col2"), "col2", true))),            // Internal column added for sorting
+                                                            new AliasExpression(uce("b", "col2"), "col2", true)),            // Internal column added for sorting
+                                                            null),
                                                         asList(sortItem(uce("b", "col2"), Order.ASC))),
                                                     "",
                                                     "object",
                                                     null),
                                                 null),
                                                 "obj1"),
-                                                new AliasExpression(uce("a", "col2"), "col2", true))),                       // Internal column added for sorting
+                                                new AliasExpression(uce("a", "col2"), "col2", true)),                       // Internal column added for sorting
+                                            null),
                                         asList(sortItem(uce("a", "col2"), Order.ASC))),
                                     "",
                                     "object_array",
@@ -370,7 +377,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new AggregateWrapperExpression(new AliasExpression(
                                     new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("min"), null,
                                             asList(add(e("COL1"), e("col2")))), "__expr0", "min(COL1 + col2)", false), false, false)
-                        )),
+                        ),
+                        null),
                 asList(sortItem(uce("__expr0"), Order.ASC))
                 );
         
@@ -421,7 +429,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new AggregateWrapperExpression(new AliasExpression(
                                     new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("min"), null,
                                             asList(add(e("col1"), e("col2")))), "compute", false), false, false)
-                        )),
+                        ),
+                        null),
                 asList(sortItem(e("compute"), Order.ASC))
                 );
         
@@ -462,7 +471,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new AggregateWrapperExpression(e("col1"), false, false),
                             new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("max"), null, asList(e("col2"))),
                             new AggregateWrapperExpression(e("col2"), false, true)
-                        )),
+                        ),
+                        null),
                 asList(sortItem(e("col1 + col2"), Order.ASC))
                 );
 
@@ -594,7 +604,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
+        TableSourceReference table = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", of("table"), "t");
+        TableSourceReference subQueryX = new TableSourceReference(0, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
 
         // Will be any push downs here since we have an asterisk and will have to resolve ordinal runtime
         //@formatter:off
@@ -694,7 +705,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
+        TableSourceReference table = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", of("table"), "t");
+        TableSourceReference subQueryX = new TableSourceReference(0, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
 
         // Expression on ordinal 1 will be used
         //@formatter:off
@@ -1218,7 +1230,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     asList(e("t.col")),
                     asList(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))),
                            new AggregateWrapperExpression(add(e("t.col"),  new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("max"), null, asList(e("col1")))), false, false)
-                           ));
+                           ),
+                    null);
         
         assertEquals(Schema.of(
                 new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false, CoreColumn.Type.REGULAR),
@@ -1254,8 +1267,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     asList(new AggregateWrapperExpression(
                                 new AliasExpression(
                                     new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))), "cnt"), false, false),
-                           new AggregateWrapperExpression(e("col"), false, false)
-                            ));
+                           new AggregateWrapperExpression(e("col"), false, false)),
+                    null);
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1287,7 +1300,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                new AggregateWrapperExpression(
                                        new AliasExpression(
                                            new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("max"), null, asList(e("col2"))), "__expr0"), false, true)
-                                )),
+                                ),
+                        null),
                     null,
                     e("__expr0 > 10"));
         
@@ -1331,7 +1345,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                new AggregateWrapperExpression(
                                        new AliasExpression(
                                            new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("max"), null, asList(e("col2"))), "__expr0"), false, true)
-                                )),
+                                ),
+                        null),
                     null,
                     e("__expr0 > 10"));
         
@@ -1378,7 +1393,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                    new AggregateWrapperExpression(
                                            new AliasExpression(
                                                new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("max"), null, asList(e("col2"))), "__expr2"), false, true)
-                                    )),
+                                    ),
+                            null),
                         null,
                         e("__expr2 < 10 and (2 + __expr1) > 20")),
                     asList(sortItem(e("__expr1"), Order.ASC)));
@@ -1431,7 +1447,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                    new AggregateWrapperExpression(
                                            new AliasExpression(
                                                new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("max"), null, asList(e("col2"))), "__expr1"), false, true)
-                                    )),
+                                    ),
+                            null),
                         null,
                         e("__expr1 < 10 and (2 + __expr0) > 20")),
                     asList(sortItem(e("__expr0"), Order.ASC)));
@@ -1473,7 +1490,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                new AggregateWrapperExpression(
                                        new AliasExpression(
                                            new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))), "__expr0", "count(1)", false), false, false)
-                                )),
+                                ),
+                        null),
                     null,
                     e("__expr0 > 10"));
         
@@ -1514,7 +1532,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                    new AggregateWrapperExpression(
                                            new AliasExpression(
                                                new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))), "__expr0", "count(1)", false), false, false)
-                                    )),
+                                    ),
+                            null),
                         null,
                         e("__expr0 > 10")),
                     asList(sortItem(e("__expr0"), Order.DESC)));
@@ -1555,7 +1574,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                    new AggregateWrapperExpression(
                                            new AliasExpression(
                                                new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))), "numberOfRecords", false), false, false)
-                                    )),
+                                    ),
+                            null),
                         null,
                         e("numberOfRecords > 10")),
                     asList(sortItem(e("numberOfRecords"), Order.DESC)));
@@ -1594,7 +1614,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                     new AliasExpression(
                                         new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))), "cnt"), false, false),
                                new AggregateWrapperExpression(e("col"), false, false)
-                                )),
+                                ),
+                        null),
                     asList(sortItem(e("cnt"), Order.ASC)));
 
         Assertions.assertThat(actual.getSchema())
@@ -1633,7 +1654,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         asList(new AggregateWrapperExpression(
                                     new AliasExpression(
                                         new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))), "cnt"), false, false),
-                               new AggregateWrapperExpression(e("col"), false, true))),
+                               new AggregateWrapperExpression(e("col"), false, true)),
+                        null),
                     asList(sortItem(e("col"), Order.ASC)));
         //@formatter:on
 
@@ -1669,7 +1691,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                     new AliasExpression(
                                         new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))), "cnt"), false, false),
                                new AggregateWrapperExpression(e("col"), false, true),
-                               new AggregateWrapperExpression(e("col2"), false, true))),
+                               new AggregateWrapperExpression(e("col2"), false, true)),
+                        null),
                     asList(sortItem(add(add(e("col"), intLit(10)), e("col2")), Order.ASC)));
         //@formatter:on
 

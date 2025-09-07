@@ -75,7 +75,7 @@ public class SchemaUtils
     {
         if (column instanceof CoreColumn cc)
         {
-            return new CoreColumn(cc, tableSourceReference);
+            return new CoreColumn(cc, cc.getType(), tableSourceReference);
         }
 
         return CoreColumn.of(column.getName(), column.getType(), tableSourceReference);
@@ -84,9 +84,15 @@ public class SchemaUtils
     /** Creates a new column from provide column with a new type. */
     public static Column changeType(Column column, ResolvedType type)
     {
+        return changeType(column, type, getTableSource(column));
+    }
+
+    /** Creates a new column from provide column with a new type. */
+    public static Column changeType(Column column, ResolvedType type, TableSourceReference tableSourceReference)
+    {
         if (column instanceof CoreColumn cc)
         {
-            return new CoreColumn(cc, type);
+            return new CoreColumn(cc, type, tableSourceReference);
         }
 
         return new Column(column.getName(), type);
@@ -261,13 +267,17 @@ public class SchemaUtils
         return emptySet();
     }
 
-    /** Create a schema from provided expressions. */
-    public static Schema getSchema(List<? extends IExpression> expressions, boolean aggregate)
+    /**
+     * Create a schema from provided expressions.
+     *
+     * @param parentTableSource Reference to mark expressions that lack a table source with.
+     */
+    public static Schema getSchema(TableSourceReference parentTableSource, List<? extends IExpression> expressions, boolean aggregate)
     {
         List<Column> columns = new ArrayList<>(expressions.size());
         for (IExpression expression : expressions)
         {
-            columns.add(getColumn(expression, aggregate, null));
+            columns.add(getColumn(parentTableSource, expression, aggregate, null));
         }
         return new Schema(columns);
     }
@@ -275,7 +285,7 @@ public class SchemaUtils
     /**
      * Create a schema from provided expression and runtime vectors. This is used during schema less queries to create a schema based on runtime values
      */
-    public static Schema getSchema(List<? extends IExpression> expressions, ValueVector[] projectionVectors, boolean aggregate)
+    public static Schema getSchema(TableSourceReference parentTableSource, List<? extends IExpression> expressions, ValueVector[] projectionVectors, boolean aggregate)
     {
         // Else we need to construct the actual schema from the actual vectors
         List<Column> columns = new ArrayList<>(projectionVectors.length);
@@ -284,13 +294,13 @@ public class SchemaUtils
         int size = projectionVectors.length;
         for (int i = 0; i < size; i++)
         {
-            columns.add(getColumn(expressions.get(i), aggregate, projectionVectors[i].type()));
+            columns.add(getColumn(parentTableSource, expressions.get(i), aggregate, projectionVectors[i].type()));
         }
         return new Schema(columns);
     }
 
     /** Create a column from provided expression and optional type */
-    public static Column getColumn(IExpression expression, boolean aggregate, ResolvedType type)
+    private static Column getColumn(TableSourceReference parentTableSource, IExpression expression, boolean aggregate, ResolvedType type)
     {
         String name = "";
         String outputName = "";
@@ -324,7 +334,10 @@ public class SchemaUtils
                 columnType = cr.columnType();
             }
         }
-
+        if (tableSourceReference == null)
+        {
+            tableSourceReference = parentTableSource;
+        }
         return new CoreColumn(name, type, outputName, expression.isInternal(), tableSourceReference, columnType);
     }
 

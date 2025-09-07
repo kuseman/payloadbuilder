@@ -31,6 +31,7 @@ import se.kuseman.payloadbuilder.core.logicalplan.Limit;
 import se.kuseman.payloadbuilder.core.logicalplan.MaxRowCountAssert;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
+import se.kuseman.payloadbuilder.core.logicalplan.SubQuery;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
 
 /**
@@ -141,7 +142,7 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
 
             if (projection)
             {
-                logicalPlans.add(new Projection(context.current, columnsResult));
+                logicalPlans.add(new Projection(context.current, columnsResult, null));
                 allConstantScans = false;
             }
             else
@@ -211,7 +212,7 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
                     .stream()
                     .map(e -> (IAggregateExpression) e.accept(SubQueryExpressionVisitor.INSTANCE, context))
                     .toList();
-            ILogicalPlan result = new Aggregate(context.current, plan.getAggregateExpressions(), projections);
+            ILogicalPlan result = new Aggregate(context.current, plan.getAggregateExpressions(), projections, plan.getParentTableSource());
             context.current = prevCurrent;
             return result;
         }
@@ -239,7 +240,7 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
         ILogicalPlan result = context.current;
         context.current = prevCurrent;
 
-        return new Aggregate(result, plan.getAggregateExpressions(), singletonList((IAggregateExpression) e));
+        return new Aggregate(result, plan.getAggregateExpressions(), singletonList((IAggregateExpression) e), plan.getParentTableSource());
     }
 
     @Override
@@ -260,7 +261,7 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
                     .stream()
                     .map(e -> e.accept(SubQueryExpressionVisitor.INSTANCE, context))
                     .toList();
-            ILogicalPlan result = new Projection(context.current, expressions);
+            ILogicalPlan result = new Projection(context.current, expressions, plan.getParentTableSource());
             context.current = prevCurrent;
             return result;
         }
@@ -283,7 +284,7 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
 
         ILogicalPlan result = context.current;
         context.current = prevCurrent;
-        return new Projection(result, singletonList(e));
+        return new Projection(result, singletonList(e), plan.getParentTableSource());
     }
 
     /**
@@ -389,6 +390,10 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
             if (plan instanceof Projection p)
             {
                 plan = p.getInput();
+            }
+            if (plan instanceof SubQuery s)
+            {
+                plan = s.getInput();
             }
 
             if (plan instanceof ConstantScan cs)

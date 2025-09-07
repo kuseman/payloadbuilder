@@ -8,17 +8,17 @@ public interface ICoreExpressionVisitor<T, C> extends IExpressionVisitor<T, C>
     default T visit(AsteriskExpression expression, C context)
     {
         return visitChildren(context, expression);
-    };
+    }
 
     default T visit(UnresolvedColumnExpression expression, C context)
     {
         return visitChildren(context, expression);
-    };
+    }
 
     default T visit(UnresolvedFunctionCallExpression expression, C context)
     {
         return visitChildren(context, expression);
-    };
+    }
 
     default T visit(UnresolvedSubQueryExpression expression, C context)
     {
@@ -44,5 +44,4 @@ public interface ICoreExpressionVisitor<T, C> extends IExpressionVisitor<T, C>
     {
         return visitChildren(context, expression);
     }
-
 }

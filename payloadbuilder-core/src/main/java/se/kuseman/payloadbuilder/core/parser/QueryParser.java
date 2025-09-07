@@ -652,43 +652,8 @@ public class QueryParser
             {
                 ColumnAliasListContext columnAliasList = ctx.columnAliasList();
 
+                // Expression scan
                 if (ctx.derivedTable()
-                        .selectStatement() != null)
-                {
-                    if (columnAliasList != null)
-                    {
-                        throw new ParseException("Columns alias(es) is not supported on sub query statements", columnAliasList);
-                    }
-
-                    boolean prevInsideSubQuery = insideSubQuery;
-                    insideSubQuery = true;
-                    LogicalSelectStatement stm = (LogicalSelectStatement) visit(ctx.derivedTable()
-                            .selectStatement());
-                    insideSubQuery = prevInsideSubQuery;
-
-                    // If this was a derived table with a simple projection that was turned into a constant scan
-                    // unwrap the plan with a new schema according to a unique tablesource ref.
-                    //
-                    // select *
-                    // from (
-                    // select 10 col, 20 col2
-                    // )
-                    if (stm.getSelect() instanceof ConstantScan cs)
-                    {
-                        TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.CONSTANTSCAN, "", QualifiedName.of(alias), alias);
-                        List<String> columns = cs.getSchema()
-                                .getColumns()
-                                .stream()
-                                .map(Column::getName)
-                                .toList();
-                        return ConstantScan.create(tableSourceRef, columns, cs.getRowsExpressions(), cs.getLocation());
-                    }
-
-                    TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of(alias), alias);
-                    return new SubQuery(stm.getSelect(), tableSourceRef, Location.from(ctx.derivedTable()
-                            .selectStatement()));
-                }
-                else if (ctx.derivedTable()
                         .expression() != null)
                 {
                     if (!options.isEmpty())
@@ -707,28 +672,68 @@ public class QueryParser
                             .expression()));
                 }
 
-                boolean prevInsideProjection = insideProjection;
-                insideProjection = true;
-                List<List<IExpression>> expressions = ctx.derivedTable()
-                        .tableValueConstructor()
-                        .expr_list()
-                        .stream()
-                        .map(this::getExpressionList)
-                        .toList();
-                insideProjection = prevInsideProjection;
+                ILogicalPlan input = null;
+                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of(alias), alias);
 
-                List<String> columns = emptyList();
-                if (columnAliasList != null)
+                if (ctx.derivedTable()
+                        .selectStatement() != null)
                 {
-                    columns = columnAliasList.identifier()
+                    if (columnAliasList != null)
+                    {
+                        throw new ParseException("Columns alias(es) is not supported on sub query statements", columnAliasList);
+                    }
+
+                    boolean prevInsideSubQuery = insideSubQuery;
+                    insideSubQuery = true;
+                    LogicalSelectStatement stm = (LogicalSelectStatement) visit(ctx.derivedTable()
+                            .selectStatement());
+                    insideSubQuery = prevInsideSubQuery;
+
+                    input = stm.getSelect();
+                    // If this was a derived table with a simple projection that was turned into a constant scan
+                    // unwrap the plan with a new schema according to the subquery tablesource ref.
+                    //
+                    // select *
+                    // from (
+                    // select 10 col, 20 col2
+                    // )
+                    if (stm.getSelect() instanceof ConstantScan cs)
+                    {
+                        List<String> columns = cs.getSchema()
+                                .getColumns()
+                                .stream()
+                                .map(Column::getName)
+                                .toList();
+                        input = ConstantScan.create(tableSourceRef, columns, cs.getRowsExpressions(), cs.getLocation());
+                    }
+                }
+                else
+                {
+                    //
+                    boolean prevInsideProjection = insideProjection;
+                    insideProjection = true;
+                    List<List<IExpression>> expressions = ctx.derivedTable()
+                            .tableValueConstructor()
+                            .expr_list()
                             .stream()
-                            .map(this::getIdentifier)
+                            .map(this::getExpressionList)
                             .toList();
+                    insideProjection = prevInsideProjection;
+
+                    List<String> columns = emptyList();
+                    if (columnAliasList != null)
+                    {
+                        columns = columnAliasList.identifier()
+                                .stream()
+                                .map(this::getIdentifier)
+                                .toList();
+                    }
+
+                    input = ConstantScan.create(tableSourceRef, columns, expressions, Location.from(ctx.derivedTable()
+                            .tableValueConstructor()));
                 }
 
-                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.CONSTANTSCAN, "", QualifiedName.of(alias), alias);
-                return ConstantScan.create(tableSourceRef, columns, expressions, Location.from(ctx.derivedTable()
-                        .tableValueConstructor()));
+                return new SubQuery(input, tableSourceRef, Location.from(ctx.derivedTable()));
             }
 
             FunctionCallContext functionCall = ctx.functionCall();
@@ -1487,7 +1492,7 @@ public class QueryParser
                     return ConstantScan.create(expressions, Location.from(ctx.SELECT()));
                 }
 
-                plan = new Projection(plan, expressions);
+                plan = new Projection(plan, expressions, null);
             }
             // TODO: mark all table source references with an asterisk to properly push down projections
             // else
@@ -1518,7 +1523,7 @@ public class QueryParser
             {
                 // Empty aggregate and projection
                 // We will aggregate the whole input
-                plan = new Aggregate(plan, emptyList(), emptyList());
+                plan = new Aggregate(plan, emptyList(), emptyList(), null);
             }
 
             return plan;
@@ -1546,7 +1551,7 @@ public class QueryParser
                 List<IExpression> aggregateExpressions = ctx.groupBy.stream()
                         .map(this::getExpression)
                         .collect(toList());
-                plan = new Aggregate(plan, aggregateExpressions, projectionExpressions);
+                plan = new Aggregate(plan, aggregateExpressions, projectionExpressions, null);
             }
             return plan;
         }

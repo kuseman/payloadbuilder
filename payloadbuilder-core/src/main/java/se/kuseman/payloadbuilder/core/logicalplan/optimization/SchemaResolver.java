@@ -108,7 +108,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                 .collect(toList());
 
         context.resolvingAggregateProjectionExpression = false;
-        return new Aggregate(input, aggregateExpressions, projectionExpressions);
+        return new Aggregate(input, aggregateExpressions, projectionExpressions, plan.getParentTableSource());
     }
 
     @Override

@@ -47,7 +47,7 @@ public class ProjectionTest extends APhysicalPlanTest
 
         MutableBoolean closed = new MutableBoolean(false);
         IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY),
-                asList(col1, new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, col1, col3), col3));
+                asList(col1, new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, col1, col3), col3), null);
 
         //@formatter:off
         Schema expectedSchema = Schema.of(
@@ -148,7 +148,7 @@ public class ProjectionTest extends APhysicalPlanTest
             }
         };
 
-        IPhysicalPlan plan = new Projection(1, input, asList(aastExp, bcol3Exp, calcExp));
+        IPhysicalPlan plan = new Projection(1, input, asList(aastExp, bcol3Exp, calcExp), null);
 
         // Asterisks => empty schema
         //@formatter:off
@@ -216,7 +216,7 @@ public class ProjectionTest extends APhysicalPlanTest
         };
 
         MutableBoolean closed = new MutableBoolean(false);
-        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY), asList(col1, col3, ocol4));
+        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY), asList(col1, col3, ocol4), null);
 
         Schema outerSchema = schema("col4");
 

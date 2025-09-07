@@ -379,7 +379,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
             expressions = visit(plan, plan.getExpressions(), context);
         }
         return new Projection(plan.getInput()
-                .accept(this, context), expressions);
+                .accept(this, context), expressions, plan.getParentTableSource());
     }
 
     protected ILogicalPlan create(Aggregate plan, C context)
@@ -406,7 +406,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         }
 
         return new Aggregate(plan.getInput()
-                .accept(this, context), aggregateExpressions, projectionExpressions);
+                .accept(this, context), aggregateExpressions, projectionExpressions, plan.getParentTableSource());
     }
 
     protected ILogicalPlan create(Join plan, C context)
@@ -608,17 +608,6 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         public Void visit(SubQuery plan, Set<TableSourceReference> context)
         {
             context.add(plan.getTableSource());
-            return super.visit(plan, context);
-        }
-
-        @Override
-        public Void visit(ConstantScan plan, Set<TableSourceReference> context)
-        {
-            TableSourceReference tableSource = plan.getTableSource();
-            if (tableSource != null)
-            {
-                context.add(tableSource);
-            }
             return super.visit(plan, context);
         }
     }
