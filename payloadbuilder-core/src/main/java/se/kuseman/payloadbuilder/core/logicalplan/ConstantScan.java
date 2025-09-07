@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import org.apache.commons.lang3.ObjectUtils;
+
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -14,24 +16,24 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
 
 /** {@link se.kuseman.payloadbuilder.core.physicalplan.ConstantScan} */
 public class ConstantScan implements ILogicalPlan
 {
-    public static final ConstantScan ONE_ROW_EMPTY_SCHEMA = new ConstantScan(Schema.EMPTY, null, List.of(emptyList()), null);
-    public static final ConstantScan ZERO_ROWS_EMPTY_SCHEMA = new ConstantScan(Schema.EMPTY, null, emptyList(), null);
+    public static final ConstantScan ONE_ROW_EMPTY_SCHEMA = new ConstantScan(Schema.EMPTY, List.of(emptyList()), null);
+    public static final ConstantScan ZERO_ROWS_EMPTY_SCHEMA = new ConstantScan(Schema.EMPTY, emptyList(), null);
 
     private final Schema schema;
-    private final TableSourceReference tableSource;
     private final List<List<IExpression>> rowsExpressions;
     private final Location location;
 
-    private ConstantScan(Schema schema, TableSourceReference tableSource, List<List<IExpression>> rowsExpressions, Location location)
+    private ConstantScan(Schema schema, List<List<IExpression>> rowsExpressions, Location location)
     {
         this.schema = requireNonNull(schema, "schema");
-        this.tableSource = tableSource;
         this.rowsExpressions = requireNonNull(rowsExpressions, "rowsExpressions");
         this.location = location;
         validate();
@@ -40,11 +42,6 @@ public class ConstantScan implements ILogicalPlan
     public Location getLocation()
     {
         return location;
-    }
-
-    public TableSourceReference getTableSource()
-    {
-        return tableSource;
     }
 
     public List<List<IExpression>> getRowsExpressions()
@@ -144,17 +141,26 @@ public class ConstantScan implements ILogicalPlan
         }
 
         List<ResolvedType> columnTypes = getTypesFromRows(rowsExpressions, location);
-        Schema schema = new Schema(IntStream.range(0, columnTypes.size())
-                .mapToObj(i -> SchemaUtils.changeType(this.schema.getColumns()
-                        .get(i), columnTypes.get(i)))
+        List<TableSourceReference> tableSourceReferences = getTableSourceReferenceFromRows(null, rowsExpressions, location);
+        List<Column> columns = this.schema.getColumns();
+        Schema schema = new Schema(IntStream.range(0, columns.size())
+                .mapToObj(i ->
+                {
+                    // Use the new ref if non null else keep the existing
+                    TableSourceReference ref = ObjectUtils.getIfNull(tableSourceReferences.get(i), SchemaUtils.getTableSource(this.getSchema()
+                            .getColumns()
+                            .get(i)));
+
+                    return SchemaUtils.changeType(columns.get(i), columnTypes.get(i), ref);
+                })
                 .toList());
-        return new ConstantScan(schema, tableSource, rowsExpressions, location);
+        return new ConstantScan(schema, rowsExpressions, location);
     }
 
     /** Constructs a constant scan with a schema and no rows. */
     public static ConstantScan create(Schema schema)
     {
-        return new ConstantScan(schema, null, emptyList(), null);
+        return new ConstantScan(schema, emptyList(), null);
     }
 
     /** Constructs a constant scan with provided column names and row expressions. */
@@ -163,18 +169,20 @@ public class ConstantScan implements ILogicalPlan
         requireNonNull(tableSource);
         // Create schema from provided row expressions. Highest priority of each column
         List<ResolvedType> columnTypes = getTypesFromRows(rowsExpressions, location);
+        // Pick table source ref. for each column
+        List<TableSourceReference> tableSourceReferences = getTableSourceReferenceFromRows(tableSource, rowsExpressions, location);
         Schema schema = new Schema(IntStream.range(0, columnNames.size())
-                .mapToObj(i -> (Column) CoreColumn.of(columnNames.get(i), columnTypes.get(i), tableSource))
+                .mapToObj(i -> (Column) CoreColumn.of(columnNames.get(i), columnTypes.get(i), tableSourceReferences.get(i)))
                 .toList());
 
-        return new ConstantScan(schema, tableSource, rowsExpressions, location);
+        return new ConstantScan(schema, rowsExpressions, location);
     }
 
     /** Constructs a constant scan with provided column names and a single row of expressions. */
     public static ConstantScan create(List<IExpression> rowExpressions, Location location)
     {
-        Schema schema = SchemaUtils.getSchema(rowExpressions, false);
-        return new ConstantScan(schema, null, List.of(rowExpressions), location);
+        Schema schema = SchemaUtils.getSchema(null, rowExpressions, false);
+        return new ConstantScan(schema, List.of(rowExpressions), location);
     }
 
     private static List<ResolvedType> getTypesFromRows(List<List<IExpression>> rowsExpressions, Location location)
@@ -212,5 +220,60 @@ public class ConstantScan implements ILogicalPlan
             }
         }
         return columnTypes;
+    }
+
+    private static List<TableSourceReference> getTableSourceReferenceFromRows(TableSourceReference tableSource, List<List<IExpression>> rowsExpressions, Location location)
+    {
+        if (rowsExpressions.isEmpty())
+        {
+            return emptyList();
+        }
+
+        int count = rowsExpressions.get(0)
+                .size();
+        List<TableSourceReference> tableSources = new ArrayList<>(count);
+        int rowCount = rowsExpressions.size();
+        for (int i = 0; i < count; i++)
+        {
+            TableSourceReference rowTableSource = null;
+
+            for (int j = 0; j < rowCount; j++)
+            {
+                List<IExpression> rowExpressions = rowsExpressions.get(j);
+
+                if (rowExpressions.size() != count)
+                {
+                    throw new ParseException("All rows expressions must be of equal size.", location);
+                }
+
+                IExpression expression = rowExpressions.get(i);
+                if (expression instanceof HasColumnReference hcr)
+                {
+                    ColumnReference cr = hcr.getColumnReference();
+                    if (cr != null)
+                    {
+                        if (rowTableSource == null)
+                        {
+                            rowTableSource = cr.tableSourceReference();
+                        }
+                        // We have different sources, null out the reference
+                        else if (!rowTableSource.equals(cr.tableSourceReference()))
+                        {
+                            rowTableSource = null;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // If there was no table source for the current row pick the provided (subquery)
+            if (rowTableSource == null)
+            {
+                rowTableSource = tableSource;
+            }
+
+            tableSources.add(rowTableSource);
+        }
+        return tableSources;
     }
 }

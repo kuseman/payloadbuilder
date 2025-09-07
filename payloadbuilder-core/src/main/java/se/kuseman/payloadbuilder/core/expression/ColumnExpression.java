@@ -194,9 +194,6 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
             // This happens when having an asterisk schema and we only know which table source
             // this columns belongs to and we don't have an ordinal
             if (columnReference != null
-                    // Sub query table sources are only a marker during planning and should not be compared
-                    && columnReference.tableSourceReference()
-                            .getType() != TableSourceReference.Type.SUBQUERY
                     && (columnTableSourceReference == null
                             || columnReference.tableSourceReference()
                                     .getId() != columnTableSourceReference.getId()))

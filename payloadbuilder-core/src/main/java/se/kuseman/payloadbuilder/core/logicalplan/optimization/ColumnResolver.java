@@ -56,6 +56,7 @@ import se.kuseman.payloadbuilder.core.expression.UnresolvedFunctionCallExpressio
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
+import se.kuseman.payloadbuilder.core.logicalplan.Concatenation;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
@@ -115,6 +116,9 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         /** Flag to indicate when we are resolving inside a sub query */
         boolean insideSubQuery = false;
 
+        /** Stack subQueryTableSource. */
+        Deque<TableSourceReference> subQueryTableSource = new ArrayDeque<>();
+
         /**
          * Set with column references used when resolving aggregate projection to detect if an expression should be single value or grouped
          */
@@ -167,8 +171,11 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Expand all static asterisks, they should not be left for execution
         expressions = expandAsterisks(expressions, context.outerReferences, context.outerSchema, schema);
 
+        // Mark projection expressions that lack a table source reference with the closest sub query
+        // reference
+        TableSourceReference parentTableSourceReference = context.subQueryTableSource.peek();
         // Might create the resulting schema from the expressions here and not do that on demand
-        ILogicalPlan result = new Projection(input, expressions);
+        ILogicalPlan result = new Projection(input, expressions, parentTableSourceReference);
         context.planSchema.push(new ResolveSchema(result.getSchema()));
         return result;
     }
@@ -365,7 +372,8 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             }
         }
 
-        ILogicalPlan result = new Aggregate(input, aggregateExpressions, projectionExpressions);
+        TableSourceReference parentTableSourceReference = context.subQueryTableSource.peek();
+        ILogicalPlan result = new Aggregate(input, aggregateExpressions, projectionExpressions, parentTableSourceReference);
         context.planSchema.push(new ResolveSchema(result.getSchema()));
         return result;
     }
@@ -378,9 +386,13 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // CSON
         context.insideSubQuery = true;
 
+        context.subQueryTableSource.push(plan.getTableSource());
+
         // Eliminate sub query, no sub queries should be left
         ILogicalPlan result = plan.getInput()
                 .accept(this, context);
+
+        context.subQueryTableSource.pop();
 
         ResolveSchema schema = context.getSchema(result);
 
@@ -408,6 +420,16 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         context.planSchema.push(new ResolveSchema(schema, plan.getTableSource()));
         context.insideSubQuery = prevInsideSubQuery;
         return new SubQuery(result, plan.getTableSource(), plan.getLocation());
+    }
+
+    @Override
+    public ILogicalPlan visit(Concatenation plan, Ctx context)
+    {
+        ILogicalPlan result = super.visit(plan, context);
+
+        context.planSchema.push(new ResolveSchema(result.getSchema()));
+
+        return result;
     }
 
     @Override
@@ -505,9 +527,8 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
 
         ILogicalPlan result = plan.reCreate(rowsExpressions);
 
-        TableSourceReference tableSource = plan.getTableSource();
-        context.planSchema.push(new ResolveSchema(result.getSchema(), tableSource != null ? tableSource.getAlias()
-                : ""));
+        // TableSourceReference tableSource = plan.getTableSource();
+        context.planSchema.push(new ResolveSchema(result.getSchema()));
 
         return result;
     }

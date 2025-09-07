@@ -5,9 +5,11 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
 import java.util.List;
+import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 
 /** Projects input with a list of expressions */
@@ -17,11 +19,13 @@ public class Projection implements ILogicalPlan
     private final ILogicalPlan input;
     /** Projection expressions */
     private final List<IExpression> expressions;
+    private final TableSourceReference parentTableSource;
 
-    public Projection(ILogicalPlan input, List<IExpression> expressions)
+    public Projection(ILogicalPlan input, List<IExpression> expressions, TableSourceReference parentTableSource)
     {
         this.input = requireNonNull(input, "input");
         this.expressions = requireNonNull(expressions, "expressions");
+        this.parentTableSource = parentTableSource;
     }
 
     public List<IExpression> getExpressions()
@@ -34,10 +38,15 @@ public class Projection implements ILogicalPlan
         return input;
     }
 
+    public TableSourceReference getParentTableSource()
+    {
+        return parentTableSource;
+    }
+
     @Override
     public Schema getSchema()
     {
-        return SchemaUtils.getSchema(expressions, false);
+        return SchemaUtils.getSchema(parentTableSource, expressions, false);
     }
 
     @Override
@@ -72,7 +81,8 @@ public class Projection implements ILogicalPlan
         else if (obj instanceof Projection that)
         {
             return input.equals(that.input)
-                    && expressions.equals(that.expressions);
+                    && expressions.equals(that.expressions)
+                    && Objects.equals(parentTableSource, that.parentTableSource);
         }
         return false;
     }

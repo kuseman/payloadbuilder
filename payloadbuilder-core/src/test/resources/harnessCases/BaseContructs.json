@@ -1222,6 +1222,7 @@
         "Make sure that the calculated column inside subquery in used in the join predicate"
       ],
       "query": [
+        "--set @@debugplan = true ",
         "select *",
         "from source s",
         "inner join ",
@@ -1952,6 +1953,52 @@
       ]
     },
     {
+      "name": "Table values ctor with outer references 2",
+      "query": [
+        "--set @@debugplan = true ",
+        "select y.* ",
+        "from source s ",
+        "outer apply ( ",
+        "  values (s.col1, s.col2) ",
+        ") y (col3, col4) "
+      ],
+      "expectedResultSets": [
+        [
+          [ { "key": "col3", "value": 1}, { "key": "col4", "value": 2}],
+          [ { "key": "col3", "value": 3}, { "key": "col4", "value": 4}],
+          [ { "key": "col3", "value": 5}, { "key": "col4", "value": 6}]
+        ]
+      ]
+    },
+    {
+      "name": "Table values ctor with outer references 3",
+      "query": [
+        "--set @@debugplan = true ",
+        "select y.* ",
+        "from source s ",
+        "inner join data d ",
+        "  on d.id = s.col1 ",
+        "outer apply ( ",
+        "  values (s.col1, s.col2) ",
+        "  ,      (d.id,   d.data) ", 
+        ") y (col3, col4) "
+      ],
+      "expectedResultSets": [
+        [
+          [ { "key": "col3", "value": 1}, { "key": "col4", "value": 2}],
+          [ { "key": "col3", "value": 1}, { "key": "col4", "value": "1_1"}],
+          [ { "key": "col3", "value": 1}, { "key": "col4", "value": 2}],
+          [ { "key": "col3", "value": 1}, { "key": "col4", "value": "1_2"}],
+          [ { "key": "col3", "value": 3}, { "key": "col4", "value": 4}],
+          [ { "key": "col3", "value": 3}, { "key": "col4", "value": "3_1"}],
+          [ { "key": "col3", "value": 3}, { "key": "col4", "value": 4}],
+          [ { "key": "col3", "value": 3}, { "key": "col4", "value": "3_2"}],
+          [ { "key": "col3", "value": 3}, { "key": "col4", "value": 4}],
+          [ { "key": "col3", "value": 3}, { "key": "col4", "value": "3_3"}]
+        ]
+      ]
+    },
+    {
       "name": "Table values ctor multiple",
       "query": [
         "--set @@debugplan = true ",
@@ -2027,7 +2074,7 @@
         ") y ",
         "outer apply ( ",
         "  select 3 col1, 4 col2 ",
-        ") z  "
+        ") z "
       ],
       "expectedResultSets": [
         [

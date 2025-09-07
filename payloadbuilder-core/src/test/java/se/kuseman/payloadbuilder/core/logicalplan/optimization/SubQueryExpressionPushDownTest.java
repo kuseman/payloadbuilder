@@ -92,12 +92,16 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(q);
         ILogicalPlan actual = optimize(context, plan);
 
+        TableSourceReference subQueryX = new TableSourceReference(0, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
+
         //@formatter:off
         ILogicalPlan expected = projection(
                 new Join(
                     ConstantScan.ONE_ROW_EMPTY_SCHEMA,
                     projection(
-                        ConstantScan.create(new TableSourceReference(0, TableSourceReference.Type.CONSTANTSCAN, "", QualifiedName.of("x"), "x"), List.of("col"), List.of(List.of(intLit(1))), null),
+                        subQuery(
+                            ConstantScan.create(subQueryX, List.of("col"), List.of(List.of(intLit(1))), null),
+                            subQueryX),
                         asList(new AliasExpression(uce("x", "col"), "__expr0", true))
                     ),
                     Join.Type.LEFT,
@@ -137,28 +141,32 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         ILogicalPlan plan = getSchemaResolvedPlan(q);
         ILogicalPlan actual = optimize(context, plan);
+        TableSourceReference subQueryX = new TableSourceReference(0, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
 
         //@formatter:off
-        ILogicalPlan expected = new Concatenation(
-                List.of("col1", "col2"),
-                List.of(
-                projection(
-                    new OperatorFunctionScan(
-                        Schema.of(new CoreColumn("__expr0", ResolvedType.ANY, "", true)),
-                        ConstantScan.create(List.of(new AliasExpression(stringLit("hello"), "col1")), null),
-                        "",
-                        "object",
-                        null),
-                    List.of(intLit(1), uce("__expr0"))),
-                projection(
-                    new OperatorFunctionScan(
-                        Schema.of(new CoreColumn("__expr1", ResolvedType.ANY, "", true)),
-                        ConstantScan.create(List.of(new AliasExpression(stringLit("world"), "col2")), null),
-                        "",
-                        "object",
-                        null),
-                    List.of(intLit(2), uce("__expr1")))
-                ), null);
+        ILogicalPlan expected = 
+                subQuery(
+                    new Concatenation(
+                    List.of("col1", "col2"),
+                    List.of(
+                    projection(
+                        new OperatorFunctionScan(
+                            Schema.of(new CoreColumn("__expr0", ResolvedType.ANY, "", true)),
+                            ConstantScan.create(List.of(new AliasExpression(stringLit("hello"), "col1")), null),
+                            "",
+                            "object",
+                            null),
+                        List.of(intLit(1), uce("__expr0"))),
+                    projection(
+                        new OperatorFunctionScan(
+                            Schema.of(new CoreColumn("__expr1", ResolvedType.ANY, "", true)),
+                            ConstantScan.create(List.of(new AliasExpression(stringLit("world"), "col2")), null),
+                            "",
+                            "object",
+                            null),
+                        List.of(intLit(2), uce("__expr1")))
+                    ), null),
+                    subQueryX);
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -711,7 +719,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                 new Aggregate(
                                     tableScan(schemaB, tableB),
                                     List.of(uce("b", "col1")),
-                                    List.of(new AggregateWrapperExpression(new AliasExpression(uce("b", "col1"), "__expr0", true), false, true))),
+                                    List.of(new AggregateWrapperExpression(new AliasExpression(uce("b", "col1"), "__expr0", true), false, true)),
+                                    null),
                                 1
                             ),
                             Join.Type.LEFT,
@@ -726,7 +735,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                 List.of(uce("b", "col1")),
                                 List.of(new AggregateWrapperExpression(new AliasExpression(
                                         new FunctionCallExpression("sys", max, null, List.of(uce("b", "col1"))), "__expr1", true),
-                                        false, true))),
+                                        false, true)),
+                                null),
                                         //(new AliasExpression(uce("b", "col1"), "__expr1", true), false, true))),
                             1
                         ),

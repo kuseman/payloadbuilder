@@ -43,7 +43,7 @@ public class HashAggregateTest extends APhysicalPlanTest
         {
         });
 
-        new HashAggregate(0, scan(ds, table, schema), asList(ce("col1")), emptyList());
+        new HashAggregate(0, scan(ds, table, schema), asList(ce("col1")), emptyList(), null);
     }
 
     @Test(
@@ -55,7 +55,7 @@ public class HashAggregateTest extends APhysicalPlanTest
         {
         });
 
-        new HashAggregate(0, scan(ds, table, schema), emptyList(), asList(new AggregateWrapperExpression(ce("col1"), false, false)));
+        new HashAggregate(0, scan(ds, table, schema), emptyList(), asList(new AggregateWrapperExpression(ce("col1"), false, false)), null);
     }
 
     @Test
@@ -70,7 +70,7 @@ public class HashAggregateTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan plan =
                 new Sort(2,
-                        new HashAggregate(1, scan(ds, table, Schema.EMPTY), emptyList(), emptyList()),
+                        new HashAggregate(1, scan(ds, table, Schema.EMPTY), emptyList(), emptyList(), null),
                 asList(sortItem(ce("col1", 0), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
@@ -113,8 +113,8 @@ public class HashAggregateTest extends APhysicalPlanTest
                                     new FunctionCallExpression("", SystemCatalog.get().getScalarFunction("count"), null, asList(col1)),
                                     new AggregateWrapperExpression(col2, false, false),
                                     new FunctionCallExpression("", SystemCatalog.get().getScalarFunction("sum"), null, asList(col1)),
-                                    new AggregateWrapperExpression(new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, col1, col2), false, false))
-                                    ),
+                                    new AggregateWrapperExpression(new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, col1, col2), false, false)),
+                                    null),
                 asList(sortItem(ce("count", 0), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
@@ -238,7 +238,8 @@ public class HashAggregateTest extends APhysicalPlanTest
                 .getScalarFunction("count"), null, asList(col1)), new FunctionCallExpression("",
                         SystemCatalog.get()
                                 .getScalarFunction("sum"),
-                        null, asList(col1))));
+                        null, asList(col1))),
+                null);
 
         for (int i = 0; i < 1; i++)
         {

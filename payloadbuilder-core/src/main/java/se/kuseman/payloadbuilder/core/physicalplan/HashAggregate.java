@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.time.DurationFormatUtils;
@@ -28,6 +29,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
@@ -54,20 +56,22 @@ public class HashAggregate implements IPhysicalPlan
     private final Schema schema;
     private final boolean hasAsteriskProjection;
     private final boolean hasAsteriskSchema;
+    private TableSourceReference parentTableSource;
 
-    public HashAggregate(int nodeId, IPhysicalPlan input, List<IExpression> aggregateExpressions, List<IAggregateExpression> projectionExpressions)
+    public HashAggregate(int nodeId, IPhysicalPlan input, List<IExpression> aggregateExpressions, List<IAggregateExpression> projectionExpressions, TableSourceReference parentTableSource)
     {
         this.nodeId = nodeId;
         this.input = requireNonNull(input, "input");
         this.projectionExpressions = requireNonNull(projectionExpressions, "projectionExpressions");
         this.aggregateExpressions = requireNonNull(aggregateExpressions, "aggregateExpressions");
         this.schema = projectionExpressions.isEmpty() ? input.getSchema()
-                : SchemaUtils.getSchema(projectionExpressions, true);
+                : SchemaUtils.getSchema(parentTableSource, projectionExpressions, true);
         this.hasAsteriskProjection = projectionExpressions.stream()
                 .anyMatch(e -> e instanceof AggregateWrapperExpression awe
                         && awe.getExpression() instanceof AsteriskExpression);
         this.hasAsteriskSchema = hasAsteriskProjection
                 || SchemaUtils.isAsterisk(schema);
+        this.parentTableSource = parentTableSource;
         if ((aggregateExpressions.isEmpty()
                 && !projectionExpressions.isEmpty())
                 || (!aggregateExpressions.isEmpty()
@@ -362,7 +366,7 @@ public class HashAggregate implements IPhysicalPlan
             result[i] = aggregators[i].combine(context);
         }
 
-        final Schema s = hasAsteriskSchema ? SchemaUtils.getSchema(actualExpressions, result, true)
+        final Schema s = hasAsteriskSchema ? SchemaUtils.getSchema(parentTableSource, actualExpressions, result, true)
                 : schema;
         final int groupSize = table.size();
         return TupleIterator.singleton(new TupleVector()
@@ -422,7 +426,8 @@ public class HashAggregate implements IPhysicalPlan
             return nodeId == that.nodeId
                     && input.equals(that.input)
                     && aggregateExpressions.equals(that.aggregateExpressions)
-                    && projectionExpressions.equals(that.projectionExpressions);
+                    && projectionExpressions.equals(that.projectionExpressions)
+                    && Objects.equals(parentTableSource, that.parentTableSource);
         }
         return false;
     }

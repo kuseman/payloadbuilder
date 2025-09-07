@@ -74,10 +74,10 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
-        TableSourceReference tableB = of(2, "", "tableB", "b");
-        TableSourceReference a_table = new TableSourceReference(1, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("a.table"), "t");
+        TableSourceReference tableB = of(3, "", "tableB", "b");
+        TableSourceReference a_table = new TableSourceReference(2, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("a.table"), "t");
 
-        TableSourceReference subQueryT = new TableSourceReference(3, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("t"), "t");
+        TableSourceReference subQueryT = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("t"), "t");
 
         Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
         Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
@@ -98,7 +98,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     null,
                                     false,
                                     schemaA),
-                                asList(cre("col1", tableB), cre("col2", tableB))),
+                                asList(cre("col1", tableB), cre("col2", tableB)),
+                                subQueryT),
                         subQueryT),
                         Join.Type.LEFT,
                         "t",
@@ -420,7 +421,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 new Aggregate(
                     tableScan(schemaA, tableA),
                     emptyList(),
-                    emptyList());
+                    emptyList(),
+                    null);
         //@formatter:on
 
         Assertions.assertThat(actual.getSchema())
@@ -461,7 +463,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     asList(
                             new DereferenceExpression(
                                 new DereferenceExpression(cre("log", tableA), "nested", -1, ResolvedType.of(Type.Any)),
-                                "level", -1, ResolvedType.of(Type.Any))));
+                                "level", -1, ResolvedType.of(Type.Any))),
+                    null);
         //@formatter:on
 
         Assertions.assertThat(actual.getSchema())
@@ -529,7 +532,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     Set.of(ast("b", ResolvedType.table(schemaB), tableB)),
                     false,
                     Schema.of(ast("a", Type.Any, tableA), pop("b", ResolvedType.table(schemaB), tableB))),
-                    asList(new AliasExpression(ce("__expr0", ResolvedType.table(Schema.of(ast("", "b.*", Type.Any, tableB)))), "obj"))
+                    asList(new AliasExpression(ce("__expr0", ResolvedType.table(Schema.of(ast("", "b.*", Type.Any, tableB)))), "obj")),
+                    null
                 );
         //@formatter:on
 
@@ -572,7 +576,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 asList(
                     agg(cre("col", tableA), true),
                     new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(cre("col2", tableA))),
-                    agg(cre("col3", tableA), false)));
+                    agg(cre("col3", tableA), false)),
+                null);
         //@formatter:on
 
         //@formatter:off
@@ -845,10 +850,10 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA0 = of(0, "", "tableA", "a");
-        TableSourceReference tableA1 = of(2, "", "tableA", "a");
-        TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
-        TableSourceReference subQueryY = new TableSourceReference(3, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("y"), "y");
+        TableSourceReference tableA0 = of(1, "", "tableA", "a");
+        TableSourceReference tableA1 = of(3, "", "tableA", "a");
+        TableSourceReference subQueryX = new TableSourceReference(0, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
+        TableSourceReference subQueryY = new TableSourceReference(2, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("y"), "y");
 
         Schema schemaA0 = Schema.of(ast("a", Type.Any, tableA0));
         Schema schemaA1 = Schema.of(ast("a", Type.Any, tableA1));
@@ -859,7 +864,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     subQuery(
                         projection(
                             tableScan(schemaA0, tableA0),
-                            asList(new AliasExpression(add(cre("col", tableA0), cre("col2", tableA0)), "col"))),
+                            asList(new AliasExpression(add(cre("col", tableA0), cre("col2", tableA0)), "col")),
+                            subQueryX),
                         subQueryX),
                     subQuery(
                         new Filter(
@@ -872,7 +878,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     (IExpression) null,
                     asSet(col("col", Type.Any, subQueryX)),
                     false,
-                    Schema.of(col("col", Type.Any, null)));
+                    Schema.of(col("col", Type.Any, subQueryX)));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -881,7 +887,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         Assertions.assertThat(actual.getSchema())
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
-                .isEqualTo(Schema.of(col("col", Type.Any, null), ast("a", Type.Any, tableA1)));
+                .isEqualTo(Schema.of(col("col", Type.Any, subQueryX), ast("a", Type.Any, tableA1)));
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
@@ -2437,7 +2443,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     asSet(),
                                     false,
                                     schemaA),
-                                asList(cre("col", tableA))),
+                                asList(cre("col", tableA)),
+                                subQueryX),
                             subQueryX),
                         asList(cre("col", tableA, 0)));
         //@formatter:on
@@ -2494,7 +2501,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                         subQuery(
                             projection(
                                 tableScan(schemaA, tableA),
-                                asList(new AliasExpression(add(cre("col1", tableA), cre("col2", tableA)), "col"), cre("col3", tableA))),
+                                asList(new AliasExpression(add(cre("col1", tableA), cre("col2", tableA)), "col"), cre("col3", tableA)),
+                                subQueryX),
                             subQueryX),
                     asList(cre("col", subQueryX, 0)));
         //@formatter:on
@@ -2682,7 +2690,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     tableScan(schemaB, tableB),
                                     null,
                                     eq(cre("col", tableB), ocre("col", tableA))),
-                                asList(cre("col2", tableB), ocre("col3", tableA))),
+                                asList(cre("col2", tableB), ocre("col3", tableA)),
+                                subQueryX),
                             subQueryX),
                         Join.Type.INNER,
                         null,
@@ -2772,7 +2781,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     tableScan(schemaB, tableB),
                                     null,
                                     eq(cre("col", tableB, 0, ResolvedType.of(Type.Int)), ocre("col", tableA, 0, ResolvedType.of(Type.String)))),
-                                asList(cre("col2", tableB, 1, ResolvedType.of(Type.Float)), ocre("col3", tableA, 1, ResolvedType.of(Type.Int)))),
+                                asList(cre("col2", tableB, 1, ResolvedType.of(Type.Float)), ocre("col3", tableA, 1, ResolvedType.of(Type.Int))),
+                                subQueryX),
                             subQueryX),
                         Join.Type.INNER,
                         null,
@@ -2836,10 +2846,10 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
-        TableSourceReference tableB = of(1, "", "tableB", "b");
-        TableSourceReference tableC = of(2, "", "tableC", "c");
+        TableSourceReference tableB = of(2, "", "tableB", "b");
+        TableSourceReference tableC = of(4, "", "tableC", "c");
         TableSourceReference subQueryY = new TableSourceReference(3, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("y"), "y");
-        TableSourceReference subQueryX = new TableSourceReference(4, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
+        TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
         Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
         Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
         Schema schemaC = Schema.of(ast("c", Type.Any, tableC));
@@ -2859,7 +2869,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                                     tableScan(schemaC, tableC),
                                                     null,
                                                     and(eq(cre("col", tableC), ocre("col", tableB)), eq(cre("col2", tableC), ocre("col2", tableA)))),
-                                                asList(cre("col3", tableC), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableC)))),
+                                                asList(cre("col3", tableC), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableC))),
+                                                subQueryY),
                                             subQueryY),
                                         Join.Type.INNER,
                                         null,
@@ -2872,7 +2883,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     ),
                                     null,
                                     and(eq(cre("col", tableB), ocre("col", tableA)), eq(cre("col3", tableC, CoreColumn.Type.REGULAR), cre("col3", tableB)))),
-                                asList(cre("col2", tableB), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableB, tableC)))),
+                                asList(cre("col2", tableB), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableB, tableC))),
+                                subQueryX),
                             subQueryX),
                         Join.Type.INNER,
                         null,
@@ -2896,7 +2908,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
             .isEqualTo(Schema.of(
                 ast("a", Type.Any, tableA),
                 col("col2", Type.Any, tableB),
-                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, null, CoreColumn.Type.ASTERISK)));
+                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, subQueryX, CoreColumn.Type.ASTERISK)));
         //@formatter:on
 
         Assertions.assertThat(actual)
@@ -2929,10 +2941,10 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
-        TableSourceReference tableB = of(1, "", "tableB", "b");
-        TableSourceReference tableC = of(2, "", "tableC", "c");
+        TableSourceReference tableB = of(2, "", "tableB", "b");
+        TableSourceReference tableC = of(4, "", "tableC", "c");
         TableSourceReference subQueryY = new TableSourceReference(3, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("y"), "y");
-        TableSourceReference subQueryX = new TableSourceReference(4, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
+        TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
         Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
         Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
         Schema schemaC = Schema.of(ast("c", Type.Any, tableC));
@@ -2952,7 +2964,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                                     tableScan(schemaC, tableC),
                                                     null,
                                                     eq(cre("col2", tableC), ocre("col2", tableA))),
-                                                asList(cre("col3", tableC), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableC)))),
+                                                asList(cre("col3", tableC), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableC))),
+                                                subQueryY),
                                             subQueryY),
                                         Join.Type.INNER,
                                         null,
@@ -2963,7 +2976,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     ),
                                     null,
                                     eq(cre("col3", tableC, CoreColumn.Type.REGULAR), cre("col3", tableB))),
-                                asList(cre("col2", tableB), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableB, tableC)))),
+                                asList(cre("col2", tableB), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableB, tableC))),
+                                subQueryX),
                             subQueryX),
                         Join.Type.INNER,
                         null,
@@ -2987,7 +3001,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
             .isEqualTo(Schema.of(
                 ast("a", Type.Any, tableA),
                 col("col2", Type.Any, tableB),
-                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, null, CoreColumn.Type.ASTERISK)));
+                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, subQueryX, CoreColumn.Type.ASTERISK)));
         //@formatter:on
 
         Assertions.assertThat(actual)
@@ -3452,7 +3466,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     subQuery(
                         projection(
                             tableScan(schemaB, tableB),
-                            asList(cre("col1", tableB), cre("col2", tableB), cre("col3", tableB))),
+                            asList(cre("col1", tableB), cre("col2", tableB), cre("col3", tableB)),
+                            subQueryX),
                         subQueryX),
                     asList(cre("col1", tableB, 0), cre("col2", tableB, 1), add(cre("col3", tableB, 2), cre("col2", tableB, 1))));
         //@formatter:on
@@ -3524,7 +3539,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                 tableScan(schemaB, tableB),
                                 List.of(cre("col1", tableB, 0, ResolvedType.of(Type.Int)),
                                         cre("col2", tableB, 1, ResolvedType.of(Type.Float)),
-                                        cre("col3", tableB, 2, ResolvedType.of(Type.String)))),
+                                        cre("col3", tableB, 2, ResolvedType.of(Type.String))),
+                                subQueryX),
                             subQueryX),
                         List.of(cre("col1", tableB, 0, ResolvedType.of(Type.Int)),
                                 cre("col2", tableB, 1, ResolvedType.of(Type.Float)),

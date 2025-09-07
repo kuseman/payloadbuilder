@@ -19,7 +19,7 @@ class ObjectArrayFunctionImpl
     static ResolvedType getAggregateType(List<IExpression> arguments)
     {
         // This is the aggregate but the arguments are considered non aggregate for the schema
-        Schema schema = SchemaUtils.getSchema(arguments, false);
+        Schema schema = SchemaUtils.getSchema(null, arguments, false);
         return ResolvedType.table(schema);
     }
 

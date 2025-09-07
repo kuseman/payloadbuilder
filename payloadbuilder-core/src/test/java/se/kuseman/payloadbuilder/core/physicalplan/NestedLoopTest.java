@@ -420,7 +420,8 @@ public class NestedLoopTest extends AJoinTest
                               col4,
                               new AliasExpression(new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, col1,
                                       new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, col1, col2)), "oCalc")
-                            )),
+                            ),
+                            null),
                         outerReferences,
                         null,
                         outerSchemaLess);

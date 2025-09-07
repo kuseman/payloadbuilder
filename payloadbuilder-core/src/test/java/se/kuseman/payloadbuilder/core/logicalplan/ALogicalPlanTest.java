@@ -33,7 +33,12 @@ public abstract class ALogicalPlanTest extends AExpressionTest
 
     protected Projection projection(ILogicalPlan input, List<IExpression> expressions)
     {
-        return new Projection(input, expressions);
+        return new Projection(input, expressions, null);
+    }
+
+    protected Projection projection(ILogicalPlan input, List<IExpression> expressions, TableSourceReference parentTableSource)
+    {
+        return new Projection(input, expressions, parentTableSource);
     }
 
     protected SortItem sortItem(IExpression expression, Order order)

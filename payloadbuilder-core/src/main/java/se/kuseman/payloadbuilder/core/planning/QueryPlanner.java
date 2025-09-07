@@ -105,7 +105,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             input = p.getInput();
         }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, expressions));
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, expressions, plan.getParentTableSource()));
     }
 
     @Override
@@ -201,7 +201,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         IPhysicalPlan input = plan.getInput()
                 .accept(this, context);
 
-        return wrapWithAnalyze(context, new HashAggregate(context.getNextNodeId(), input, plan.getAggregateExpressions(), plan.getProjectionExpressions()));
+        return wrapWithAnalyze(context, new HashAggregate(context.getNextNodeId(), input, plan.getAggregateExpressions(), plan.getProjectionExpressions(), plan.getParentTableSource()));
     }
 
     @Override

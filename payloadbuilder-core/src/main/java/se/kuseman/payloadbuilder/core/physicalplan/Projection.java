@@ -9,6 +9,7 @@ import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -17,6 +18,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
@@ -32,17 +34,19 @@ public class Projection implements IPhysicalPlan
     private final Schema schema;
     private final boolean hasAsteriskProjection;
     private final boolean hasAsteriskSchema;
+    private final TableSourceReference parentTableSource;
 
-    public Projection(int nodeId, IPhysicalPlan input, List<IExpression> expressions)
+    public Projection(int nodeId, IPhysicalPlan input, List<IExpression> expressions, TableSourceReference parentTableSource)
     {
         this.nodeId = nodeId;
         this.input = requireNonNull(input, "input");
         this.expressions = requireNonNull(expressions, "expressions");
-        this.schema = SchemaUtils.getSchema(expressions, false);
+        this.schema = SchemaUtils.getSchema(parentTableSource, expressions, false);
         this.hasAsteriskProjection = expressions.stream()
                 .anyMatch(e -> e instanceof AsteriskExpression);
         this.hasAsteriskSchema = hasAsteriskProjection
                 || SchemaUtils.isAsterisk(schema);
+        this.parentTableSource = parentTableSource;
     }
 
     public IPhysicalPlan getInput()
@@ -115,7 +119,7 @@ public class Projection implements IPhysicalPlan
                     vectors[i] = actualExpressions.get(i)
                             .eval(vector, context);
                 }
-                final Schema schema = hasAsteriskSchema ? SchemaUtils.getSchema(actualExpressions, vectors, false)
+                final Schema schema = hasAsteriskSchema ? SchemaUtils.getSchema(parentTableSource, actualExpressions, vectors, false)
                         : Projection.this.schema;
                 return new TupleVector()
                 {
@@ -186,7 +190,8 @@ public class Projection implements IPhysicalPlan
         {
             return nodeId == that.nodeId
                     && input.equals(that.input)
-                    && expressions.equals(that.expressions);
+                    && expressions.equals(that.expressions)
+                    && Objects.equals(parentTableSource, that.parentTableSource);
         }
         return false;
     }

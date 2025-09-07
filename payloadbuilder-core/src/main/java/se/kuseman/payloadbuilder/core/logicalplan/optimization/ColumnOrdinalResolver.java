@@ -79,7 +79,7 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
         context.schema = prevSchema;
         context.outerSchema = prevOuterSchema;
 
-        return new Projection(input, expressions);
+        return new Projection(input, expressions, plan.getParentTableSource());
     }
 
     @Override
@@ -161,7 +161,7 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
                 .stream()
                 .map(e -> (IAggregateExpression) ColumnOrdinalRewriter.INSTANCE.visit(e, context))
                 .collect(toList());
-        return new Aggregate(input, aggregateExpressions, projectionExpressions);
+        return new Aggregate(input, aggregateExpressions, projectionExpressions, plan.getParentTableSource());
     }
 
     @Override

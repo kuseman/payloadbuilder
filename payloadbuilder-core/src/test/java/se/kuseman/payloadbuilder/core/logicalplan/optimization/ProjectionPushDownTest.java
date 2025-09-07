@@ -67,7 +67,8 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                     subQuery(
                         projection(
                             tableScan(schema, table, asList("col1", "col2")),
-                            asList(cre("col1", table), cre("col2", table))),
+                            asList(cre("col1", table), cre("col2", table)),
+                            subQueryX),
                     subQueryX),
                     asList(cre("col1", table, 0))
                     );

@@ -298,11 +298,13 @@ public class QueryParserTest extends Assert
                                             asList(e("a")),
                                             emptyList(),
                                             null),
-                                        asList(new AsteriskExpression(QualifiedName.of("a"), null))),
+                                        asList(new AsteriskExpression(QualifiedName.of("a"), null)),
+                                        null),
                                     "",
                                     "objectarray",
                                     null),
-                                null))),
+                                null)),
+                        null),
                     false);
         //@formatter:on
         Statement actual = s("select a.col, (select a.* from open_table(a) a for objectarray) from \"table\" a where a.col > 10");
