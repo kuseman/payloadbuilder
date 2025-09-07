@@ -15,6 +15,7 @@ import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
+import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SortItem;
@@ -22,6 +23,9 @@ import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
+import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ALogicalPlanVisitor;
@@ -533,9 +537,9 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     }
 
     /** Extract columns from provided expressions */
-    protected static Map<TableSourceReference, Set<String>> collectColumns(List<IExpression> expressions)
+    protected static Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> collectColumns(List<IExpression> expressions)
     {
-        Map<TableSourceReference, Set<String>> columns = new HashMap<>();
+        Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> columns = new HashMap<>();
         for (IExpression expression : expressions)
         {
             expression.accept(ColumnReferenceExtractor.INSTANCE, columns);
@@ -543,30 +547,60 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         return columns;
     }
 
+    protected record ColumnReferenceExtractorResult(IExpression expression, ColumnReference columnReference, String column)
+    {
+    }
+
     /** Visitor that collects columns from an expression */
-    static class ColumnReferenceExtractor extends AExpressionVisitor<Void, Map<TableSourceReference, Set<String>>>
+    static class ColumnReferenceExtractor extends AExpressionVisitor<Void, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>>>
     {
         static final ColumnReferenceExtractor INSTANCE = new ColumnReferenceExtractor();
 
         @Override
-        public Void visit(UnresolvedColumnExpression expression, Map<TableSourceReference, Set<String>> columns)
+        public Void visit(UnresolvedColumnExpression expression, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> columns)
         {
             throw new IllegalArgumentException("Unresolved column expression should not be visited");
         }
 
         @Override
-        public Void visit(IColumnExpression expression, Map<TableSourceReference, Set<String>> context)
+        public Void visit(IColumnExpression expression, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
         {
             ColumnExpression ce = (ColumnExpression) expression;
-            TableSourceReference tableRef = ce.getColumnReference()
-                    .tableSourceReference();
+            add(ce, ce.getAlias()
+                    .getAlias(), context);
+            return null;
+        }
+
+        @Override
+        public Void visit(IDereferenceExpression expression, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
+        {
+            // The dereference doesn't have a column reference, that means that this is a nested property on some target
+            // which means that the the right side of the deref IS NOT a column but rather a nested property/field.
+            if (expression instanceof DereferenceExpression de
+                    && !de.hasColumnReferenceSet())
+            {
+                super.visit(expression, context);
+            }
+            else
+            {
+                add((HasColumnReference) expression, expression.getRight(), context);
+            }
+            return null;
+        }
+
+        private void add(HasColumnReference hcr, String column, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
+        {
+            ColumnReference colRef = hcr.getColumnReference();
+            TableSourceReference tableRef = null;
+            if (colRef != null)
+            {
+                tableRef = colRef.tableSourceReference();
+            }
             if (tableRef != null)
             {
                 context.computeIfAbsent(tableRef, k -> new HashSet<>())
-                        .add(ce.getAlias()
-                                .getAlias());
+                        .add(new ColumnReferenceExtractorResult((IExpression) hcr, colRef, column));
             }
-            return null;
         }
     }
 
