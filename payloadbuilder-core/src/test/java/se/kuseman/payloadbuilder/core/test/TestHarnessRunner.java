@@ -33,6 +33,8 @@ import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.ProjectionType;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.FunctionType;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Option;
@@ -447,6 +449,7 @@ public class TestHarnessRunner
             final Schema schema = getSchema(testTable);
             final List<Object[]> rows = testTable.getRows();
             final int rowCount = rows.size();
+            final Projection projection = data.getProjection();
 
             return new IDatasource()
             {
@@ -461,7 +464,25 @@ public class TestHarnessRunner
                     }
 
                     ObjectTupleVector tupleVector = new ObjectTupleVector(data.getSchema()
-                            .orElse(schema), rowCount, (row, col) -> rows.get(row)[col]);
+                            .orElse(schema), rowCount, (row, col) ->
+                            {
+                                Column column = schema.getColumns()
+                                        .get(col);
+
+                                // Return values based on projection for this datasource
+                                if (projection.type() == ProjectionType.NONE)
+                                {
+                                    return null;
+                                }
+                                else if (projection.type() == ProjectionType.COLUMNS
+                                        && !projection.columns()
+                                                .contains(column.getName()))
+                                {
+                                    return null;
+                                }
+
+                                return rows.get(row)[col];
+                            });
                     return TupleIterator.singleton(tupleVector);
                 }
             };

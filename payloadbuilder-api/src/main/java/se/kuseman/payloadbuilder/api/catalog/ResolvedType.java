@@ -26,8 +26,11 @@ public class ResolvedType
     }
     public static final ResolvedType STRING = ResolvedType.of(Type.String);
     public static final ResolvedType INT = ResolvedType.of(Type.Int);
+    public static final ResolvedType BOOLEAN = ResolvedType.of(Type.Boolean);
     public static final ResolvedType ANY = ResolvedType.of(Type.Any);
     public static final ResolvedType DOUBLE = ResolvedType.of(Type.Double);
+    public static final ResolvedType LONG = ResolvedType.of(Type.Long);
+    public static final ResolvedType FLOAT = ResolvedType.of(Type.Float);
 
     private final Type type;
     /** Type used do specify the contained type if {@link #type} is {@link Type#Array} */

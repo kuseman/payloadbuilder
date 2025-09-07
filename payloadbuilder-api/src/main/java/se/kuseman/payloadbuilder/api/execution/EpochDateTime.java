@@ -5,6 +5,7 @@ import static java.util.Objects.requireNonNull;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -231,6 +232,11 @@ public class EpochDateTime implements Comparable<EpochDateTime>, ValueVector
         else if (object instanceof LocalDate ld)
         {
             return new EpochDateTime(ld.atStartOfDay());
+        }
+        else if (object instanceof OffsetDateTime odt)
+        {
+            // Strip zone information
+            return new EpochDateTime(odt.toLocalDateTime());
         }
 
         throw new IllegalArgumentException("Cannot cast '" + object

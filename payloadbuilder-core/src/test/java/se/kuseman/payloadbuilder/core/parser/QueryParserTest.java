@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
+import java.util.List;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
@@ -280,7 +281,7 @@ public class QueryParserTest extends Assert
                             new TableScan(
                                 TableSchema.EMPTY,
                                 new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "a"),
-                                emptyList(),
+                                se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL,
                                 false,
                                 emptyList(),
                                 null),
@@ -580,8 +581,18 @@ public class QueryParserTest extends Assert
         assertSelect("select 1 order by 1");
         assertSelect("select top 10 1");
 
-        assertEquals(new LogicalSelectStatement(new ExpressionScan(new TableSourceReference(0, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("a.b"), "a"), Schema.EMPTY, e("a.b"), null),
+        //@formatter:off
+        assertEquals(new LogicalSelectStatement(
+                new Projection(
+                    new ExpressionScan(
+                        new TableSourceReference(0, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("a.b"), "a"),
+                        Schema.EMPTY,
+                        e("a.b"),
+                        null),
+                    List.of(new AsteriskExpression(null)),
+                    null),
                 false), assertSelect("select * from (a.b) a"));
+        //@formatter:on
 
         assertSelectFail(ParseException.class, "Expression scans cannot have options", "select * from (a.b) a with (a=123)");
 

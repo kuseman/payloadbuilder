@@ -16,14 +16,22 @@ public class TableSourceReference
     private final String catalogAlias;
     private final QualifiedName name;
     private final String alias;
+    /** Reference to the parent table source reference. */
+    private final TableSourceReference parent;
 
     public TableSourceReference(int id, Type type, String catalogAlias, QualifiedName name, String alias)
+    {
+        this(id, type, catalogAlias, name, alias, null);
+    }
+
+    public TableSourceReference(int id, Type type, String catalogAlias, QualifiedName name, String alias, TableSourceReference parent)
     {
         this.id = id;
         this.type = requireNonNull(type, "type");
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.name = requireNonNull(name, "name");
         this.alias = Objects.toString(alias, "");
+        this.parent = parent;
     }
 
     public int getId()
@@ -51,6 +59,21 @@ public class TableSourceReference
         return name;
     }
 
+    public TableSourceReference getParent()
+    {
+        return parent;
+    }
+
+    /** Create a new instance with a link to provided parent table source reference. */
+    public TableSourceReference withParent(TableSourceReference parent)
+    {
+        if (requireNonNull(parent).getId() == id)
+        {
+            return this;
+        }
+        return new TableSourceReference(id, type, catalogAlias, name, alias, parent);
+    }
+
     @Override
     public int hashCode()
     {
@@ -74,7 +97,8 @@ public class TableSourceReference
                     && type == that.type
                     && catalogAlias.equals(that.catalogAlias)
                     && alias.equals(that.alias)
-                    && name.equals(that.name);
+                    && name.equals(that.name)
+                    && Objects.equals(parent, that.parent);
         }
         return false;
     }

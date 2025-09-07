@@ -37,9 +37,8 @@ public class LogicalPlanOptimizer
             COLUMN_RESOLVER,
             /* Push down predicates to table sources */
             new PredicatePushDown(),
-            /* Collect all used columns and push down to table sources.
-             * TODO: Fix this, currently broken due to asterisk selects isn't handled and we get wrong projections */
-            //new ProjectionPushDown()
+            /* Collect all used columns and push down to table sources. */
+            new ProjectionPushDown(),
             /* Rule that corrects wrong column ordinals after predicate push down might have changed */
             new ColumnOrdinalResolver()
             );

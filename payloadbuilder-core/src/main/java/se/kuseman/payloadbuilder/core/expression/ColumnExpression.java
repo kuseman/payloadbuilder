@@ -318,6 +318,11 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
                     .append(columnReference.tableSourceReference())
                     .append(", columnType=")
                     .append(columnReference.columnType());
+            if (columnReference.tableTypeTableSource() != null)
+            {
+                sb.append(", tableType table=")
+                        .append(columnReference.tableTypeTableSource());
+            }
         }
 
         if (hasOptions)
