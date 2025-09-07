@@ -1394,12 +1394,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
-        Schema e_bExpectedSchema = Schema.of(ast("b", ResolvedType.of(Type.Any), e_b));
+        Schema e_bExpectedSchema = Schema.of(ast("b", ResolvedType.of(Type.Any), e_b.withParent(tableB)));
 
         //@formatter:off
         Schema objectArraySchema = Schema.of(
-                col("col1", ResolvedType.of(Type.Any), e_b),
-                col("col2", ResolvedType.of(Type.Any), e_b)
+                col("col1", ResolvedType.of(Type.Any), e_b.withParent(tableB)),
+                col("col2", ResolvedType.of(Type.Any), e_b.withParent(tableB))
         );
 
         IPhysicalPlan expected = new Projection(
@@ -1422,10 +1422,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                             4,
                             new ExpressionScan(
                                 3,
-                                e_b,
+                                e_b.withParent(tableB),
                                 e_bExpectedSchema,
                                 ocre("b", tableB, ResolvedType.table(expectedSchemaB), CoreColumn.Type.POPULATED)),
-                            asList(cre("col1", e_b), cre("col2", e_b)),
+                            asList(cre("col1", e_b.withParent(tableB), tableB), cre("col2", e_b.withParent(tableB), tableB)),
                             null),
                         SystemCatalog.get().getOperatorFunction("object_array"),
                         "sys",
@@ -1443,8 +1443,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
-                .usingOverriddenEquals()
-                .ignoringFieldsOfTypes(Random.class)
+                .ignoringFieldsOfTypes(Random.class, Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);

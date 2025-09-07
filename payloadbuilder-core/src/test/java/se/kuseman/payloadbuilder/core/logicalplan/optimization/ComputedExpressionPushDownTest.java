@@ -577,7 +577,9 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         // Will be any push downs here since we have an asterisk and will have to resolve ordinal runtime
         //@formatter:off
         ILogicalPlan expected = new Sort(
-                tableScan(Schema.of(ast("t", table)), table),
+                projection(
+                    tableScan(Schema.of(ast("t", table)), table),
+                    List.of(new AsteriskExpression(null))),
                 asList(sortItem(intLit(1), Order.ASC))
                 );
         //@formatter:on
@@ -609,12 +611,16 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         // Will be any push downs here since we have an asterisk and will have to resolve ordinal runtime
         //@formatter:off
-        ILogicalPlan expected = 
-                subQuery(
-                    new Sort(
-                        tableScan(Schema.of(ast("t", table)), table),
-                        asList(sortItem(intLit(1), Order.ASC))),
-                    subQueryX);
+        ILogicalPlan expected =
+                projection(
+                    subQuery(
+                        new Sort(
+                            projection(
+                                tableScan(Schema.of(ast("t", table)), table),
+                                List.of(new AsteriskExpression(null))),
+                            asList(sortItem(intLit(1), Order.ASC))),
+                        subQueryX),
+                    List.of(new AsteriskExpression(null)));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -710,14 +716,16 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         // Expression on ordinal 1 will be used
         //@formatter:off
-        ILogicalPlan expected = 
-                subQuery(
-                    new Sort(
-                        projection(
-                            tableScan(Schema.of(ast("t", table)), table),
-                            asList(e("col"))),
-                        asList(sortItem(new UnresolvedColumnExpression(QualifiedName.of("col"), -1, null), Order.ASC))),
-                    subQueryX);
+        ILogicalPlan expected =
+                projection(
+                    subQuery(
+                        new Sort(
+                            projection(
+                                tableScan(Schema.of(ast("t", table)), table),
+                                asList(e("col"))),
+                            asList(sortItem(new UnresolvedColumnExpression(QualifiedName.of("col"), -1, null), Order.ASC))),
+                        subQueryX),
+                    List.of(new AsteriskExpression(null)));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -941,7 +949,9 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected = 
                     new Sort(
-                        tableScan(Schema.of(ast("t", table)), table),
+                        projection(
+                            tableScan(Schema.of(ast("t", table)), table),
+                            List.of(new AsteriskExpression(null))),
                         asList(sortItem(e("col"), Order.ASC)));
         //@formatter:on
 
