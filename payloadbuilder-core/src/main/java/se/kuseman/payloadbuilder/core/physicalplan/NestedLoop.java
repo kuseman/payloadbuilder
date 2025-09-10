@@ -1084,7 +1084,7 @@ public class NestedLoop implements IPhysicalPlan
             // We do this if we have a non populated join because a populated join has an inner schema
             // even if we have an asterisk query
             if (populateAlias == null
-                    && SchemaUtils.isAsterisk(innerSchema, false))
+                    && SchemaUtils.isAsterisk(innerSchema))
             {
                 return unmatchedOuter;
             }

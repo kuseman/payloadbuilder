@@ -157,7 +157,7 @@ public class ProjectionTest extends APhysicalPlanTest
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
                 new CoreColumn("", ResolvedType.of(Type.Any), "a.*", false, tableA, CoreColumn.Type.ASTERISK),
-                nast("col3", ResolvedType.of(Type.Any), tableB),
+                col("col3", ResolvedType.of(Type.Any), tableB),
                 new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false)));
         //@formatter:on
 
@@ -169,7 +169,7 @@ public class ProjectionTest extends APhysicalPlanTest
                 col("col1", Type.Any, tableA),
                 col("col2", Type.Any, tableA),
                 col("col3", Type.Any, tableA),
-                nast("col3", Type.Any, tableB),
+                col("col3", Type.Any, tableB),
                 new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false));
         //@formatter:on
 

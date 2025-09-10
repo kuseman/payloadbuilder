@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 import static java.util.Arrays.asList;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -28,6 +29,9 @@ public class TableScanTest extends APhysicalPlanTest
         assertEquals(Schema.EMPTY, plan.getSchema());
 
         TupleVector vector = PlanUtils.concat(context, plan.execute(context));
+
+        Assertions.assertThat(vector.getSchema())
+                .isEqualTo(Schema.of(col("col", ResolvedType.of(Type.Int), table)));
 
         assertEquals(Schema.of(col("col", ResolvedType.of(Type.Int), table)), vector.getSchema());
     }

@@ -731,7 +731,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     2,
                     new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
                     new ExpressionPredicate(eq(cre("id", tableB), ocre("id", tableA)))),
-                asSet(nast("id", ResolvedType.of(Type.Any), tableA)),
+                asSet(col("id", ResolvedType.of(Type.Any), tableA)),
                 null,
                 expectedSchemaA);
         //@formatter:on
@@ -782,7 +782,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     2,
                     new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
                     new ExpressionPredicate(eq(cre("id", tableB), ocre("id", tableA)))),
-                asSet(nast("id", ResolvedType.of(Type.Any), tableA)),
+                asSet(col("id", ResolvedType.of(Type.Any), tableA)),
                 null,
                 expectedSchemaA);
         //@formatter:on
@@ -1389,8 +1389,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         //@formatter:off
         Schema objectArraySchema = Schema.of(
-            nast("col1", ResolvedType.of(Type.Any), e_b),
-            nast("col2", ResolvedType.of(Type.Any), e_b)
+                col("col1", ResolvedType.of(Type.Any), e_b),
+                col("col2", ResolvedType.of(Type.Any), e_b)
         );
 
         IPhysicalPlan expected = new Projection(
@@ -2360,12 +2360,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         )
                     ),
                 List.of(cre("col", tableA)),
-                List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
+                List.of(cre("col", tableB, CoreColumn.Type.REGULAR)),
                 new ExpressionPredicate(
                     and(
                         and(
                             eq(
-                                cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK),
+                                cre("col", tableB, CoreColumn.Type.REGULAR),
                                 cre("col", tableA)),
                             eq(cre("active", tableA), LiteralBooleanExpression.TRUE)),
                         eq(

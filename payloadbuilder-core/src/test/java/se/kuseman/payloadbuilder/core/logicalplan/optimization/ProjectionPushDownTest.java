@@ -12,9 +12,7 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
-import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
@@ -71,7 +69,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                             tableScan(schema, table, asList("col1", "col2")),
                             asList(cre("col1", table), cre("col2", table))),
                     subQueryX),
-                    asList(cre("col1", table, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK))
+                    asList(cre("col1", table, 0))
                     );
         //@formatter:on
 
@@ -114,6 +112,12 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     public void test_join()
     {
         //@formatter:off
+        /*
+         * select a.col1, b.col2
+         * from tableA a
+         * inner join tableB b
+         *  on a.col3 = b.col4
+         */
         ILogicalPlan plan = 
                 projection(
                     new Sort(
@@ -160,6 +164,12 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
+
         assertEquals(expected, actual);
     }
 

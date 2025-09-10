@@ -63,6 +63,12 @@ public class CoreColumn extends Column
         this(source.getName(), type, source.outputName, source.internal, source.tableSourceReference, source.columnType);
     }
 
+    /** Copy ctor. New tablesource of column */
+    public CoreColumn(CoreColumn source, TableSourceReference tableSource)
+    {
+        this(source.getName(), source.getType(), source.outputName, source.internal, tableSource, source.columnType);
+    }
+
     public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, TableSourceReference tableSourceReference, Type columnType)
     {
         super(name, type);
@@ -162,11 +168,6 @@ public class CoreColumn extends Column
          * An asterisk column which is used in a schema less query for catalogs that doesn't have schemas. This acts as a place holder during planning where the actual columns will come runtime.
          */
         ASTERISK,
-
-        /**
-         * A column that origins from an {@link #ASTERISK} column. This is a marker to know if a schema is in it's whole asterisk but otherwise this column is counted as a regular, resolve wise.
-         */
-        NAMED_ASTERISK,
 
         /** A regular column. */
         REGULAR,
