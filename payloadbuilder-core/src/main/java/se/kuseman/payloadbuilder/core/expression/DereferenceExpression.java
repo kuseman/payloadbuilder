@@ -221,7 +221,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                     .get(i);
 
             asteriskInSchema = asteriskInSchema
-                    || SchemaUtils.isAsterisk(column, true);
+                    || SchemaUtils.isAsterisk(column);
 
             if (right.equalsIgnoreCase(column.getName()))
             {

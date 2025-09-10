@@ -18,6 +18,8 @@ import java.util.Set;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -82,6 +84,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
  */
 class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ColumnResolver.class);
+
     ColumnResolver()
     {
         // We handle all expression rewriting when handling the logical plans
@@ -381,16 +385,24 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         ResolveSchema schema = context.getSchema(result);
 
         // Validate sub query schema, all columns must have a specified alias
+        Set<String> columnNames = new HashSet<>();
         int size = schema.getSize();
         for (int i = 0; i < size; i++)
         {
             Column column = schema.getColumn(i)
                     .getValue();
-            boolean isAsterisk = SchemaUtils.isAsterisk(column, false);
+            boolean isAsterisk = SchemaUtils.isAsterisk(column);
             if ("".equals(column.getName())
                     && !isAsterisk)
             {
                 throw new ParseException("Missing column name for ordinal " + i + " of " + plan.getAlias(), plan.getLocation());
+            }
+
+            // Multiple columns with the same name
+            if (!isAsterisk
+                    && !columnNames.add(column.getName()))
+            {
+                throw new ParseException("The column '" + column.getName() + "' was specified multiple times for '" + plan.getAlias() + "'", plan.getLocation());
             }
         }
         context.planSchema.push(new ResolveSchema(schema, plan.getTableSource()));
@@ -434,13 +446,14 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             throw new ParseException(e.getMessage(), plan.getLocation());
         }
 
-        if (SchemaUtils.isAsterisk(schema, true))
+        // Empty schema => create an asterisk column with the table source
+        if (Schema.EMPTY.equals(schema))
         {
             schema = Schema.of(new CoreColumn(plan.getAlias(), ResolvedType.of(Type.Any), "", false, tableSource, CoreColumn.Type.ASTERISK));
         }
         else
         {
-            // .. force all columns to have a proper column reference
+            // .. force all columns to have a proper table source reference
             schema = SchemaResolver.recreate(tableSource, schema);
         }
 
@@ -547,9 +560,9 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             }
         }
 
-        if (SchemaUtils.isAsterisk(schema, true))
+        // Create an asterisk column with the table source ref if no schema was provided.
+        if (Schema.EMPTY.equals(schema))
         {
-            // Set an asterisk schema with expression scans table source
             schema = Schema.of(new CoreColumn(plan.getAlias(), ResolvedType.of(Type.Any), "", false, tableSource, CoreColumn.Type.ASTERISK));
         }
         else
@@ -647,7 +660,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 }
 
                 // Asterisk schemas are expanded runtime
-                if (SchemaUtils.isAsterisk(schema.getSchema(), false))
+                if (SchemaUtils.isAsterisk(schema.getSchema()))
                 {
                     result.add(ae);
                     continue;
@@ -1071,6 +1084,15 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                     .build(), path, expression.getLocation());
         }
 
+        /**
+         * Column resolving.
+         * -----------------
+         * High level precedence:
+         * - 1. Inner scope. The closest schema scope to expression. Ie. ExpressionScan/From/Join etc.
+         * - 2. In case of ambiguity regular column wins of asterisk column
+         * - 3. Outer scope. The outer schema if any. Sub query expressions
+         * - 4. In case of ambiguity regular column wins of asterisk column
+         */
         private IExpression resolveColumn(UnresolvedColumnExpression expression, ColumnResolver.Ctx context)
         {
             // CSOFF
@@ -1087,66 +1109,57 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             String column = path.getFirst();
             path = path.extract(1);
 
-            IExpression result = null;
-            Pair<IExpression, Column> pair = null;
+            ResolveResult resolveResult = null;
             if (schema != null)
             {
-                pair = resolve(expression.getColumn(), schema, alias, column, null, expression.getLocation());
-                result = pair != null ? pair.getKey()
-                        : null;
+                resolveResult = resolve(expression.getColumn(), schema, alias, column, null, expression.getLocation());
             }
 
-            boolean aliasMatch = !"".equals(alias)
-                    && result != null;
+            boolean aliasMatch = resolveResult != null
+                    && resolveResult.aliasMatch;
 
-            // Search in outer scope
+            // Search in outer scope if we didn't get any result from current scope
+            // or we did get a non alias match
             // NOTE! Schema is the same as the outer schema when resolving a projection with subexpressions
             if (outerSchema != null
                     && schema != outerSchema
                     && !aliasMatch)
             {
-                IExpression maybeResult = result;
-                boolean isAsterisk = pair != null
-                        && SchemaUtils.isAsterisk(pair.getValue(), true);
+                ResolveResult scopeResult = resolveResult;
+                Set<Column> outerReferences = new HashSet<>();
+                ResolveResult outerResult = resolve(expression.getColumn(), outerSchema, alias, column, outerReferences, expression.getLocation());
+                resolveResult = getHighestPrecedence(scopeResult, outerResult);
 
-                Set<Column> outerReferences = context.outerReferences;
-                context.outerReferences = new HashSet<>();
-
-                // Result is still null or
-                // we found an asterisk match and we have an outer schema then we must search in outer too
-                // since there could be a non asterisk match there which have higher precedence
-                if (result == null
-                        || isAsterisk)
+                // If we picked the outer scoped result, add the the resulting column to the outer references collection
+                if (outerResult != null
+                        && resolveResult == outerResult)
                 {
-                    pair = resolve(expression.getColumn(), outerSchema, alias, column, context.outerReferences, expression.getLocation());
-                    result = pair != null ? pair.getKey()
-                            : null;
-                }
-
-                // Swap back to the first hit if outer did not yield a match
-                // or that was also asterisk
-                if (isAsterisk)
-                {
-                    result = getHighestPrecedence(maybeResult, pair);
-
-                    // The result was the outer match, add the temp outer references to result
-                    if (result != maybeResult
-                            && outerReferences != null)
+                    if (scopeResult != null)
                     {
-                        outerReferences.addAll(context.outerReferences);
+                        LOGGER.debug("Picked outer reference for: {}, expression: {}", expression.getQualifiedColumn(), resolveResult.expression());
+                    }
+                    if (context.outerReferences != null)
+                    {
+                        context.outerReferences.addAll(outerReferences);
                     }
                 }
-                else if (outerReferences != null)
-                {
-                    outerReferences.addAll(context.outerReferences);
-                }
-                // Restore the outer references
-                context.outerReferences = outerReferences;
             }
 
-            if (result == null)
+            if (resolveResult == null)
             {
-                // If we are on top we can bind non matching expressions to a single available schema
+                /*
+                 * @formatter:off
+                 * If we have a qualifier with multiple parts we treat the first part as alias
+                 * and if that don't match we will get no result, BUT if we have a single schema in context
+                 * then we can assume that the first part of the qualifier is NOT an alias but rather a column.
+                 *
+                 * ie.
+                 *
+                 * select ( select multi.part.qualifier )   <--- 'multi' will be treated as an alias but will get no match
+                 * from tableA a                            <--- only schema we have so assume 'multi' is a column
+                 *
+                 * @formatter:on
+                 */
                 if (!context.insideSubQuery)
                 {
                     path = expression.getColumn();
@@ -1160,24 +1173,13 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                                     || outerSchema.isEmpty())
                             && schema.schemas.size() == 1)
                     {
-                        pair = resolve(expression.getColumn(), schema, schema.schemas.get(0).alias, column, null, expression.getLocation());
-                        result = pair != null ? pair.getKey()
-                                : null;
-                    }
-                    else if ((schema == null
-                            || schema.isEmpty())
-                            && outerSchema != null
-                            && outerSchema.schemas.size() == 1)
-                    {
-                        pair = resolve(expression.getColumn(), outerSchema, outerSchema.schemas.get(0).alias, column, context.outerReferences, expression.getLocation());
-                        result = pair != null ? pair.getKey()
-                                : null;
+                        resolveResult = resolve(expression.getColumn(), schema, schema.schemas.get(0).alias, column, null, expression.getLocation());
                     }
                 }
 
-                if (result != null)
+                if (resolveResult != null)
                 {
-                    return DereferenceExpression.create(result, path, expression.getLocation());
+                    return DereferenceExpression.create(resolveResult.expression, path, expression.getLocation());
                 }
                 else
                 {
@@ -1186,44 +1188,114 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 }
             }
 
-            if (path.size() > 0)
-            {
-                return DereferenceExpression.create(result, path, expression.getLocation());
-            }
-
-            return result;
+            return DereferenceExpression.create(resolveResult.expression, path, expression.getLocation());
         }
 
         /** Returns the expression that has the highest precedence between a current match and outer schema match */
-        private IExpression getHighestPrecedence(IExpression current, Pair<IExpression, Column> outer)
+        private ResolveResult getHighestPrecedence(ResolveResult current, ResolveResult outer)
         {
             if (outer == null)
             {
                 return current;
             }
-
-            boolean isPopulated = SchemaUtils.isPopulated(outer.getValue());
-            boolean isAsterisk = SchemaUtils.isAsterisk(outer.getValue(), true);
-
-            // Current is asterisk here
-            // Non asterisk or populated has higher precedence than asterisk
-            if (!isAsterisk
-                    || isPopulated)
+            else if (current == null)
             {
-                return outer.getKey();
+                return outer;
+            }
+
+            // Score the candidates according to alias/populated/asterisk
+            int currentScore = (current.aliasMatch ? 1
+                    : 0)
+                    + (current.populatedMatch ? 1
+                            : 0)
+                    + (current.asteriskMatch ? -1
+                            : 0);
+            int outerScore = (outer.aliasMatch ? 1
+                    : 0)
+                    + (outer.populatedMatch ? 1
+                            : 0)
+                    + (outer.asteriskMatch ? -1
+                            : 0);
+
+            if (outerScore > currentScore)
+            {
+                return outer;
             }
 
             // Fallback to current if no distinct "winner" can be found
             return current;
         }
 
-        private Pair<IExpression, Column> resolve(QualifiedName originalQname, ResolveSchema schema, String alias, String column, Set<Column> outerReferences, Location location)
+        /** Result of a resolve of a QFN against a schema. */
+        private record ResolveResult(IExpression expression, boolean aliasMatch, boolean asteriskMatch, boolean populatedMatch)
+        {
+        }
+
+        /**
+         * @formatter:off
+         * Resolve a split qualified name me against a schema.
+         * Alias is the first part of the QFN if there are more than one parts otherwise is empty
+         *
+         * Matching aliases
+         * ----------------
+         *
+         * alias => the alias of the qualified name (will be empty if QFN is a single item)
+         * - a.col => alias 'a'
+         * - t => no alias ie. ''
+         * --
+         * column => the second part of the QFN if items > 1 otherwise the QFN part
+         * - a.col => 'col'
+         * - t => 't'
+         * --
+         * schemaAlias => The alias that the column belongs to
+         * --
+         * -- select a.col
+         * -- from tableA a
+         * --
+         * -- => all columns originating from tableA will have schemaAlias 'a'
+         * --
+         * -- select a.col, b.col
+         * -- from tableA a
+         * -- inner join tableB b
+         * --   on ..
+         * --
+         * -- => all columns originating from tableA will have schemaAlias 'a'
+         * -- => all columns originating from tableB will have schemaAlias 'b'
+         * --
+         * -- select x.col
+         * -- from (
+         * --   select *
+         * --   from tableA a
+         * --   inner join tableB b
+         * --     on..
+         * -- ) x
+         * -- => All columns originating from subquery x have schemaAlias 'x'
+         *
+         * Precedence
+         * ----------
+         *
+         * - 1. Alias match with column match
+         * ----- Full match.
+         * - 2. Empty alias with column match
+         * ----- Semi match. If multiple => ambiguity
+         * - 3. Empty alias with schema alias matching on populated column
+         * ----- Full match (populated)
+         * - 4. Alias match on asterisk column
+         * ----- Full Asterisk match.
+         * - 5. Empty alias matching asterisk schema column
+         * ----- Semi match. If multiple => ambiguity
+         *
+         * Ordinals can only be used if the schema doesn't contain any asterisk columns
+         * @formatter:on
+         */
+        private ResolveResult resolve(QualifiedName originalQname, ResolveSchema schema, String alias, String column, Set<Column> outerReferences, Location location)
         {
             int asteriskIndexMatch = -1;
             int nonAsteriskIndexMatch = -1;
             boolean multipleAsterisk = false;
             boolean canUseOrdinal = true;
-            boolean aliasMatch = false;
+
+            boolean emptyAlias = "".equals(alias);
 
             int size = schema.getSize();
             for (int i = 0; i < size; i++)
@@ -1231,65 +1303,100 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 Pair<String, Column> p = schema.getColumn(i);
 
                 Column schemaColumn = p.getValue();
-                CoreColumn.Type columnType = SchemaUtils.getColumnType(schemaColumn);
-                boolean isAsterisk = columnType == CoreColumn.Type.ASTERISK;
+                // We only look for direct asterisk columns here
+                boolean isAsterisk = SchemaUtils.getColumnType(schemaColumn) == CoreColumn.Type.ASTERISK;
                 String schemaAlias = p.getKey();
-                TableSourceReference schemaTableRef = SchemaUtils.getTableSource(schemaColumn);
-                String columnAlias = schemaTableRef != null ? schemaTableRef.getAlias()
-                        : "";
+                // If the schema doesn't have an alias check to see if the column has a TableSourceReference
+                // attached and if so use the as schemaAlias
+                if ("".equals(schemaAlias))
+                {
+                    TableSourceReference tsr = SchemaUtils.getTableSource(schemaColumn);
+                    schemaAlias = tsr != null ? tsr.getAlias()
+                            : "";
+                }
+                boolean emptySchemaAlias = "".equals(schemaAlias);
 
+                boolean aliasMatch = !emptyAlias
+                        && !emptySchemaAlias
+                        && alias.equalsIgnoreCase(schemaAlias);
                 // Ordinals can be used if there are no asterisk in the schema
-                // Named asterisks count as asterisk schema wise
                 canUseOrdinal = canUseOrdinal
-                        && !(columnType == CoreColumn.Type.ASTERISK
-                                || columnType == CoreColumn.Type.NAMED_ASTERISK);
+                        && !isAsterisk;
 
-                // Match alias
-                if (!"".equals(alias))
+                // Drop out on mismatching alias combo
+                if (!emptyAlias
+                        && !emptySchemaAlias
+                        && !alias.equalsIgnoreCase(schemaAlias))
                 {
-                    // Non empty schema alias and the qualifier alias doesn't match => column not eligible
-                    if (!"".equalsIgnoreCase(schemaAlias)
-                            && !alias.equalsIgnoreCase(schemaAlias))
-                    {
-                        continue;
-                    }
-                    // Empty schema alias and the qualifier alias doesn't match column alias => column not eligible
-                    else if ("".equalsIgnoreCase(schemaAlias)
-                            && !alias.equalsIgnoreCase(columnAlias))
-                    {
-                        continue;
-                    }
+                    continue;
                 }
 
-                if (isAsterisk)
-                {
-                    // We cannot throw until after loop since a named column has higher prio
-                    // and then it's ok to have multiple asterisk matches
-                    multipleAsterisk = asteriskIndexMatch >= 0;
-                    asteriskIndexMatch = i;
-                }
-                else if (column.equalsIgnoreCase(schemaColumn.getName())
-                        || (SchemaUtils.isPopulated(schemaColumn)
-                                && schemaColumn.getName()
-                                        .equalsIgnoreCase(alias)))
-                {
+                /*
+                 * @formatter:off
+                 * A populated match can be on column or alias
+                 *
+                 * select x       <--- column match
+                 * from tableA A
+                 * inner populate join tableB x
+                 *   on ....
+                 *
+                 * select x.col       <--- alias match (this also needs a Dereference since we want col on x)
+                 * from tableA A
+                 * inner populate join tableB x
+                 *   on ....
+                 *
+                 * @formatter:on
+                 */
+                boolean populatedMatch = SchemaUtils.isPopulated(schemaColumn)
+                        && ((emptyAlias
+                                && column.equalsIgnoreCase(schemaColumn.getName()))
+                                || (alias.equalsIgnoreCase(schemaColumn.getName())));
 
-                    // Multiple matches of named columns is not allowed
-                    if (nonAsteriskIndexMatch >= 0)
-                    {
-                        throw new ParseException("Ambiguous column: " + originalQname, location);
-                    }
+                // Bullet 3
+                // A full populated match.
+                // We can break out here since it's now allowed to have multiple aliases with the same name
+                // so there can only be one match
+                if (populatedMatch)
+                {
                     nonAsteriskIndexMatch = i;
-                    aliasMatch = schemaColumn.getName()
-                            .equalsIgnoreCase(alias);
-
-                    // If we have a match with an alias we don't need to search any more
-                    if (alias != null
-                            && CI.equals(alias, columnAlias))
+                    break;
+                }
+                // Bullet 1,2
+                else if (!isAsterisk)
+                {
+                    boolean columnMatch = column.equalsIgnoreCase(schemaColumn.getName());
+                    // A full non asterisk match => no need to look any more
+                    if ((aliasMatch
+                            && columnMatch))
                     {
+                        nonAsteriskIndexMatch = i;
+                        // We can break here when a full match occurs
                         break;
                     }
-
+                    // A semi match
+                    else if (emptyAlias
+                            && columnMatch)
+                    {
+                        // Multiple matches of named columns is not allowed
+                        if (nonAsteriskIndexMatch >= 0)
+                        {
+                            throw new ParseException("Ambiguous column: " + originalQname, location);
+                        }
+                        nonAsteriskIndexMatch = i;
+                    }
+                }
+                // Bullet 4,5 in precedence chart
+                else
+                {
+                    // Full or semi alias match
+                    if (aliasMatch
+                            || emptyAlias)
+                    {
+                        // We cannot throw until after loop since a non asterisk column has higher prio
+                        // and then it's ok to have multiple asterisk matches
+                        multipleAsterisk = asteriskIndexMatch >= 0;
+                        asteriskIndexMatch = i;
+                    }
                 }
             }
 
@@ -1304,46 +1411,51 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 return null;
             }
 
-            int index = nonAsteriskIndexMatch >= 0 ? nonAsteriskIndexMatch
+            final int index = nonAsteriskIndexMatch >= 0 ? nonAsteriskIndexMatch
                     : asteriskIndexMatch;
 
-            TableSourceReference schemaTableSource = schema.getTableSource(index);
-
-            Column match = schema.getColumn(index)
-                    .getRight();
-
+            Pair<String, Column> pair = schema.getColumn(index);
+            Column match = pair.getRight();
+            TableSourceReference tableRef = SchemaUtils.getTableSource(match);
+            boolean populatedMatch = SchemaUtils.isPopulated(match);
+            boolean populatedAliasMatch = populatedMatch
+                    && alias.equalsIgnoreCase(match.getName());
+            // CSOFF
+            boolean asteriskMatch = SchemaUtils.isAsterisk(match);
+            boolean aliasMatch = !emptyAlias
+                    && (alias.equalsIgnoreCase(pair.getKey())
+                            || (tableRef != null
+                                    && alias.equalsIgnoreCase(tableRef.getAlias())));
+            // CSON
             int ordinal = canUseOrdinal ? index
                     : -1;
 
-            ColumnExpression.Builder builder = ColumnExpression.Builder.of(aliasMatch ? alias
+            // Set the alias of the ColumnExpression to the alias and not the column
+            // in case we matched the alias and not the column
+            ColumnExpression.Builder builder = ColumnExpression.Builder.of(populatedAliasMatch ? alias
                     : column, match.getType())
                     .withOrdinal(ordinal);
 
             if (ordinal < 0)
             {
-                builder.withColumn(aliasMatch ? alias
+                builder.withColumn(populatedAliasMatch ? alias
                         : column);
             }
-
-            TableSourceReference tableRef = SchemaUtils.getTableSource(match);
 
             // If column did not have a table source use the one from schema (sub query)
             if (tableRef == null)
             {
-                tableRef = schemaTableSource;
+                tableRef = schema.getTableSource(index);
             }
 
             if (tableRef != null)
             {
                 CoreColumn.Type columnType = SchemaUtils.getColumnType(match);
-
-                // Switch to a named asterisk upon match since we cannot have asterisk columns
-                // further down
+                // Switch asterisk to regular upon match
                 if (columnType == CoreColumn.Type.ASTERISK)
                 {
-                    columnType = CoreColumn.Type.NAMED_ASTERISK;
+                    columnType = CoreColumn.Type.REGULAR;
                 }
-
                 match = new CoreColumn(column, match.getType(), "", false, tableRef, columnType);
                 builder.withColumnReference(new ColumnReference(tableRef, columnType));
             }
@@ -1354,14 +1466,19 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 builder.withOuterReference(true);
                 outerReferences.add(match);
             }
-
             // If we had a match on the alias we need to wrap the column expression with a dereference of the column
-            if (aliasMatch)
+            IExpression expression = builder.build();
+            if (populatedAliasMatch)
             {
-                return Pair.of(DereferenceExpression.create(builder.build(), QualifiedName.of(column), location), match);
+                expression = DereferenceExpression.create(builder.build(), QualifiedName.of(column), location);
             }
 
-            return Pair.of(builder.build(), match);
+            if (LOGGER.isDebugEnabled())
+            {
+                LOGGER.debug("Resolved (outer={}): {} to: {}:{}", outerReferences != null, originalQname, expression.getClass()
+                        .getSimpleName(), expression.toVerboseString());
+            }
+            return new ResolveResult(expression, aliasMatch, asteriskMatch, populatedMatch);
         }
     }
 

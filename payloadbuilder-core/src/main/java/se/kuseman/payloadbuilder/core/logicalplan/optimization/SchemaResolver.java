@@ -171,7 +171,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
             if (schema.getSize() > 0
                     && schema.getColumns()
                             .stream()
-                            .anyMatch(c -> SchemaUtils.isAsterisk(c, true)))
+                            .anyMatch(c -> SchemaUtils.isAsterisk(c)))
             {
                 throw new ParseException("Schema for table: " + plan.getTableSource()
                                          + " is invalid. Schema must be either empty (asterisk) or have only regular columns. Check implementation of Catalog: "
@@ -182,11 +182,12 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
             indices = tableSchema.getIndices();
         }
 
-        // No schema returned, create an asterisk
-        if (SchemaUtils.isAsterisk(schema, true))
+        // No schema returned, create an asterisk column with table source ref.
+        if (Schema.EMPTY.equals(schema))
         {
             schema = Schema.of(new CoreColumn(plan.getAlias(), ResolvedType.of(Type.Any), "", false, plan.getTableSource(), CoreColumn.Type.ASTERISK));
         }
+        // .. else recreate the schema and tag the table source to all columns
         else
         {
             schema = recreate(plan.getTableSource(), schema);
@@ -236,18 +237,12 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
         return new TableFunctionScan(plan.getTableSource(), plan.getSchema(), arguments, options, plan.getLocation());
     }
 
+    /** Recreate provided schema's columns with provided table source */
     static Schema recreate(final TableSourceReference tableSource, Schema schema)
     {
         return new Schema(schema.getColumns()
                 .stream()
-                .map(c ->
-                {
-                    ResolvedType type = c.getType();
-                    boolean asterisk = SchemaUtils.isAsterisk(c, true);
-                    // // Force all columns to have a column reference
-                    return new CoreColumn(c.getName(), type, "", false, tableSource, asterisk ? CoreColumn.Type.NAMED_ASTERISK
-                            : CoreColumn.Type.REGULAR);
-                })
+                .map(c -> SchemaUtils.changeTableSource(c, tableSource))
                 .collect(toList()));
     }
 

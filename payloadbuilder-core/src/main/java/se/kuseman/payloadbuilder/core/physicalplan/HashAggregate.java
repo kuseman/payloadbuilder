@@ -67,7 +67,7 @@ public class HashAggregate implements IPhysicalPlan
                 .anyMatch(e -> e instanceof AggregateWrapperExpression awe
                         && awe.getExpression() instanceof AsteriskExpression);
         this.hasAsteriskSchema = hasAsteriskProjection
-                || SchemaUtils.isAsterisk(schema, true);
+                || SchemaUtils.isAsterisk(schema);
         if ((aggregateExpressions.isEmpty()
                 && !projectionExpressions.isEmpty())
                 || (!aggregateExpressions.isEmpty()

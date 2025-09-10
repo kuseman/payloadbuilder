@@ -109,7 +109,7 @@ public abstract class AExpressionTest extends Assert
     /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String alias, TableSourceReference tr, String column, ResolvedType type)
     {
-        return cre(alias, tr, column, type, CoreColumn.Type.NAMED_ASTERISK);
+        return cre(alias, tr, column, type, CoreColumn.Type.REGULAR);
     }
 
     /** Create an {@link ColumnExpression} */
@@ -136,7 +136,7 @@ public abstract class AExpressionTest extends Assert
     /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String column, TableSourceReference tr, ResolvedType type)
     {
-        return cre(column, tr, type, CoreColumn.Type.NAMED_ASTERISK);
+        return cre(column, tr, type, CoreColumn.Type.REGULAR);
     }
 
     /** Create an {@link ColumnExpression} */
@@ -183,7 +183,7 @@ public abstract class AExpressionTest extends Assert
     /** Create an {@link ColumnExpression} with no ordinal and outer reference */
     protected ColumnExpression ocre(String column, TableSourceReference tr)
     {
-        return ocre(column, tr, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK);
+        return ocre(column, tr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR);
     }
 
     /** Create an {@link ColumnExpression} with type, no ordinal and outer reference */
@@ -367,20 +367,6 @@ public abstract class AExpressionTest extends Assert
         return new CoreColumn(name, type, "", false, tableSourceReference, CoreColumn.Type.ASTERISK);
     }
 
-    protected CoreColumn nast(String name, ResolvedType type, TableSourceReference tableSourceReference)
-    {
-        return nast(name, type, tableSourceReference, false);
-    }
-
-    protected CoreColumn nast(String name, ResolvedType type, TableSourceReference tableSourceReference, boolean internal)
-    {
-        return new CoreColumn(name, type, "", internal, tableSourceReference, CoreColumn.Type.NAMED_ASTERISK);
-    }
-
-    protected CoreColumn nast(String name, Type type, TableSourceReference tableSourceReference)
-    {
-        return new CoreColumn(name, ResolvedType.of(type), "", false, tableSourceReference, CoreColumn.Type.NAMED_ASTERISK);
-    }
     // CSOFF
 
     protected void assertExpression(Object expected, Map<String, Object> values, String expression) throws Exception

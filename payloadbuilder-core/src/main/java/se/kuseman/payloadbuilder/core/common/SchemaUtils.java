@@ -71,6 +71,17 @@ public class SchemaUtils
     }
 
     /** Creates a new column from provide column with a new type. */
+    public static Column changeTableSource(Column column, TableSourceReference tableSourceReference)
+    {
+        if (column instanceof CoreColumn cc)
+        {
+            return new CoreColumn(cc, tableSourceReference);
+        }
+
+        return CoreColumn.of(column.getName(), column.getType(), tableSourceReference);
+    }
+
+    /** Creates a new column from provide column with a new type. */
     public static Column changeType(Column column, ResolvedType type)
     {
         if (column instanceof CoreColumn cc)
@@ -106,12 +117,10 @@ public class SchemaUtils
     /** Returns true if this schema contains asterisk columns */
     public static boolean isAsterisk(Schema schema)
     {
-        return isAsterisk(schema, true);
-    }
-
-    /** Returns true if this schema contains asterisk columns */
-    public static boolean isAsterisk(Schema schema, boolean includeNamedAsterisks)
-    {
+        if (schema == null)
+        {
+            return false;
+        }
         int size = schema.getSize();
         if (size == 0)
         {
@@ -122,33 +131,45 @@ public class SchemaUtils
         {
             Column column = schema.getColumns()
                     .get(i);
-            if (isAsterisk(column, includeNamedAsterisks))
+            if (isAsterisk(column))
             {
                 return true;
-            }
-
-            if (column.getType()
-                    .getType() == Column.Type.Table
-                    || column.getType()
-                            .getType() == Column.Type.Object)
-            {
-                if (isAsterisk(column.getType()
-                        .getSchema(), includeNamedAsterisks))
-                {
-                    return true;
-                }
             }
         }
         return false;
     }
 
-    /** Returns true if provided column is asterisk */
-    public static boolean isAsterisk(Column column, boolean includeSemiAsterisks)
+    /**
+     * Returns true if provided column is asterisk.
+     */
+    public static boolean isAsterisk(Column column)
     {
-        return column instanceof CoreColumn cc
-                && (cc.getColumnType() == CoreColumn.Type.ASTERISK
-                        || (includeSemiAsterisks
-                                && cc.getColumnType() == CoreColumn.Type.NAMED_ASTERISK));
+        if (column instanceof CoreColumn cc)
+        {
+            if (cc.getColumnType() == CoreColumn.Type.ASTERISK)
+            {
+                return true;
+            }
+
+            // A populated column who's schema is asterisk counts as asterisk
+            if (cc.getColumnType() == CoreColumn.Type.POPULATED)
+            {
+                return isAsterisk(cc.getType()
+                        .getSchema());
+            }
+
+            // If we have an internal column who's type is a table that is an asterisk schema
+            // this column is treated as asterisk
+            if (cc.isInternal()
+                    && cc.getType()
+                            .getType() == Column.Type.Table)
+            {
+                return isAsterisk(cc.getType()
+                        .getSchema());
+            }
+
+        }
+        return false;
     }
 
     /** Return column type of provided column */

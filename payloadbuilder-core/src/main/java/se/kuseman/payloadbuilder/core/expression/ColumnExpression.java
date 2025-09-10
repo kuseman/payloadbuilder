@@ -6,6 +6,9 @@ import static org.apache.commons.lang3.Strings.CI;
 import java.util.List;
 import java.util.Objects;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
+
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -382,6 +385,12 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
         public ColumnExpression build()
         {
             return new ColumnExpression(alias, column, resolvedType, columnReference, ordinal, outerReference, lambdaId);
+        }
+
+        @Override
+        public String toString()
+        {
+            return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
         }
     }
 }
