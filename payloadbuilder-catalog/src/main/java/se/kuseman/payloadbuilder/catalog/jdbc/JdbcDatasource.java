@@ -19,9 +19,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
@@ -45,17 +49,18 @@ import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 /** Jdbc datasource */
 class JdbcDatasource implements IDatasource
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(JdbcDatasource.class);
     private final JdbcCatalog catalog;
     private final String catalogAlias;
     private final Schema schema;
     private final QualifiedName table;
-    private final List<String> projection;
+    private final Projection projection;
     private final List<IPredicate> predicates;
     private final List<ISortItem> sortItems;
     private final ISeekPredicate indexPredicate;
     private final IExpression tableHintsOption;
 
-    JdbcDatasource(JdbcCatalog catalog, String catalogAlias, Schema schema, QualifiedName table, ISeekPredicate indexPredicate, List<String> projection, List<IPredicate> predicates,
+    JdbcDatasource(JdbcCatalog catalog, String catalogAlias, Schema schema, QualifiedName table, ISeekPredicate indexPredicate, Projection projection, List<IPredicate> predicates,
             List<ISortItem> sortItems, IExpression tableHintsOption)
     {
         this.catalog = catalog;
@@ -99,6 +104,7 @@ class JdbcDatasource implements IDatasource
     {
         SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
         String sql = buildSql(dialect, context, false);
+        LOGGER.debug("Table: {}, sql: {}", table, sql);
         return getIterator(dialect, catalog, context, catalogAlias, schema, sql, null, options.getBatchSize(context));
     }
 
@@ -113,16 +119,17 @@ class JdbcDatasource implements IDatasource
                     .valueAsString(0);
         }
 
-        String projection = "y.*";
-        if (!this.projection.isEmpty())
+        String projectionString = switch (projection.type())
         {
-            projection = this.projection.stream()
+            case ALL -> "y.*";
+            case NONE -> "1";
+            case COLUMNS -> projection.columns()
+                    .stream()
                     .map(c -> "y." + c)
                     .collect(joining(","));
-        }
-
+        };
         StringBuilder sb = new StringBuilder("SELECT ");
-        sb.append(projection);
+        sb.append(projectionString);
         sb.append(" FROM ");
         sb.append(table.toString())
                 .append(" y");

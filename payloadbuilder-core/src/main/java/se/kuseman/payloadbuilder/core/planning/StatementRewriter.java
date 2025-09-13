@@ -143,9 +143,10 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
                             .getDefaultCatalogAlias();
 
                     TableScan catalogFunctionsScan = new TableScan(TableSchema.EMPTY,
-                            new TableSourceReference(0, TableSourceReference.Type.TABLE, "sys", QualifiedName.of(catalog, "functions"), "fCat"), emptyList(), false, emptyList(), null);
+                            new TableSourceReference(0, TableSourceReference.Type.TABLE, "sys", QualifiedName.of(catalog, "functions"), "fCat"),
+                            se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, false, emptyList(), null);
                     TableScan systemFunctionsScan = new TableScan(TableSchema.EMPTY, new TableSourceReference(1, TableSourceReference.Type.TABLE, "sys", QualifiedName.of("functions"), "fSys"),
-                            emptyList(), false, emptyList(), null);
+                            se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, false, emptyList(), null);
 
                     // Order by type and name
                     List<SortItem> sortItems = asList(new SortItem(new LiteralIntegerExpression(2), Order.ASC, NullOrder.UNDEFINED, null),
@@ -181,7 +182,8 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
         QualifiedName qname = isBlank(catalog) ? QualifiedName.of(tableName)
                 : QualifiedName.of(catalog, tableName);
         TableSourceReference tableSourceRef = new TableSourceReference(2, TableSourceReference.Type.TABLE, "sys", qname, "t");
-        return new LogicalSelectStatement(new TableScan(TableSchema.EMPTY, tableSourceRef, emptyList(), false, emptyList(), null), false).accept(this, context);
+        return new LogicalSelectStatement(new TableScan(TableSchema.EMPTY, tableSourceRef, se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, false, emptyList(), null), false)
+                .accept(this, context);
     }
 
     @Override
