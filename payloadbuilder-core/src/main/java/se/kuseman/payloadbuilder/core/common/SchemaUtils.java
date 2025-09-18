@@ -95,7 +95,7 @@ public class SchemaUtils
             return new CoreColumn(cc, type, tableSourceReference);
         }
 
-        return new Column(column.getName(), type);
+        return CoreColumn.of(column.getName(), type, tableSourceReference);
     }
 
     /** Return a new schema which concats to other schemas */

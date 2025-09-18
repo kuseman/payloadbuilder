@@ -1,5 +1,7 @@
 package se.kuseman.payloadbuilder.api.catalog;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
@@ -19,10 +21,10 @@ public class DatasourceData
     private final Optional<Schema> schema;
     private final List<IPredicate> predicates;
     private final List<? extends ISortItem> sortItems;
-    private final List<String> projection;
+    private final Projection projection;
     private final List<Option> options;
 
-    public DatasourceData(int nodeId, Optional<Schema> schema, List<IPredicate> predicates, List<? extends ISortItem> sortItems, List<String> projection, List<Option> options)
+    public DatasourceData(int nodeId, Optional<Schema> schema, List<IPredicate> predicates, List<? extends ISortItem> sortItems, Projection projection, List<Option> options)
     {
         this.nodeId = nodeId;
         this.schema = requireNonNull(schema, "schema");
@@ -62,10 +64,28 @@ public class DatasourceData
     }
 
     /**
-     * Return the projected columns needed for this data source. This is a optimization hint that can be used for catalogs that supports fetching of specific columns only like RDMBS:es. If empty then
-     * all column should be returned
+     * Return the wanted projection for this data source. This is a optimization hint that can be used for catalogs that supports fetching of specific columns only like RDMBS:es.
+     *
+     * <pre>
+     * NOTE! If Catalog implementation has a specified {@link Schema} returned from {@link Catalog#getScanDataSource} or {@link Catalog#getSeekDataSource} that schema must be respected
+     * when applying a projection.
+     *
+     * Ie.
+     *
+     *  Schema for 'cusomter'
+     *   - id    INT
+     *   - name  STRING
+     *   - group STRING
+     *
+     * And projection wanted is [id, group] then the returned {@link TupleVector} must look like the original schema:
+     *
+     * - id: [1,2,3]
+     * - name: [null, null, null]
+     * - group: ["group1", "group2", "group3" ]
+     *
+     * </pre>
      */
-    public List<String> getProjection()
+    public Projection getProjection()
     {
         return projection;
     }
@@ -117,5 +137,49 @@ public class DatasourceData
             }
         }
         return null;
+    }
+
+    /** A projection that is wanted from the data source. */
+    public record Projection(ProjectionType type, List<String> columns)
+    {
+
+        public static final Projection NONE = new Projection(ProjectionType.NONE, emptyList());
+        public static final Projection ALL = new Projection(ProjectionType.ALL, emptyList());
+
+        /** Construct a projection. */
+        public Projection
+        {
+            columns = unmodifiableList(requireNonNull(columns));
+            if ((type == ProjectionType.ALL
+                    || type == ProjectionType.NONE)
+                    && !columns.isEmpty())
+            {
+                throw new IllegalArgumentException("Columns list must be empty when type is ALL or NONE");
+            }
+            else if (type == ProjectionType.COLUMNS
+                    && columns.isEmpty())
+            {
+                throw new IllegalArgumentException("Columns list must be NOT empty when type is COLUMNS");
+            }
+        }
+
+        /** Constructs a projection with provided columns. */
+        public static Projection columns(List<String> columns)
+        {
+            return new Projection(ProjectionType.COLUMNS, columns);
+        }
+    }
+
+    /** Definition of different projection types that sent to Catalog implementations when a specific projection is asked for. */
+    public enum ProjectionType
+    {
+        /**
+         * All available columns should be returned from datasource. Typically the case when an asterisk (*) select is targeting the data source.
+         */
+        ALL,
+        /** No projection is wanted. This is a special case when the datasource is present in the operator tree but no columns is asked from it. */
+        NONE,
+        /** A set of columns is wanted. */
+        COLUMNS;
     }
 }

@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 
+import java.util.List;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
@@ -11,6 +12,7 @@ import org.junit.Test;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
@@ -18,6 +20,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
@@ -43,7 +46,10 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("type", Type.String, tableSource), col("description", Type.String, tableSource));
 
         //@formatter:off
-        ILogicalPlan expected = new TableScan(new TableSchema(expectedSchema), tableSource, emptyList(), false, emptyList(), null);
+        ILogicalPlan expected =
+                projection(
+                    new TableScan(new TableSchema(expectedSchema), tableSource, Projection.ALL, false, emptyList(), null),
+                    List.of(new AsteriskExpression(null)));
         //@formatter:on
 
         Assertions.assertThat(actual.getSchema())
@@ -66,7 +72,9 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected =
                 new Limit(
-                        new TableScan(new TableSchema(expectedSchema), tableSource, emptyList(), false, emptyList(), null),
+                        projection(
+                            new TableScan(new TableSchema(expectedSchema), tableSource, Projection.ALL, false, emptyList(), null),
+                            List.of(new AsteriskExpression(null))),
                         e("10"));
         //@formatter:on
 
@@ -153,28 +161,30 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected = ConstantScan.create(
-                asList(
-                        intLit(12345),
-                        new AliasExpression(
-                            new UnresolvedSubQueryExpression(
-                                new OperatorFunctionScan(
-                                   Schema.of(Column.of("output", Type.Any)),
-                                   new TableScan(new TableSchema(expectedSchema), tableSource, asList(), false, emptyList(), null),
-                                   "",
-                                   "object_array",
-                                   null
-                                ), null),
-                            "tables")),
-                null);
+                        asList(
+                                intLit(12345),
+                                new AliasExpression(
+                                    new UnresolvedSubQueryExpression(
+                                        new OperatorFunctionScan(
+                                           Schema.of(Column.of("output", Type.Any)),
+                                           projection(
+                                               new TableScan(new TableSchema(expectedSchema), tableSource, Projection.ALL, false, emptyList(), null),
+                                               List.of(new AsteriskExpression(null))),
+                                           "",
+                                           "object_array",
+                                           null
+                                        ), null),
+                                    "tables")),
+                        null);
         //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
                 .isEqualTo(expected);
-
-        // System.out.println(expected.print(0));
-        // System.out.println(actual.print(0));
 
         assertEquals(expected, actual);
     }

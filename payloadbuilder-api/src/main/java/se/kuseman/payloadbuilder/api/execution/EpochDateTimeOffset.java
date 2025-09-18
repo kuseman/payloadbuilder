@@ -6,6 +6,7 @@ import static se.kuseman.payloadbuilder.api.execution.EpochDateTime.UTC;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -224,6 +225,10 @@ public class EpochDateTimeOffset implements Comparable<EpochDateTimeOffset>, Val
         else if (object instanceof ZonedDateTime zdt)
         {
             return new EpochDateTimeOffset(zdt);
+        }
+        else if (object instanceof OffsetDateTime odt)
+        {
+            return new EpochDateTimeOffset(odt.toZonedDateTime());
         }
         else if (object instanceof LocalDateTime ldt)
         {
