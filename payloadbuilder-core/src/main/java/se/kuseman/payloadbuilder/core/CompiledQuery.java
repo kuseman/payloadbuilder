@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.statement.QueryStatement;
@@ -26,6 +27,12 @@ public class CompiledQuery
     public QueryResult execute(QuerySession session)
     {
         return new QueryResultImpl(session, query);
+    }
+
+    /** Execute this query with provided session returning a raw query result that returns the raw {@link TupleVector}'s */
+    public RawQueryResult executeRaw(QuerySession session)
+    {
+        return new RawQueryResultImpl(session, query);
     }
 
     public List<Warning> getWarnings()
