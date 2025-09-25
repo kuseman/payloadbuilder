@@ -633,7 +633,7 @@ public class QueryParser
                         .qname()), alias);
 
                 boolean tempTable = ctx.tableName().tempHash != null;
-                return new TableScan(TableSchema.EMPTY, tableSourceRef, emptyList(), tempTable, options, Location.from(ctx.tableName()));
+                return new TableScan(TableSchema.EMPTY, tableSourceRef, se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, tempTable, options, Location.from(ctx.tableName()));
             }
             else if (ctx.variable() != null)
             {
@@ -1464,43 +1464,24 @@ public class QueryParser
                 throw new ParseException("Cannot have asterisk select with GROUP BY's", ctx);
             }
 
-            // One select item that is an asterisk one
-            boolean isSelectAll = ctx.selectItem()
-                    .size() == 1
-                    && ctx.selectItem()
-                            .get(0)
-                            .ASTERISK() != null
-                    && ctx.selectItem()
-                            .get(0).alias == null;
+            boolean prevInsideProjection = insideProjection;
+            insideProjection = true;
+            List<IExpression> expressions = ctx.selectItem()
+                    .stream()
+                    .map(i -> (IExpression) visitSelectItem(i))
+                    .collect(toList());
+            insideProjection = prevInsideProjection;
 
-            if (!isSelectAll)
+            validateAssignmentProjection(expressions, ctx);
+            // No table source => create a constant scan of the expressions
+            if (!containsAsterisks
+                    && plan instanceof ConstantScan cs
+                    && ConstantScan.ONE_ROW_EMPTY_SCHEMA.equals(cs))
             {
-                boolean prevInsideProjection = insideProjection;
-                insideProjection = true;
-                List<IExpression> expressions = ctx.selectItem()
-                        .stream()
-                        .map(i -> (IExpression) visitSelectItem(i))
-                        .collect(toList());
-                insideProjection = prevInsideProjection;
-
-                validateAssignmentProjection(expressions, ctx);
-                // No table source => create a constant scan of the expressions
-                if (!containsAsterisks
-                        && plan instanceof ConstantScan cs
-                        && ConstantScan.ONE_ROW_EMPTY_SCHEMA.equals(cs))
-                {
-                    return ConstantScan.create(expressions, Location.from(ctx.SELECT()));
-                }
-
-                plan = new Projection(plan, expressions, null);
+                return ConstantScan.create(expressions, Location.from(ctx.SELECT()));
             }
-            // TODO: mark all table source references with an asterisk to properly push down projections
-            // else
-            // {
-            //
-            // }
 
-            return plan;
+            return new Projection(plan, expressions, null);
         }
 
         private ILogicalPlan wrapSort(ILogicalPlan plan, SelectStatementContext ctx)

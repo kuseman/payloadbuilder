@@ -145,28 +145,30 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected = 
+            projection(
                 subQuery(
                     new Concatenation(
-                    List.of("col1", "col2"),
-                    List.of(
-                    projection(
-                        new OperatorFunctionScan(
-                            Schema.of(new CoreColumn("__expr0", ResolvedType.ANY, "", true)),
-                            ConstantScan.create(List.of(new AliasExpression(stringLit("hello"), "col1")), null),
-                            "",
-                            "object",
-                            null),
-                        List.of(intLit(1), uce("__expr0"))),
-                    projection(
-                        new OperatorFunctionScan(
-                            Schema.of(new CoreColumn("__expr1", ResolvedType.ANY, "", true)),
-                            ConstantScan.create(List.of(new AliasExpression(stringLit("world"), "col2")), null),
-                            "",
-                            "object",
-                            null),
-                        List.of(intLit(2), uce("__expr1")))
-                    ), null),
-                    subQueryX);
+                        List.of("col1", "col2"),
+                        List.of(
+                        projection(
+                            new OperatorFunctionScan(
+                                Schema.of(new CoreColumn("__expr0", ResolvedType.ANY, "", true)),
+                                ConstantScan.create(List.of(new AliasExpression(stringLit("hello"), "col1")), null),
+                                "",
+                                "object",
+                                null),
+                            List.of(intLit(1), uce("__expr0"))),
+                        projection(
+                            new OperatorFunctionScan(
+                                Schema.of(new CoreColumn("__expr1", ResolvedType.ANY, "", true)),
+                                ConstantScan.create(List.of(new AliasExpression(stringLit("world"), "col2")), null),
+                                "",
+                                "object",
+                                null),
+                            List.of(intLit(2), uce("__expr1")))
+                        ), null),
+                    subQueryX),
+                List.of(new AsteriskExpression(null)));
         //@formatter:on
 
         // System.out.println(expected.print(0));

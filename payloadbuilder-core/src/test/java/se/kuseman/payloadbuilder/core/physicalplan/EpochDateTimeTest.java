@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
@@ -35,6 +36,7 @@ public class EpochDateTimeTest extends Assert
         // Test that offsets are stripped from zoned date time
         assertEquals(EpochDateTime.from("2010-10-10T00:10:00.00Z"), EpochDateTime.from(ZonedDateTime.parse("2010-10-10T00:10:00.00+03:00")));
         assertEquals(EpochDateTime.from("2010-10-10T00:10:00.00Z"), EpochDateTime.from(EpochDateTimeOffset.from(ZonedDateTime.parse("2010-10-10T00:10:00.00+03:00"))));
+        assertEquals(EpochDateTime.from("2010-10-10T00:10:00.00Z"), EpochDateTime.from(OffsetDateTime.parse("2010-10-10T00:10:00.00+03:00")));
 
         Object o = EpochDateTime.from("2010-10-10T00:10:00.00Z")
                 .getLocalDateTime();

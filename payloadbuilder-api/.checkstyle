@@ -13,4 +13,5 @@
   <fileset name="java" enabled="true" check-config-name="java-test" local="true">
     <file-match-pattern match-pattern="^src/test/java/.*\.java$" include-pattern="true"/>
   </fileset>
+  <filter name="FilesInSync" enabled="true"/>
 </fileset-config>
