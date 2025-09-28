@@ -85,17 +85,17 @@ public class HttpCatalogTest
 
         // Query
         actual = catalog.getTableSchema(context.getSession(), "http", table, List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}"))));
-        assertEquals(new TableSchema(Schema.EMPTY, List.of(new Index(table, asList("id"), ColumnsType.ALL))), actual);
+        assertEquals(new TableSchema(Schema.EMPTY, List.of(new Index(table, asList("id"), ColumnsType.ANY))), actual);
 
         // Body
         actual = catalog.getTableSchema(context.getSession(), "http", table,
                 List.of(new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{ \"keys\": [{{bodyId}}] }"))));
-        assertEquals(new TableSchema(Schema.EMPTY, List.of(new Index(table, asList("bodyId"), ColumnsType.ALL))), actual);
+        assertEquals(new TableSchema(Schema.EMPTY, List.of(new Index(table, asList("bodyId"), ColumnsType.ANY))), actual);
 
         // Query + body
         actual = catalog.getTableSchema(context.getSession(), "http", table, List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}")),
                 new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{ \"keys\": [{{bodyId}}] }"))));
-        assertEquals(new TableSchema(Schema.EMPTY, List.of(new Index(table, asList("id", "bodyId"), ColumnsType.ALL))), actual);
+        assertEquals(new TableSchema(Schema.EMPTY, List.of(new Index(table, asList("id", "bodyId"), ColumnsType.ANY))), actual);
     }
 
     @Test
@@ -848,30 +848,6 @@ public class HttpCatalogTest
         {
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("Missing catalog property 'endpoint' for catalog alias: http"));
-        }
-    }
-
-    @Test
-    public void test_getScanDataSource_with_no_placeholders_unsupported_content_type()
-    {
-        String body = "{\"json\":\"value\"}";
-        IExecutionContext context = TestUtils.mockExecutionContext("http", Map.of("endpoint", "http://localhost"), 0, null);
-
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
-                asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("put")),
-                        new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
-                        new Option(QualifiedName.of(HttpCatalog.HEADER, "Content-Type"), ExpressionTestUtils.createStringExpression("text/plain"))));
-        IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("endpoint"), data);
-
-        try
-        {
-            dataSource.execute(context);
-            fail("Should fail");
-        }
-        catch (IllegalArgumentException e)
-        {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Only application/json Content-Type is supported"));
         }
     }
 

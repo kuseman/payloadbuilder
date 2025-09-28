@@ -1,7 +1,7 @@
 package se.kuseman.payloadbuilder.catalog.http;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.joining;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -9,19 +9,16 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.net.URLEncoder;
 import java.net.URLStreamHandler;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.regex.Matcher;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
@@ -31,6 +28,7 @@ import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.net.URIAuthority;
 import org.apache.hc.core5.net.URIBuilder;
 import org.apache.hc.core5.util.Timeout;
@@ -40,10 +38,8 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
-import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.catalog.http.HttpCatalog.Request;
 
 /** Data source impl. for Http catalog */
@@ -75,8 +71,35 @@ class HttpDataSource implements IDatasource
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
+        HttpUriRequestBase request = getRequest(context, false);
+        return createIterator(httpClient, request, responseTransformers, context, options);
+    }
+
+    @Override
+    public Map<String, Object> getDescribeProperties(IExecutionContext context)
+    {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        HttpUriRequestBase httpRequest = getRequest(context, true);
+        properties.put("Request", httpRequest.getMethod() + " " + httpRequest.getRequestUri());
+        if (httpRequest.getEntity() instanceof StringEntity se)
+        {
+            String body;
+            try
+            {
+                body = IOUtils.toString(se.getContent(), StandardCharsets.UTF_8);
+                properties.put("Body", body);
+            }
+            catch (IOException e)
+            {
+            }
+        }
+        return properties;
+    }
+
+    private String getBaseEndpoint(IExecutionContext context)
+    {
         String endpoint = this.endpoint;
-        if (!StringUtils.startsWithIgnoreCase(endpoint, "http"))
+        if (!Strings.CI.startsWith(endpoint, "http"))
         {
             endpoint = context.getSession()
                     .getCatalogProperty(catalogAlias, endpoint)
@@ -86,12 +109,91 @@ class HttpDataSource implements IDatasource
                 throw new IllegalArgumentException("Missing catalog property '" + this.endpoint + "' for catalog alias: " + catalogAlias);
             }
         }
-
-        HttpUriRequestBase request = getBaseRequest(context, options, endpoint);
-        return execute(httpClient, request, responseTransformers, context, options);
+        return endpoint;
     }
 
-    static TupleIterator execute(CloseableHttpClient httpClient, HttpUriRequestBase request, List<IResponseTransformer> responseTransformers, IExecutionContext context, List<Option> options)
+    /** Builds the request to be made out of query and body expressions. */
+    private HttpUriRequestBase getRequest(IExecutionContext context, boolean describe)
+    {
+        String endpoint = getBaseEndpoint(context);
+
+        Map<String, Object> values = emptyMap();
+        if (!request.predicates()
+                .isEmpty()
+                || seekPredicate != null)
+        {
+            values = PatternUtils.createValues(context, seekPredicate, request.predicates(), describe);
+        }
+
+        // Replace query expression
+        if (request.queryExpression() != null)
+        {
+            String query = request.queryExpression()
+                    .eval(context)
+                    .valueAsString(0);
+
+            endpoint += PatternUtils.replacePattern(query, PatternUtils.URL_ENCODED_CONTENT_TYPE, values);
+        }
+
+        HttpUriRequestBase httpRequest = getRequestBase(context, options, endpoint);
+
+        // Process body expression
+        if (request.bodyExpression() != null)
+        {
+            String body = request.bodyExpression()
+                    .eval(context)
+                    .valueAsString(0);
+
+            // Default to application/json, to be backwards compatible with pre. mustache
+            ContentType contentType = ContentType.APPLICATION_JSON;
+            if (request.contentType() != null)
+            {
+                contentType = ContentType.parseLenient(request.contentType()
+                        .eval(context)
+                        .valueAsString(0));
+            }
+            body = PatternUtils.replacePattern(body, contentType, values);
+            httpRequest.setEntity(new StringEntity(body, StandardCharsets.UTF_8));
+        }
+
+        return httpRequest;
+    }
+
+    /** Construct a base request with method and headers. */
+    static HttpUriRequestBase getRequestBase(IExecutionContext context, List<Option> options, String endpoint)
+    {
+        String method = "GET";
+        List<Header> headers = new ArrayList<>();
+
+        for (Option option : options)
+        {
+            QualifiedName name = option.getOption();
+            if (name.size() == 2
+                    && HttpCatalog.HEADER.equalsIgnoreCase(name.getFirst()))
+            {
+                String value = option.getValueExpression()
+                        .eval(context)
+                        .valueAsString(0);
+                headers.add(new BasicHeader(name.getParts()
+                        .get(1), value));
+            }
+            else if (HttpCatalog.METHOD.equalsIgnoreCase(name))
+            {
+                String value = option.getValueExpression()
+                        .eval(context)
+                        .valueAsString(0);
+                method = value != null ? value.toUpperCase()
+                        : method;
+            }
+        }
+
+        HttpUriRequestBase httpRequest = new HttpUriRequestBase(method, getURI(endpoint));
+        httpRequest.setHeaders(headers.toArray(new Header[0]));
+        return httpRequest;
+    }
+
+    /** Creates an {@link TupleIterator} and actual do the http request work. */
+    static TupleIterator createIterator(CloseableHttpClient httpClient, HttpUriRequestBase request, List<IResponseTransformer> responseTransformers, IExecutionContext context, List<Option> options)
     {
         ValueVector vv = context.getOption(QualifiedName.of(HttpCatalog.FAIL_ON_NON_200), options);
         boolean failOnNon200 = vv == null
@@ -205,175 +307,6 @@ class HttpDataSource implements IDatasource
             context.getSession()
                     .unregisterAbortListener(abortListener);
         }
-    }
-
-    private HttpUriRequestBase getBaseRequest(IExecutionContext context, List<Option> options, String baseEndpoint)
-    {
-        String endpoint = baseEndpoint;
-
-        // Gather place holder values
-        Map<String, List<Object>> replaceValues = new HashMap<>();
-
-        // Predicates
-        if (!request.predicates()
-                .isEmpty())
-        {
-            for (HttpCatalog.Predicate p : request.predicates())
-            {
-                replaceValues.put(p.name(), evalPredicate(context, p.values()));
-            }
-        }
-
-        // .. seek predicate
-        if (seekPredicate != null)
-        {
-            List<ISeekKey> keys = seekPredicate.getSeekKeys(context);
-            int size = keys.size();
-            for (int i = 0; i < size; i++)
-            {
-                ISeekKey key = keys.get(i);
-                String column = seekPredicate.getIndexColumns()
-                        .get(i);
-                List<Object> values = new ArrayList<>();
-                ValueVector vectorValues = key.getValue();
-                int vsize = vectorValues.size();
-                for (int v = 0; v < vsize; v++)
-                {
-                    Object value = vectorValues.valueAsObject(v);
-                    values.add(value);
-                }
-
-                replaceValues.compute(column, (k, v) ->
-                {
-                    if (v == null)
-                    {
-                        return values;
-                    }
-
-                    v.addAll(values);
-                    return v;
-                });
-            }
-        }
-
-        // Replace query expression
-        if (request.queryExpression() != null)
-        {
-            String queryPart = request.queryExpression()
-                    .eval(context)
-                    .valueAsString(0);
-
-            if (!replaceValues.isEmpty())
-            {
-                StringBuilder sb = new StringBuilder(queryPart.length() * 2);
-                Matcher matcher = HttpCatalog.PLACEHOLDER_PATTERN.matcher(queryPart);
-                while (matcher.find())
-                {
-                    List<Object> list = replaceValues.get(matcher.group(1));
-                    String replaceValue = list.stream()
-                            .filter(Objects::nonNull)
-                            .map(String::valueOf)
-                            .map(v -> URLEncoder.encode(v, StandardCharsets.UTF_8))
-                            .collect(joining(","));
-                    matcher.appendReplacement(sb, replaceValue);
-                }
-                matcher.appendTail(sb);
-                endpoint += sb.toString();
-            }
-        }
-
-        HttpUriRequestBase httpRequest = getRequestBase(context, options, endpoint);
-
-        // Process body expression
-        if (request.bodyExpression() != null)
-        {
-            ContentType contentType = ContentType.APPLICATION_JSON;
-            if (request.contentType() != null)
-            {
-                contentType = ContentType.parseLenient(request.contentType()
-                        .eval(context)
-                        .valueAsString(0));
-            }
-            // TODO: request body builder abstraction, escape strings, append items
-            // ie.
-            // xml -> <field>value1</field><field>value2</field>
-            // json -> "value1","value2"
-            // For now we only support json
-            if (!ContentType.APPLICATION_JSON.isSameMimeType(contentType))
-            {
-                throw new IllegalArgumentException("Only application/json Content-Type is supported");
-            }
-
-            String body = request.bodyExpression()
-                    .eval(context)
-                    .valueAsString(0);
-
-            if (!replaceValues.isEmpty())
-            {
-                StringBuilder sb = new StringBuilder(body.length() * 2);
-                Matcher matcher = HttpCatalog.PLACEHOLDER_PATTERN.matcher(body);
-                while (matcher.find())
-                {
-                    List<Object> list = replaceValues.get(matcher.group(1));
-                    String replaceValue = list.stream()
-                            .filter(Objects::nonNull)
-                            .map(v ->
-                            {
-                                if (v instanceof Number)
-                                {
-                                    return String.valueOf(v);
-                                }
-
-                                return "\"" + StringEscapeUtils.escapeJson(String.valueOf(v))
-                                        .replace("\\", "\\\\")
-                                       + "\"";
-                            })
-                            .collect(joining(","));
-                    matcher.appendReplacement(sb, replaceValue);
-                }
-                matcher.appendTail(sb);
-                body = sb.toString();
-            }
-
-            httpRequest.setEntity(new StringEntity(body, StandardCharsets.UTF_8));
-        }
-
-        return httpRequest;
-    }
-
-    static HttpUriRequestBase getRequestBase(IExecutionContext context, List<Option> options, String endpoint)
-    {
-        ValueVector vv = context.getOption(HttpCatalog.METHOD, options);
-        String method = vv == null
-                || vv.isNull(0) ? GET
-                        : vv.getString(0)
-                                .toString()
-                                .toUpperCase();
-
-        HttpUriRequestBase httpRequest = new HttpUriRequestBase(method, getURI(endpoint));
-        for (Option option : options)
-        {
-            QualifiedName name = option.getOption();
-            if (name.size() == 2
-                    && HttpCatalog.HEADER.equalsIgnoreCase(name.getFirst()))
-            {
-                String value = option.getValueExpression()
-                        .eval(context)
-                        .valueAsString(0);
-                httpRequest.addHeader(name.getParts()
-                        .get(1), value);
-            }
-        }
-
-        return httpRequest;
-    }
-
-    private List<Object> evalPredicate(IExecutionContext context, List<IExpression> expressions)
-    {
-        return expressions.stream()
-                .map(e -> e.eval(context)
-                        .valueAsObject(0))
-                .toList();
     }
 
     /** Dummy handler to ensure URL to not do any stupid connections we don't want. */

@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.catalog.http;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -10,8 +11,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.config.ConnectionConfig;
@@ -59,7 +58,6 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
  * use http.endpoint = 'http://path.to.endpoint'
  * from http#endpoint x
  * 
- * 
  * A set of properties can be specified as table options to customize the request.
  * Different place holders can be added in various pattern properties.
  * - {{field}}     => This will enable 'field' as an indexed column which is intended to be used as pushdown predicates / index access
@@ -78,9 +76,69 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
  *   }'
  * )
  * 
- * If there are any index fields in either query or body all those must be present as either
- * seek predicate or push down predicate fields else a data source cannot be created
- * 
+ * Mustache templating
+ * -------------------
+ * Mustache template engine is used when building query and body part which makes it
+ * easy to build complex bodies when having predicates and index seek values.
+ *
+ * A model is prepared depending on what predicates/indices are used:
+ *
+ * Predicates:
+ * {
+ *    "field": "value",
+ *    "field2": 123
+ * }
+ * Corresponds to a where:
+ * WHERE x.field = 'value'
+ * AND x.field2 = 123
+ *
+ * Seek values:
+ * {
+ *   "@seekValues": [
+ *     {
+ *       "id": 1,
+ *       "type": "typeA"
+ *     },
+ *     {
+ *       "id": 2,
+ *       "type": "typeB"
+ *     }
+ *   ]
+ * }
+ * Corresponds to a join:
+ * ON x.id = y.id
+ * AND x.type = y.type
+ *
+ * Each join value is added to the @seekValues array.
+ *
+ * from http#"http://path/to/endpoint/v1" x with (
+ *   method = 'post',                                       // Method of HTTP request
+ *   header."Content-Type" = 'application/json',            // Headers to add. All qualifiers that has the first part = 'header' will be added
+ *   bodyPattern = '
+ *   {
+ *     "query": [
+ *       {
+ *          "boolean": {
+ *            "must": [
+ *              {
+ *                "term": {
+ *                  "type": "{{type}}"                      // Defined field with name 'type'
+ *                }
+ *              },
+ *              {
+ *                "terms": {
+ *                  "id": {{id#tojsonarray}}                // Defined field with name 'id' using helper function tojson array
+ *                                                          // which will turn the result into: ["id1", "id2", "id3"]
+ *                }
+ *              }
+ *            ]
+ *          }
+ *       }
+ *     ]
+ *   }'
+ * )
+ * where x.id IN ('id1', 'id2', 'id3')                      // Pushdown field 'id'
+ * and x.type = 'article'                                   // Pushdown field 'article'
  * </pre>
  */
 public class HttpCatalog extends Catalog
@@ -96,9 +154,6 @@ public class HttpCatalog extends Catalog
     static final QualifiedName PRINT_HEADERS = QualifiedName.of("printheaders");
     static final int DEFAULT_RECIEVE_TIMEOUT = 15000;
     static final int DEFAULT_CONNECT_TIMEOUT = 1500;
-
-    /** Placeholder regex */
-    static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{(.+?)\\}\\}");
 
     private final List<IResponseTransformer> responseTransformers;
     private final CloseableHttpClient httpClient;
@@ -143,7 +198,7 @@ public class HttpCatalog extends Catalog
     @Override
     public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
     {
-        // Collect indices in options
+        // Collect fields from option expressions
         Map<String, String> fields = new HashMap<>();
         for (Option option : options)
         {
@@ -154,13 +209,14 @@ public class HttpCatalog extends Catalog
                     && (QUERY_PATTERN.equalsIgnoreCase(firstPart)
                             || BODY_PATTERN.equalsIgnoreCase(firstPart)))
             {
-                // Inspect value expression and find field place holders
-                // these will be our index columns
-                addIndexFields(fields, option.getValueExpression());
+                for (String field : PatternUtils.extractFields(String.valueOf(option.getValueExpression())))
+                {
+                    fields.put(lowerCase(field), field);
+                }
             }
         }
 
-        return new TableSchema(Schema.EMPTY, !fields.isEmpty() ? singletonList(new Index(table, new ArrayList<>(fields.values()), ColumnsType.ALL))
+        return new TableSchema(Schema.EMPTY, !fields.isEmpty() ? singletonList(new Index(table, new ArrayList<>(fields.values()), ColumnsType.ANY))
                 : emptyList());
     }
 
@@ -193,7 +249,7 @@ public class HttpCatalog extends Catalog
         {
             // Remove the index columns from the placeholder fields
             // This to determine if a data source can be created or not.
-            // If there are placeholders all of those must be satisfied either through index
+            // If there are place holders, all of those must be satisfied either through index
             // or push down predicates
             for (String indexColumn : seekPredicate.getIndexColumns())
             {
@@ -207,17 +263,6 @@ public class HttpCatalog extends Catalog
         }
 
         return new HttpDataSource(httpClient, catalogAlias, endpoint, seekPredicate, request, responseTransformers, data.getOptions());
-    }
-
-    private void addIndexFields(Map<String, String> fields, IExpression expression)
-    {
-        String value = expression.toString();
-        Matcher matcher = PLACEHOLDER_PATTERN.matcher(value);
-        while (matcher.find())
-        {
-            String group = matcher.group(1);
-            fields.put(group.toLowerCase(), group);
-        }
     }
 
     private Request getRequest(IQuerySession session, List<Option> options, List<IPredicate> predicates, Map<String, String> fields)
@@ -247,13 +292,19 @@ public class HttpCatalog extends Catalog
                     && QUERY_PATTERN.equalsIgnoreCase(qname.getFirst()))
             {
                 queryExpression = option.getValueExpression();
-                addIndexFields(fields, option.getValueExpression());
+                for (String field : PatternUtils.extractFields(String.valueOf(option.getValueExpression())))
+                {
+                    fields.put(lowerCase(field), field);
+                }
             }
             else if (qname.size() == 1
                     && BODY_PATTERN.equalsIgnoreCase(qname.getFirst()))
             {
                 bodyExpression = option.getValueExpression();
-                addIndexFields(fields, option.getValueExpression());
+                for (String field : PatternUtils.extractFields(String.valueOf(option.getValueExpression())))
+                {
+                    fields.put(lowerCase(field), field);
+                }
             }
         }
 
@@ -295,7 +346,7 @@ public class HttpCatalog extends Catalog
                 && predicate.getComparisonType() == IComparisonExpression.Type.EQUAL)
         {
             singleValueIndices.remove(lowerColumn);
-            return new Predicate(indexColumn, singletonList(predicate.getComparisonExpression()));
+            return new Predicate(indexColumn, singletonList(predicate.getComparisonExpression()), true);
         }
         else if (predicate.getType() == IPredicate.Type.IN
                 && !predicate.getInExpression()
@@ -303,16 +354,22 @@ public class HttpCatalog extends Catalog
         {
             singleValueIndices.remove(lowerColumn);
             return new Predicate(indexColumn, predicate.getInExpression()
-                    .getArguments());
+                    .getArguments(), false);
         }
         return null;
     }
 
-    record Request(IExpression contentType, IExpression queryExpression, IExpression bodyExpression, List<Predicate> predicates)
+    //@formatter:off
+    record Request(
+            IExpression contentType,
+            IExpression queryExpression,
+            IExpression bodyExpression,
+            List<Predicate> predicates)
     {
     }
+    //@formatter:on
 
-    record Predicate(String name, List<IExpression> values)
+    record Predicate(String name, List<IExpression> values, boolean single)
     {
     }
 }
