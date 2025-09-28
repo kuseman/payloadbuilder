@@ -17,7 +17,6 @@ import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -420,7 +419,7 @@ public class SystemCatalog extends Catalog
         return new IDatasource()
         {
             @Override
-            public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+            public TupleIterator execute(IExecutionContext context)
             {
                 return TupleIterator.singleton(tupleVector.apply(context));
             }

@@ -3,7 +3,7 @@ package se.kuseman.payloadbuilder.catalog.jdbc;
 import java.util.List;
 import java.util.Optional;
 
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -38,7 +38,7 @@ class QueryFunction extends TableFunctionInfo
 
     @SuppressWarnings("unchecked")
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
     {
         ValueVector queryVector = arguments.get(0)
                 .eval(context);
@@ -64,6 +64,6 @@ class QueryFunction extends TableFunctionInfo
 
         SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
 
-        return JdbcDatasource.getIterator(dialect, catalog, context, catalogAlias, null, query, parameters, options.getBatchSize(context));
+        return JdbcDatasource.getIterator(dialect, catalog, context, catalogAlias, null, query, parameters, context.getBatchSize(options));
     }
 }

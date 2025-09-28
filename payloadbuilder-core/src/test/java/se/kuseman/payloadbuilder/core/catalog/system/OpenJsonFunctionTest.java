@@ -21,11 +21,11 @@ import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
-import se.kuseman.payloadbuilder.core.physicalplan.DatasourceOptions;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link OpenJsonFunction} */
@@ -38,14 +38,14 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     public void test_empty_on_null()
     {
         assertEquals(Arity.ONE, f.arity());
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("null")), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("null")), emptyList());
         assertFalse(it.hasNext());
     }
 
     @Test
     public void test_empty_object()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'{}'")), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'{}'")), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -74,7 +74,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     @Test
     public void test_object()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'{ \"key\": 123 }'")), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'{ \"key\": 123 }'")), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -92,7 +92,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     @Test
     public void test_empty_array()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[]'")), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[]'")), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -111,7 +111,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     @Test
     public void test_array_object()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456}]'")), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456}]'")), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -136,8 +136,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     @Test
     public void test_array_object_batch_size()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456}]'")),
-                new DatasourceOptions(List.of(new Option(DatasourceOptions.BATCH_SIZE, intLit(1)))));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456}]'")), List.of(new Option(IExecutionContext.BATCH_SIZE, intLit(1))));
 
         int batchCount = 0;
         int rowCount = 0;
@@ -176,7 +175,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     @Test
     public void test_array_object_empty_row()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}]'")), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}]'")), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -201,8 +200,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     @Test
     public void test_pointer_not_found()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}]'")),
-                new DatasourceOptions(List.of(new Option(OpenJsonFunction.JSONPATH, e("'/none'")))));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}]'")), List.of(new Option(OpenJsonFunction.JSONPATH, e("'/none'"))));
 
         assertFalse(it.hasNext());
         it.close();
@@ -212,7 +210,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     public void test_pointer_to_array()
     {
         TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'{\"rows\": [{ \"key\": 123 },{ \"key2\": 456},{}], \"otherData\": { \"key\":234 }}'")),
-                new DatasourceOptions(List.of(new Option(OpenJsonFunction.JSONPATH, e("'/rows'")))));
+                List.of(new Option(OpenJsonFunction.JSONPATH, e("'/rows'"))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -238,7 +236,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     public void test_pointer_to_object()
     {
         TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'{\"otherData\": { \"key\":234 }, \"row\": { \"key\": 123 }}'")),
-                new DatasourceOptions(List.of(new Option(OpenJsonFunction.JSONPATH, e("'/row'")))));
+                List.of(new Option(OpenJsonFunction.JSONPATH, e("'/row'"))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -262,8 +260,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     @Test
     public void test_pointer_to_empty_object()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'{\"otherData\": { \"key\":234 }, \"row\": {}}'")),
-                new DatasourceOptions(List.of(new Option(OpenJsonFunction.JSONPATH, e("'/row'")))));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'{\"otherData\": { \"key\":234 }, \"row\": {}}'")), List.of(new Option(OpenJsonFunction.JSONPATH, e("'/row'"))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -281,7 +278,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     public void test_pointer_to_empty_array()
     {
         TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'{\"otherData\": { \"key\":234 }, \"rows\": []}'")),
-                new DatasourceOptions(List.of(new Option(OpenJsonFunction.JSONPATH, e("'/rows'")))));
+                List.of(new Option(OpenJsonFunction.JSONPATH, e("'/rows'"))));
 
         assertFalse(it.hasNext());
         assertFalse(it.hasNext());
@@ -291,7 +288,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     @Test
     public void test_array_mixed_values()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}, true]'")), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}, true]'")), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -315,7 +312,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     @Test
     public void test_array_broken_json_last()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}, true'")), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}, true'")), emptyList());
 
         try
         {
@@ -347,7 +344,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
         Mockito.when(arg.eval(Mockito.any()))
                 .thenReturn(VectorTestUtils.vv(Column.Type.Any, reader));
 
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -392,7 +389,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
         Mockito.when(arg.eval(Mockito.any()))
                 .thenReturn(VectorTestUtils.vv(Column.Type.Any, baos));
 
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())

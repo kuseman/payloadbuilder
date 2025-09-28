@@ -21,6 +21,7 @@ import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -79,7 +80,7 @@ public class IndexSeekTest extends APhysicalPlanTest
         ISeekPredicate predicate = mock(ISeekPredicate.class);
         when(predicate.getSeekKeys(context)).thenReturn(List.of(() -> VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
 
-        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", false, predicate, ds, List.of(new Option(DatasourceOptions.BATCH_SIZE, new LiteralIntegerExpression(2))));
+        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", false, predicate, ds, List.of(new Option(IExecutionContext.BATCH_SIZE, new LiteralIntegerExpression(2))));
 
         TupleIterator it = is.execute(context);
         assertEquals(3, it.estimatedBatchCount());
@@ -146,7 +147,7 @@ public class IndexSeekTest extends APhysicalPlanTest
         when(predicate.getIndex()).thenReturn(new Index(QualifiedName.of("table"), List.of("col1"), ColumnsType.ALL));
         when(predicate.getSeekKeys(context)).thenReturn(List.of(() -> VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
 
-        IndexSeek is = new IndexSeek(0, schema, tsf, "", false, predicate, ds, List.of(new Option(DatasourceOptions.BATCH_SIZE, new LiteralIntegerExpression(2))));
+        IndexSeek is = new IndexSeek(0, schema, tsf, "", false, predicate, ds, List.of(new Option(IExecutionContext.BATCH_SIZE, new LiteralIntegerExpression(2))));
 
         assertEquals("Index Seek: table [col1] (ALL)", is.getName());
 

@@ -206,7 +206,7 @@ public class HttpCatalog extends Catalog
             throw new CompileException("All request placeholders must be used. Placeholders not processed: " + fields.values());
         }
 
-        return new HttpDataSource(httpClient, catalogAlias, endpoint, seekPredicate, request, responseTransformers);
+        return new HttpDataSource(httpClient, catalogAlias, endpoint, seekPredicate, request, responseTransformers, data.getOptions());
     }
 
     private void addIndexFields(Map<String, String> fields, IExpression expression)

@@ -20,11 +20,11 @@ import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
-import se.kuseman.payloadbuilder.core.physicalplan.DatasourceOptions;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link OpenCsvFunction} */
@@ -37,7 +37,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     public void test_empty_on_null()
     {
         assertEquals(Arity.ONE, f.arity());
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("null")), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("null")), emptyList());
         assertFalse(it.hasNext());
     }
 
@@ -47,7 +47,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
         TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
                 'col1,col2,col3
                 '
-                """)), new DatasourceOptions(emptyList()));
+                """)), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -78,7 +78,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
                 123
                 456
                 '
-                """)), new DatasourceOptions(List.of(new Option(DatasourceOptions.BATCH_SIZE, intLit(1)))));
+                """)), List.of(new Option(IExecutionContext.BATCH_SIZE, intLit(1))));
 
         int batchCount = 0;
         int rowCount = 0;
@@ -122,7 +122,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
                 123
                 1230,4560
                 '
-                """)), new DatasourceOptions(emptyList()));
+                """)), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -154,7 +154,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
                 123,1230
                 1230,4560
                 '
-                """)), new DatasourceOptions(emptyList()));
+                """)), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -186,7 +186,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
                 123;1230
                 1230;4560
                 '
-                """)), new DatasourceOptions(List.of(new Option(OpenCsvFunction.COLUMN_SEPARATOR, e("';'")))));
+                """)), List.of(new Option(OpenCsvFunction.COLUMN_SEPARATOR, e("';'"))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -217,7 +217,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
                 '123;1230
                 1230;4560
                 '
-                """)), new DatasourceOptions(List.of(new Option(OpenCsvFunction.COLUMN_HEADERS, e("'key;key2'")), new Option(OpenCsvFunction.COLUMN_SEPARATOR, e("';'")))));
+                """)), List.of(new Option(OpenCsvFunction.COLUMN_HEADERS, e("'key;key2'")), new Option(OpenCsvFunction.COLUMN_SEPARATOR, e("';'"))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -263,7 +263,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
         Mockito.when(arg.eval(Mockito.any()))
                 .thenReturn(VectorTestUtils.vv(Column.Type.Any, reader));
 
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -311,7 +311,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
         Mockito.when(arg.eval(Mockito.any()))
                 .thenReturn(VectorTestUtils.vv(Column.Type.Any, baos));
 
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())

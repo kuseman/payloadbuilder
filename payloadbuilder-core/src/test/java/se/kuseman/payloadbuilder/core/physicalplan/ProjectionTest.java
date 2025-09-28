@@ -144,7 +144,7 @@ public class ProjectionTest extends APhysicalPlanTest
             @Override
             public TupleIterator execute(IExecutionContext context)
             {
-                return schemaLessDS(() -> closed.setTrue(), tv).execute(context, new DatasourceOptions(emptyList()));
+                return schemaLessDS(() -> closed.setTrue(), tv).execute(context);
             }
         };
 

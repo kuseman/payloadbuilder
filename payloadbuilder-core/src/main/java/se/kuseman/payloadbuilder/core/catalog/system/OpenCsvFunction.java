@@ -22,7 +22,7 @@ import com.fasterxml.jackson.dataformat.csv.CsvSchema.Builder;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -74,7 +74,7 @@ class OpenCsvFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
     {
         ValueVector value = arguments.get(0)
                 .eval(context);
@@ -89,14 +89,14 @@ class OpenCsvFunction extends TableFunctionInfo
         try
         {
             // TODO: schema input
-            ValueVector vv = options.getOption(COLUMN_SEPARATOR, context);
+            ValueVector vv = context.getOption(COLUMN_SEPARATOR, options);
             char columnSeparator = vv == null
                     || vv.isNull(0) ? CsvSchema.DEFAULT_COLUMN_SEPARATOR
                             : vv.getString(0)
                                     .toString()
                                     .charAt(0);
 
-            vv = options.getOption(COLUMN_HEADERS, context);
+            vv = context.getOption(COLUMN_HEADERS, options);
             String columnHeaders = vv == null
                     || vv.isNull(0) ? null
                             : vv.getString(0)
@@ -132,7 +132,7 @@ class OpenCsvFunction extends TableFunctionInfo
             throw new RuntimeException("Error reading CSV", e);
         }
 
-        final int batchSize = options.getBatchSize(context);
+        final int batchSize = context.getBatchSize(options);
         return new TupleIterator()
         {
             TupleVector next;

@@ -61,8 +61,8 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.CatalogException;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate.Type;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -110,9 +110,10 @@ class ESDatasource implements IDatasource
     private final MappedProperty indexProperty;
     private final List<IPropertyPredicate> propertyPredicates;
     private final List<SortItemMeta> sortItems;
+    private final List<Option> options;
 
     ESDatasource(int nodeId, ElasticStrategy strategy, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, MappedProperty indexProperty,
-            List<IPropertyPredicate> propertyPredicates, List<SortItemMeta> sortItems)
+            List<IPropertyPredicate> propertyPredicates, List<SortItemMeta> sortItems, List<Option> options)
     {
         this.nodeId = nodeId;
         this.strategy = strategy;
@@ -122,6 +123,7 @@ class ESDatasource implements IDatasource
         this.indexProperty = indexProperty;
         this.propertyPredicates = requireNonNull(propertyPredicates, "propertyPredicates");
         this.sortItems = requireNonNull(sortItems, "sortItems");
+        this.options = options;
     }
 
     @Override
@@ -158,11 +160,11 @@ class ESDatasource implements IDatasource
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+    public TupleIterator execute(IExecutionContext context)
     {
         ValueVector indexSeekValues = getIndexSeekValues(context);
         String indexField = getIndexField();
-        int batchSize = getBatchSize(context, options, indexField, indexSeekValues);
+        int batchSize = getBatchSize(context, indexField, indexSeekValues);
 
         ESType esType = ESType.of(context.getSession(), catalogAlias, table);
         Data data = context.getStatementContext()
@@ -192,10 +194,10 @@ class ESDatasource implements IDatasource
         return getScrollingIterator(context, strategy, catalogAlias, esType.endpoint, data, searchUrl, scrollUrl, body);
     }
 
-    private int getBatchSize(IExecutionContext context, IDatasourceOptions options, String indexField, ValueVector indexSeekKeys)
+    private int getBatchSize(IExecutionContext context, String indexField, ValueVector indexSeekKeys)
     {
         // Fetch batch size from options
-        int batchSize = options.getBatchSize(context);
+        int batchSize = context.getBatchSize(options);
 
         // If this is an index request, see if the index size is lower or equal to the batch
         // size option then we can skip scrolling

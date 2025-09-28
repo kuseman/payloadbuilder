@@ -44,7 +44,7 @@ public abstract class TableFunctionInfo extends FunctionInfo
      * @see #execute(IExecutionContext, String, Optional, List, IDatasourceOptions, int)
      * @param nodeId The id of the functions node id the query plan tree. Can be used to get hold of node data from {@link IStatementContext} to store statistics during execution etc.
      */
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options, int nodeId)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options, int nodeId)
     {
         return execute(context, catalogAlias, schema, arguments, options);
     }
@@ -59,17 +59,17 @@ public abstract class TableFunctionInfo extends FunctionInfo
      * @param arguments Function arguments
      * @param options Options for this table source such as batch size etc.
      */
-    public abstract TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options);
+    public abstract TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options);
 
     /**
      * Returns a map with describe properties that is used during describe/analyze statements
      */
-    public Map<String, Object> getDescribeProperties(IExecutionContext context)
+    public Map<String, Object> getDescribeProperties(IExecutionContext context, List<IExpression> arguments, List<Option> options)
     {
         return emptyMap();
     }
 
-    /** Exception that can be thrown during schema resolving for TVS to properly trigg compile exception. */
+    /** Exception that can be thrown during schema resolving for TVF:s to properly trigg compile exception. */
     public static class SchemaResolveException extends RuntimeException
     {
         public SchemaResolveException(String message)

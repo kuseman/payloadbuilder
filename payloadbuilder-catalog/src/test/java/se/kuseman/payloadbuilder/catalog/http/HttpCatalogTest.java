@@ -22,7 +22,6 @@ import java.util.Optional;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.mock.Expectation;
 import org.mockserver.model.HttpRequest;
@@ -35,7 +34,6 @@ import se.kuseman.payloadbuilder.api.catalog.CompileException;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
@@ -118,7 +116,7 @@ public class HttpCatalogTest
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));
 
-        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500, data.getOptions()));
+        TupleIterator it = dataSource.execute(context);
         int rowCount = 0;
         while (it.hasNext())
         {
@@ -156,7 +154,7 @@ public class HttpCatalogTest
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));
 
-        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500, data.getOptions()));
+        TupleIterator it = dataSource.execute(context);
         int rowCount = 0;
         while (it.hasNext())
         {
@@ -196,7 +194,7 @@ public class HttpCatalogTest
                 .respond(HttpResponse.response("{ \"ids\":[ {\"key\":123} ]}")
                         .withHeader("Content-Type", "application/json"));
 
-        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500, data.getOptions()));
+        TupleIterator it = dataSource.execute(context);
         int rowCount = 0;
         while (it.hasNext())
         {
@@ -237,7 +235,7 @@ public class HttpCatalogTest
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));
 
-        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500, data.getOptions()));
+        TupleIterator it = dataSource.execute(context);
         int rowCount = 0;
         while (it.hasNext())
         {
@@ -293,7 +291,7 @@ public class HttpCatalogTest
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));
 
-        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500, data.getOptions()));
+        TupleIterator it = dataSource.execute(context);
         int rowCount = 0;
         while (it.hasNext())
         {
@@ -331,7 +329,7 @@ public class HttpCatalogTest
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));
 
-        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500));
+        TupleIterator it = dataSource.execute(context);
         int rowCount = 0;
         while (it.hasNext())
         {
@@ -378,11 +376,10 @@ public class HttpCatalogTest
         assertEquals(Arity.ONE, function.arity());
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = TestUtils.mockOptions(500);
 
         try
         {
-            function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createNullExpression()), options);
+            function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createNullExpression()), emptyList());
             fail("Should fail");
         }
         catch (IllegalArgumentException e)
@@ -405,8 +402,7 @@ public class HttpCatalogTest
         assertEquals(Arity.ONE, function.arity());
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = TestUtils.mockOptions(500);
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), options);
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -443,11 +439,10 @@ public class HttpCatalogTest
         assertEquals(Arity.ONE, function.arity());
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = TestUtils.mockOptions(500);
 
         try
         {
-            function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), options);
+            function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), emptyList());
             fail("Should fail");
         }
         catch (RuntimeException e)
@@ -466,11 +461,10 @@ public class HttpCatalogTest
         assertEquals(Arity.ONE, function.arity());
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = TestUtils.mockOptions(500);
 
         try
         {
-            function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:12345")), options);
+            function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:12345")), emptyList());
             fail("Should fail");
         }
         catch (RuntimeException e)
@@ -487,9 +481,9 @@ public class HttpCatalogTest
         assertEquals(Arity.ONE, function.arity());
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = TestUtils.mockOptions(500, asList(new Option(HttpCatalog.FAIL_ON_NON_200, ExpressionTestUtils.createStringExpression("false"))));
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:12345")), options);
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:12345")),
+                asList(new Option(HttpCatalog.FAIL_ON_NON_200, ExpressionTestUtils.createStringExpression("false"))));
         assertFalse(it.hasNext());
     }
 
@@ -506,9 +500,9 @@ public class HttpCatalogTest
         assertEquals(Arity.ONE, function.arity());
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = TestUtils.mockOptions(500, asList(new Option(HttpCatalog.FAIL_ON_NON_200, ExpressionTestUtils.createStringExpression("false"))));
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), options);
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())),
+                asList(new Option(HttpCatalog.FAIL_ON_NON_200, ExpressionTestUtils.createStringExpression("false"))));
         assertFalse(it.hasNext());
         mockServer.verify(mocks[0].getId());
     }
@@ -532,20 +526,14 @@ public class HttpCatalogTest
         ILiteralStringExpression bodyExpression = ExpressionTestUtils.createStringExpression(body);
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
 
         //@formatter:off
-        Mockito.when(options.getOptions())
-            .thenReturn(List.of(
-                    new Option(HttpCatalog.METHOD, methodExpression),
-                    new Option(QueryFunction.BODY, bodyExpression),
-                    new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), x_headerExpression))
-                    );
-        Mockito.when(options.getOption(any(), any())).thenCallRealMethod();
-        Mockito.when(options.getBatchSize(any())).thenReturn(500);
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), List.of(
+                new Option(HttpCatalog.METHOD, methodExpression),
+                new Option(QueryFunction.BODY, bodyExpression),
+                new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), x_headerExpression))
+                );
         //@formatter:on
-
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), options);
 
         int rowCount = 0;
         while (it.hasNext())
@@ -586,20 +574,14 @@ public class HttpCatalogTest
         ILiteralStringExpression jsonpathExpression = ExpressionTestUtils.createStringExpression("/docs");
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
         //@formatter:off
-        Mockito.when(options.getOptions())
-            .thenReturn(List.of(
-                    new Option(HttpCatalog.METHOD, methodExpression),
-                    new Option(QualifiedName.of("jsonpath"), jsonpathExpression),
-                    new Option(QueryFunction.BODY, bodyExpression),
-                    new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), x_headerExpression))
-                    );
-        Mockito.when(options.getOption(any(), any())).thenCallRealMethod();
-        Mockito.when(options.getBatchSize(any())).thenReturn(500);
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), List.of(
+                new Option(HttpCatalog.METHOD, methodExpression),
+                new Option(QualifiedName.of("jsonpath"), jsonpathExpression),
+                new Option(QueryFunction.BODY, bodyExpression),
+                new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), x_headerExpression))
+                );
         //@formatter:on
-
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), options);
 
         int rowCount = 0;
         while (it.hasNext())
@@ -636,15 +618,8 @@ public class HttpCatalogTest
         TableFunctionInfo function = catalog.getTableFunction("query");
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
-        //@formatter:off
-        Mockito.when(options.getOptions())
-            .thenReturn(List.of());
-        Mockito.when(options.getOption(any(), any())).thenCallRealMethod();
-        Mockito.when(options.getBatchSize(any())).thenReturn(500);
-        //@formatter:on
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/csv")), options);
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/csv")), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -689,17 +664,9 @@ public class HttpCatalogTest
 
         IExpression xmlPathExpression = createStringExpression("/keys/key");
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
-        //@formatter:off
-        Mockito.when(options.getOptions())
-            .thenReturn(List.of(
-                    new Option(QualifiedName.of("xmlpath"), xmlPathExpression)
-                    ));
-        Mockito.when(options.getOption(any(), any())).thenCallRealMethod();
-        Mockito.when(options.getBatchSize(any())).thenReturn(500);
-        //@formatter:on
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/xml")), options);
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/xml")),
+                List.of(new Option(QualifiedName.of("xmlpath"), xmlPathExpression)));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -738,17 +705,9 @@ public class HttpCatalogTest
         IExpression columnSeparatorExpression = createStringExpression("|");
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
-        //@formatter:off
-        Mockito.when(options.getOptions())
-            .thenReturn(List.of(
-                     new Option(QualifiedName.of("columnseparator"), columnSeparatorExpression)
-                    ));
-        Mockito.when(options.getOption(any(), any())).thenCallRealMethod();
-        Mockito.when(options.getBatchSize(any())).thenReturn(500);
-        //@formatter:on
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/csv")), options);
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/csv")),
+                List.of(new Option(QualifiedName.of("columnseparator"), columnSeparatorExpression)));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -788,9 +747,8 @@ public class HttpCatalogTest
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), ExpressionTestUtils.createStringExpression("x-value"))));
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost:" + mockServer.getPort()), data);
-        IDatasourceOptions options = TestUtils.mockOptions(500, data.getOptions());
 
-        TupleIterator it = dataSource.execute(context, options);
+        TupleIterator it = dataSource.execute(context);
 
         int rowCount = 0;
         while (it.hasNext())
@@ -828,11 +786,10 @@ public class HttpCatalogTest
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), ExpressionTestUtils.createStringExpression("x-value"))));
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost:" + mockServer.getPort()), data);
-        IDatasourceOptions options = TestUtils.mockOptions(500, data.getOptions());
 
         try
         {
-            dataSource.execute(context, options);
+            dataSource.execute(context);
             fail("Should fail");
         }
         catch (RuntimeException e)
@@ -863,9 +820,8 @@ public class HttpCatalogTest
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), ExpressionTestUtils.createStringExpression("x-value")),
                         new Option(HttpCatalog.FAIL_ON_NON_200, ExpressionTestUtils.createStringExpression("false"))));
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost:" + mockServer.getPort()), data);
-        IDatasourceOptions options = TestUtils.mockOptions(500, data.getOptions());
 
-        TupleIterator it = dataSource.execute(context, options);
+        TupleIterator it = dataSource.execute(context);
         assertFalse(it.hasNext());
 
         mockServer.verify(mocks[0].getId());
@@ -882,11 +838,10 @@ public class HttpCatalogTest
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "Content-Type"), ExpressionTestUtils.createStringExpression("text/plain"))));
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("endpoint"), data);
-        IDatasourceOptions options = TestUtils.mockOptions(500, data.getOptions());
 
         try
         {
-            dataSource.execute(context, options);
+            dataSource.execute(context);
             fail("Should fail");
         }
         catch (IllegalArgumentException e)
@@ -907,11 +862,10 @@ public class HttpCatalogTest
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "Content-Type"), ExpressionTestUtils.createStringExpression("text/plain"))));
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("endpoint"), data);
-        IDatasourceOptions options = TestUtils.mockOptions(500, data.getOptions());
 
         try
         {
-            dataSource.execute(context, options);
+            dataSource.execute(context);
             fail("Should fail");
         }
         catch (IllegalArgumentException e)

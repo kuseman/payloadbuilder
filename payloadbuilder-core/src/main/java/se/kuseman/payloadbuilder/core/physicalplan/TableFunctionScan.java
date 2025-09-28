@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -68,7 +67,7 @@ public class TableFunctionScan implements IPhysicalPlan
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put(IDatasource.CATALOG, catalogName);
         properties.put(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(getSchema()));
-        properties.putAll(functionInfo.getDescribeProperties(context));
+        properties.putAll(functionInfo.getDescribeProperties(context, arguments, options));
         return properties;
     }
 
@@ -82,9 +81,8 @@ public class TableFunctionScan implements IPhysicalPlan
     {
         Optional<Schema> schema = asteriskSchema ? Optional.empty()
                 : Optional.of(this.schema);
-        final IDatasourceOptions datasourceOptions = new DatasourceOptions(options);
-        final int batchSize = datasourceOptions.getBatchSize(context);
-        final TupleIterator iterator = functionInfo.execute(context, catalogAlias, schema, arguments, datasourceOptions, nodeId);
+        final int batchSize = context.getBatchSize(options);
+        final TupleIterator iterator = functionInfo.execute(context, catalogAlias, schema, arguments, options, nodeId);
         return new TupleIterator()
         {
             @Override

@@ -12,7 +12,7 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -35,7 +35,7 @@ class FallbackResponseTransformer implements IResponseTransformer
     }
 
     @Override
-    public TupleIterator transform(HttpUriRequestBase request, ClassicHttpResponse response, IExecutionContext context, IDatasourceOptions options)
+    public TupleIterator transform(HttpUriRequestBase request, ClassicHttpResponse response, IExecutionContext context, List<Option> options)
     {
         try
         {

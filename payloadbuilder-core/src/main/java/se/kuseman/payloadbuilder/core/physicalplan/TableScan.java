@@ -12,7 +12,6 @@ import java.util.NoSuchElementException;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -81,9 +80,8 @@ public class TableScan implements IPhysicalPlan
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
-        final IDatasourceOptions datasourceOptions = new DatasourceOptions(options);
-        final int batchSize = datasourceOptions.getBatchSize(context);
-        final TupleIterator iterator = datasource.execute(context, datasourceOptions);
+        final int batchSize = context.getBatchSize(options);
+        final TupleIterator iterator = datasource.execute(context);
         return new TupleIterator()
         {
             @Override

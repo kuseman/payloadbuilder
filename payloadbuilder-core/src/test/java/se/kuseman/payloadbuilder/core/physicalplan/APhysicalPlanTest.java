@@ -11,7 +11,6 @@ import java.util.function.Supplier;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.Option;
@@ -157,7 +156,7 @@ public abstract class APhysicalPlanTest extends AExpressionTest
                 {
                     executeAction.run();
                 }
-                return ds.execute(context, new DatasourceOptions(emptyList()));
+                return ds.execute(context);
             }
         };
     }
@@ -169,7 +168,7 @@ public abstract class APhysicalPlanTest extends AExpressionTest
 
     protected TableScan scan(IDatasource ds, TableSourceReference tableSource, Schema schema, int batchSize)
     {
-        List<Option> options = asList(new Option(QualifiedName.of(DatasourceOptions.BATCH_SIZE), intLit(batchSize)));
+        List<Option> options = asList(new Option(QualifiedName.of(IExecutionContext.BATCH_SIZE), intLit(batchSize)));
         return new TableScan(0, schema, tableSource, "", false, ds, options);
     }
 
@@ -207,7 +206,7 @@ public abstract class APhysicalPlanTest extends AExpressionTest
         return new IDatasource()
         {
             @Override
-            public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+            public TupleIterator execute(IExecutionContext context)
             {
                 return ti(closeAction, unknownEstiamteSizes, vectors.apply(context));
             }
