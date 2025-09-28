@@ -30,7 +30,6 @@ import se.kuseman.payloadbuilder.api.catalog.CompileException;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
@@ -2942,7 +2941,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
             IDatasource ds = new IDatasource()
             {
                 @Override
-                public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+                public TupleIterator execute(IExecutionContext context)
                 {
                     return null;
                 }

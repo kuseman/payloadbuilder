@@ -6,7 +6,7 @@ import java.util.Optional;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -39,7 +39,7 @@ class RangeFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
     {
         ValueVector vv;
 
@@ -78,7 +78,7 @@ class RangeFunction extends TableFunctionInfo
         final int start = from;
         final int stop = to;
         final int rowCount = Math.max(stop - start, 0);
-        final int batchSize = options.getBatchSize(context);
+        final int batchSize = context.getBatchSize(options);
 
         if (rowCount <= batchSize)
         {

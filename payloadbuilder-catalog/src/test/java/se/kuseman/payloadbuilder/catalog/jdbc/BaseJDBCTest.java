@@ -8,7 +8,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
-import static se.kuseman.payloadbuilder.catalog.TestUtils.mockOptions;
 import static se.kuseman.payloadbuilder.catalog.TestUtils.mockSortItem;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertTupleVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
@@ -208,7 +207,7 @@ abstract class BaseJDBCTest extends Assert
                 select 'done'
                 """)
 
-        ), mockOptions(500));
+        ), emptyList());
 
         int batchCount = 0;
         while (it.hasNext())
@@ -247,7 +246,7 @@ abstract class BaseJDBCTest extends Assert
         IExecutionContext context = mockExecutionContext();
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
                 new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), asList("col2"), emptyList()));
-        TupleIterator it = ds.execute(context, mockOptions(500));
+        TupleIterator it = ds.execute(context);
 
         List<String> col2Expected = asList("one", "two", "three", "four", "five");
         int expectedSize = col2Expected.size();
@@ -286,7 +285,7 @@ abstract class BaseJDBCTest extends Assert
 
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
                 new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), options));
-        TupleIterator it = ds.execute(context, mockOptions(500));
+        TupleIterator it = ds.execute(context);
 
         List<String> col2Expected = asList("one", "two", "three", "four", "five");
         int expectedSize = col2Expected.size();
@@ -330,7 +329,7 @@ abstract class BaseJDBCTest extends Assert
 
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
                 new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), options));
-        TupleIterator it = ds.execute(context, mockOptions(500));
+        TupleIterator it = ds.execute(context);
 
         List<Integer> col1Expected = asList(1, 2, 3, 4, 5);
         List<String> col2Expected = asList("one", "two", "three", "four", "five");
@@ -375,7 +374,7 @@ abstract class BaseJDBCTest extends Assert
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());
 
-        TupleIterator it = ds.execute(context, mockOptions(500));
+        TupleIterator it = ds.execute(context);
 
         int rowCount = 0;
         while (it.hasNext())
@@ -406,7 +405,7 @@ abstract class BaseJDBCTest extends Assert
         assertTrue(sortItems.isEmpty());
         assertTrue(predicates.isEmpty());
 
-        TupleIterator it = ds.execute(context, mockOptions(500));
+        TupleIterator it = ds.execute(context);
 
         int rowCount = 0;
         while (it.hasNext())
@@ -435,7 +434,7 @@ abstract class BaseJDBCTest extends Assert
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());
 
-        TupleIterator it = ds.execute(context, mockOptions(500));
+        TupleIterator it = ds.execute(context);
 
         int rowCount = 0;
         while (it.hasNext())
@@ -464,7 +463,7 @@ abstract class BaseJDBCTest extends Assert
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());
 
-        TupleIterator it = ds.execute(context, mockOptions(500));
+        TupleIterator it = ds.execute(context);
 
         int rowCount = 0;
         while (it.hasNext())

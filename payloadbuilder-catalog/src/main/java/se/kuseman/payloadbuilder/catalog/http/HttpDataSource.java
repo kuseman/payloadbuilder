@@ -37,7 +37,6 @@ import org.apache.hc.core5.util.Timeout;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
@@ -59,8 +58,10 @@ class HttpDataSource implements IDatasource
     private final ISeekPredicate seekPredicate;
     private final Request request;
     private final List<IResponseTransformer> responseTransformers;
+    private final List<Option> options;
 
-    HttpDataSource(CloseableHttpClient httpClient, String catalogAlias, String endpoint, ISeekPredicate seekPredicate, Request request, List<IResponseTransformer> responseTransformers)
+    HttpDataSource(CloseableHttpClient httpClient, String catalogAlias, String endpoint, ISeekPredicate seekPredicate, Request request, List<IResponseTransformer> responseTransformers,
+            List<Option> options)
     {
         this.httpClient = requireNonNull(httpClient);
         this.catalogAlias = requireNonNull(catalogAlias);
@@ -68,10 +69,11 @@ class HttpDataSource implements IDatasource
         this.seekPredicate = seekPredicate;
         this.request = requireNonNull(request);
         this.responseTransformers = requireNonNull(responseTransformers);
+        this.options = options;
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+    public TupleIterator execute(IExecutionContext context)
     {
         String endpoint = this.endpoint;
         if (!StringUtils.startsWithIgnoreCase(endpoint, "http"))
@@ -89,24 +91,24 @@ class HttpDataSource implements IDatasource
         return execute(httpClient, request, responseTransformers, context, options);
     }
 
-    static TupleIterator execute(CloseableHttpClient httpClient, HttpUriRequestBase request, List<IResponseTransformer> responseTransformers, IExecutionContext context, IDatasourceOptions options)
+    static TupleIterator execute(CloseableHttpClient httpClient, HttpUriRequestBase request, List<IResponseTransformer> responseTransformers, IExecutionContext context, List<Option> options)
     {
-        ValueVector vv = options.getOption(QualifiedName.of(HttpCatalog.FAIL_ON_NON_200), context);
+        ValueVector vv = context.getOption(QualifiedName.of(HttpCatalog.FAIL_ON_NON_200), options);
         boolean failOnNon200 = vv == null
                 || vv.isNull(0) ? true
                         : vv.getBoolean(0);
 
-        vv = options.getOption(QualifiedName.of(HttpCatalog.CONNECT_TIMEOUT), context);
+        vv = context.getOption(QualifiedName.of(HttpCatalog.CONNECT_TIMEOUT), options);
         int connectTimeout = vv == null
                 || vv.isNull(0) ? HttpCatalog.DEFAULT_CONNECT_TIMEOUT
                         : vv.getInt(0);
 
-        vv = options.getOption(QualifiedName.of(HttpCatalog.RECEIVE_TIMEOUT), context);
+        vv = context.getOption(QualifiedName.of(HttpCatalog.RECEIVE_TIMEOUT), options);
         int receiveTimeout = vv == null
                 || vv.isNull(0) ? HttpCatalog.DEFAULT_RECIEVE_TIMEOUT
                         : vv.getInt(0);
 
-        vv = options.getOption(QualifiedName.of(HttpCatalog.PRINT_HEADERS), context);
+        vv = context.getOption(QualifiedName.of(HttpCatalog.PRINT_HEADERS), options);
         boolean printHeaders = vv == null
                 || vv.isNull(0) ? false
                         : vv.getBoolean(0);
@@ -205,7 +207,7 @@ class HttpDataSource implements IDatasource
         }
     }
 
-    private HttpUriRequestBase getBaseRequest(IExecutionContext context, IDatasourceOptions options, String baseEndpoint)
+    private HttpUriRequestBase getBaseRequest(IExecutionContext context, List<Option> options, String baseEndpoint)
     {
         String endpoint = baseEndpoint;
 
@@ -339,9 +341,9 @@ class HttpDataSource implements IDatasource
         return httpRequest;
     }
 
-    static HttpUriRequestBase getRequestBase(IExecutionContext context, IDatasourceOptions options, String endpoint)
+    static HttpUriRequestBase getRequestBase(IExecutionContext context, List<Option> options, String endpoint)
     {
-        ValueVector vv = options.getOption(HttpCatalog.METHOD, context);
+        ValueVector vv = context.getOption(HttpCatalog.METHOD, options);
         String method = vv == null
                 || vv.isNull(0) ? GET
                         : vv.getString(0)
@@ -349,7 +351,7 @@ class HttpDataSource implements IDatasource
                                 .toUpperCase();
 
         HttpUriRequestBase httpRequest = new HttpUriRequestBase(method, getURI(endpoint));
-        for (Option option : options.getOptions())
+        for (Option option : options)
         {
             QualifiedName name = option.getOption();
             if (name.size() == 2

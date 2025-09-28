@@ -35,7 +35,6 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.FunctionType;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
@@ -368,12 +367,12 @@ public class TestHarnessRunner
                 }
 
                 @Override
-                public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
+                public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
                 {
                     // Returns a tuple vector with all options evaluated
                     List<Column> columns = new ArrayList<>();
                     List<ValueVector> vectors = new ArrayList<>();
-                    for (Option option : options.getOptions())
+                    for (Option option : options)
                     {
                         columns.add(new Column(option.getOption()
                                 .toDotDelimited(),
@@ -452,10 +451,10 @@ public class TestHarnessRunner
             return new IDatasource()
             {
                 @Override
-                public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+                public TupleIterator execute(IExecutionContext context)
                 {
                     QualifiedName optionName = QualifiedName.of("test_array");
-                    ValueVector option = options.getOption(optionName, context);
+                    ValueVector option = context.getOption(optionName, data.getOptions());
                     if (option != null)
                     {
                         ((ExecutionContext) context).setVariable(optionName.getFirst(), option);
@@ -583,7 +582,7 @@ public class TestHarnessRunner
             return new IDatasource()
             {
                 @Override
-                public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+                public TupleIterator execute(IExecutionContext context)
                 {
                     return TupleIterator.singleton(tupleVector);
                 }

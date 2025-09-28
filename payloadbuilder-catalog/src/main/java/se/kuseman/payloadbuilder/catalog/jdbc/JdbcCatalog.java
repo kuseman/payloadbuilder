@@ -123,12 +123,12 @@ public class JdbcCatalog extends Catalog
 
         if (SYS_TABLES.equalsIgnoreCase(type))
         {
-            return (ctx, opt) -> getSystemIterator(session, catalogAlias, null, true);
+            return ctx -> getSystemIterator(session, catalogAlias, null, true);
         }
         else if (SYS_COLUMNS.equalsIgnoreCase(type))
         {
             final IExpression tableFilterExpression = data.extractEqualsPredicate(QualifiedName.of(SYS_COLUMNS_TABLE));
-            return (ctx, opt) ->
+            return ctx ->
             {
                 String tableFilter = tableFilterExpression != null ? String.valueOf(tableFilterExpression.eval(ctx)
                         .valueAsObject(0))
@@ -138,7 +138,7 @@ public class JdbcCatalog extends Catalog
         }
         else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
         {
-            return (ctx, opt) -> TupleIterator.singleton(getFunctionsTupleVector(data.getSchema()
+            return ctx -> TupleIterator.singleton(getFunctionsTupleVector(data.getSchema()
                     .get()));
         }
 
@@ -175,7 +175,7 @@ public class JdbcCatalog extends Catalog
                 .orElse(null);
 
         return new JdbcDatasource(this, catalogAlias, data.getSchema()
-                .orElse(null), table, seekPredicate, projection, predicates, sortItems, tableHintsOption);
+                .orElse(null), table, seekPredicate, projection, predicates, sortItems, tableHintsOption, data.getOptions());
     }
 
     private List<String> getOptionProjection(List<Option> options)

@@ -11,7 +11,7 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -40,7 +40,7 @@ class QueryFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
     {
         /*
          * @formatter:off
@@ -67,7 +67,7 @@ class QueryFunction extends TableFunctionInfo
 
         HttpUriRequestBase httpRequest = HttpDataSource.getRequestBase(context, options, endpoint);
 
-        vv = options.getOption(BODY, context);
+        vv = context.getOption(BODY, options);
         String body = vv == null
                 || vv.isNull(0) ? null
                         : vv.getString(0)

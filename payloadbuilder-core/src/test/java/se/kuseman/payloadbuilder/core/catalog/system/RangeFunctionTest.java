@@ -21,7 +21,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
-import se.kuseman.payloadbuilder.core.physicalplan.DatasourceOptions;
 
 /** Test {@link RangeFunction} */
 public class RangeFunctionTest extends APhysicalPlanTest
@@ -33,7 +32,7 @@ public class RangeFunctionTest extends APhysicalPlanTest
     public void test()
     {
         Schema schema = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
-        TupleIterator it = f.execute(context, "", Optional.of(schema), asList(intLit(1), intLit(10)), new DatasourceOptions(emptyList()));
+        TupleIterator it = f.execute(context, "", Optional.of(schema), asList(intLit(1), intLit(10)), emptyList());
 
         int count = 0;
         while (it.hasNext())
@@ -53,8 +52,7 @@ public class RangeFunctionTest extends APhysicalPlanTest
     {
         Schema schema = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
         context.setVariable("batch", ValueVector.literalInt(3, 1));
-        TupleIterator it = f.execute(context, "", Optional.of(schema), asList(intLit(1), intLit(11)),
-                new DatasourceOptions(asList(new Option(QualifiedName.of("batch_size"), new VariableExpression("batch")))));
+        TupleIterator it = f.execute(context, "", Optional.of(schema), asList(intLit(1), intLit(11)), asList(new Option(QualifiedName.of("batch_size"), new VariableExpression("batch"))));
 
         int count = 0;
         while (it.hasNext())

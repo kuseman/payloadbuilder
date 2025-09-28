@@ -47,7 +47,7 @@ public class IndexSeek extends TableScan
         properties.put(IDatasource.INDEX, seekPredicate.getIndexColumns());
         properties.put("Seek Keys", seekPredicate.toString());
 
-        int batchSize = getBatchSize(context);
+        int batchSize = context.getBatchSize(options);
         if (batchSize > 0)
         {
             properties.put("Batch Size", batchSize);
@@ -64,7 +64,7 @@ public class IndexSeek extends TableScan
             return TupleIterator.EMPTY;
         }
 
-        int batchSize = getBatchSize(context);
+        int batchSize = context.getBatchSize(options);
         int seekKeySize = seekKeys.get(0)
                 .getValue()
                 .size();
@@ -75,7 +75,6 @@ public class IndexSeek extends TableScan
         }
 
         StatementContext statementContext = (StatementContext) context.getStatementContext();
-        DatasourceOptions dataSourceOptions = new DatasourceOptions(options);
 
         return new TupleIterator()
         {
@@ -153,7 +152,7 @@ public class IndexSeek extends TableScan
                             batchSeekKeys.add(() -> batchVector);
                         }
                         statementContext.setIndexSeekKeys(batchSeekKeys);
-                        currentIterator = datasource.execute(context, dataSourceOptions);
+                        currentIterator = datasource.execute(context);
                         continue;
                     }
                     else if (!currentIterator.hasNext())
@@ -200,21 +199,6 @@ public class IndexSeek extends TableScan
                 return true;
             }
         };
-    }
-
-    private int getBatchSize(IExecutionContext context)
-    {
-        for (Option option : options)
-        {
-            if (DatasourceOptions.BATCH_SIZE.equals(option.getOption()))
-            {
-                ValueVector vv = option.getValueExpression()
-                        .eval(context);
-                return !vv.isNull(0) ? vv.getInt(0)
-                        : -1;
-            }
-        }
-        return -1;
     }
 
     @Override

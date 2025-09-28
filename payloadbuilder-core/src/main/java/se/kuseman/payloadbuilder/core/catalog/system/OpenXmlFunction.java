@@ -36,7 +36,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -88,7 +88,7 @@ class OpenXmlFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
     {
         ValueVector value = arguments.get(0)
                 .eval(context);
@@ -105,13 +105,13 @@ class OpenXmlFunction extends TableFunctionInfo
         try
         {
             // TODO: schema input
-            ValueVector vv = options.getOption(XMLPATH, context);
+            ValueVector vv = context.getOption(XMLPATH, options);
             xmlPath = vv == null
                     || vv.isNull(0) ? ""
                             : vv.getString(0)
                                     .toString();
 
-            vv = options.getOption(XMLCOLUMNS, context);
+            vv = context.getOption(XMLCOLUMNS, options);
             columnsOption = vv == null
                     || vv.isNull(0) ? null
                             : StringUtils.split(vv.getString(0)
@@ -140,7 +140,7 @@ class OpenXmlFunction extends TableFunctionInfo
             throw new RuntimeException("Error reading XML", e);
         }
 
-        final int batchSize = options.getBatchSize(context);
+        final int batchSize = context.getBatchSize(options);
         final String[] xmlPathParts = StringUtils.split(xmlPath, '/');
         final String rowElementName = xmlPathParts.length > 0 ? xmlPathParts[xmlPathParts.length - 1]
                 : "";

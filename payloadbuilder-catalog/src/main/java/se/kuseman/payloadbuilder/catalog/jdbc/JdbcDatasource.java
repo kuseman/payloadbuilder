@@ -23,10 +23,10 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
@@ -54,9 +54,10 @@ class JdbcDatasource implements IDatasource
     private final List<ISortItem> sortItems;
     private final ISeekPredicate indexPredicate;
     private final IExpression tableHintsOption;
+    private final List<Option> options;
 
     JdbcDatasource(JdbcCatalog catalog, String catalogAlias, Schema schema, QualifiedName table, ISeekPredicate indexPredicate, List<String> projection, List<IPredicate> predicates,
-            List<ISortItem> sortItems, IExpression tableHintsOption)
+            List<ISortItem> sortItems, IExpression tableHintsOption, List<Option> options)
     {
         this.catalog = catalog;
         this.catalogAlias = catalogAlias;
@@ -67,6 +68,7 @@ class JdbcDatasource implements IDatasource
         this.sortItems = sortItems;
         this.projection = projection;
         this.tableHintsOption = tableHintsOption;
+        this.options = options;
     }
 
     @Override
@@ -95,11 +97,11 @@ class JdbcDatasource implements IDatasource
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+    public TupleIterator execute(IExecutionContext context)
     {
         SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
         String sql = buildSql(dialect, context, false);
-        return getIterator(dialect, catalog, context, catalogAlias, schema, sql, null, options.getBatchSize(context));
+        return getIterator(dialect, catalog, context, catalogAlias, schema, sql, null, context.getBatchSize(options));
     }
 
     // CSOFF

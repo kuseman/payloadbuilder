@@ -15,7 +15,7 @@ import org.apache.hc.core5.http.HttpHeaders;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -61,7 +61,7 @@ public abstract class ATableFunctionForwardResponseTransformer implements IRespo
     }
 
     @Override
-    public TupleIterator transform(HttpUriRequestBase request, ClassicHttpResponse response, IExecutionContext context, IDatasourceOptions options) throws IOException
+    public TupleIterator transform(HttpUriRequestBase request, ClassicHttpResponse response, IExecutionContext context, List<Option> options) throws IOException
     {
         // Redirect this response to core function
         TableFunctionInfo openJsonFunction = context.getSession()

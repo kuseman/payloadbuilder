@@ -21,7 +21,7 @@ import org.apache.commons.io.FileUtils;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -80,7 +80,7 @@ public class FilesystemCatalog extends Catalog
         }
 
         @Override
-        public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
+        public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
         {
             ValueVector value = arguments.get(0)
                     .eval(context);
@@ -190,7 +190,7 @@ public class FilesystemCatalog extends Catalog
         }
 
         @Override
-        public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
+        public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
         {
             ValueVector value = arguments.get(0)
                     .eval(context);
@@ -213,7 +213,7 @@ public class FilesystemCatalog extends Catalog
 
             final Iterator<Path> it = getIterator(path, recursive);
 
-            final int batchSize = options.getBatchSize(context);
+            final int batchSize = context.getBatchSize(options);
 
             return new TupleIterator()
             {

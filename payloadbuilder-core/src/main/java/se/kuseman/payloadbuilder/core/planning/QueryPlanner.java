@@ -18,7 +18,6 @@ import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.CompileException;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
@@ -738,7 +737,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         }
 
         @Override
-        public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+        public TupleIterator execute(IExecutionContext context)
         {
             TemporaryTable temporaryTable = ((ExecutionContext) context).getSession()
                     .getTemporaryTable(name);

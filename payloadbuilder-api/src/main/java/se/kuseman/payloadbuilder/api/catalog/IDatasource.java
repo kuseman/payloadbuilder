@@ -18,7 +18,7 @@ public interface IDatasource
     public static final String INDEX = "Index";
 
     /** Execute data source returning a stream of tuple vectors */
-    TupleIterator execute(IExecutionContext context, IDatasourceOptions options);
+    TupleIterator execute(IExecutionContext context);
 
     /**
      * Returns a map with describe properties that is used during describe/analyze statements

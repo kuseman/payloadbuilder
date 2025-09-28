@@ -25,7 +25,6 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
-import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.Index;
@@ -114,7 +113,7 @@ public class ESCatalog extends Catalog
         }
         else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
         {
-            return (context, options) -> TupleIterator.singleton(getFunctionsTupleVector(data.getSchema()
+            return context -> TupleIterator.singleton(getFunctionsTupleVector(data.getSchema()
                     .get()));
         }
         else if (SYS_INDICES.equalsIgnoreCase(type))
@@ -195,7 +194,7 @@ public class ESCatalog extends Catalog
         List<IPropertyPredicate> propertyPredicates = collectPredicates(session, catalogAlias, data.getPredicates(), properties);
         List<SortItemMeta> sortItems = collectSortItems(properties, data.getSortItems());
 
-        return new ESDatasource(data.getNodeId(), meta.getStrategy(), catalogAlias, table, seekPredicate, indexProperty, propertyPredicates, sortItems);
+        return new ESDatasource(data.getNodeId(), meta.getStrategy(), catalogAlias, table, seekPredicate, indexProperty, propertyPredicates, sortItems, data.getOptions());
     }
 
     private MappedProperty getMappedProperty(Map<QualifiedName, MappedProperty> properties, QualifiedName qname)
@@ -369,7 +368,7 @@ public class ESCatalog extends Catalog
         return new IDatasource()
         {
             @Override
-            public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+            public TupleIterator execute(IExecutionContext context)
             {
                 return TupleIterator.singleton(new ObjectTupleVector(schema, result.size(), (row, col) ->
                 {
@@ -436,7 +435,7 @@ public class ESCatalog extends Catalog
         return new IDatasource()
         {
             @Override
-            public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+            public TupleIterator execute(IExecutionContext context)
             {
                 return TupleIterator.singleton(new ObjectTupleVector(schema, result.size(), (row, col) ->
                 {
@@ -472,7 +471,7 @@ public class ESCatalog extends Catalog
         return new IDatasource()
         {
             @Override
-            public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+            public TupleIterator execute(IExecutionContext context)
             {
                 return TupleIterator.singleton(new ObjectTupleVector(schema, result.size(), (row, col) ->
                 {
