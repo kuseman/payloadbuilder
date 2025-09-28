@@ -94,18 +94,18 @@ final class ESQueryUtils
     }
 
     /** Build search body **/
-    static String getSearchBody(boolean describe, ElasticStrategy strategy, List<SortItemMeta> sortItems, List<IPropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField,
+    static String getSearchBody(ElasticStrategy strategy, List<SortItemMeta> sortItems, List<IPropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField,
             boolean quoteIndexFieldValues, IExecutionContext context)
     {
         StringBuilder sb = new StringBuilder().append('{');
         appendSortItems(strategy, sortItems, sb);
-        appendPropertyPredicates(describe, strategy, propertyPredicates, indexSeekValues, indexField, quoteIndexFieldValues, sb, context);
+        appendPropertyPredicates(strategy, propertyPredicates, indexSeekValues, indexField, quoteIndexFieldValues, sb, context);
         sb.append('}');
         return sb.toString();
     }
 
-    private static void appendPropertyPredicates(boolean describe, ElasticStrategy strategy, List<IPropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField,
-            boolean quoteIndexFieldValues, StringBuilder sb, IExecutionContext context)
+    private static void appendPropertyPredicates(ElasticStrategy strategy, List<IPropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField, boolean quoteIndexFieldValues,
+            StringBuilder sb, IExecutionContext context)
     {
         StringBuilder filterMust = new StringBuilder();
         StringBuilder filterMustNot = new StringBuilder();

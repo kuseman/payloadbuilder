@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.api.execution;
 import static java.util.Collections.unmodifiableMap;
 import static java.util.Objects.requireNonNull;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -1310,6 +1311,18 @@ public interface ValueVector
         }
 
         throw new IllegalArgumentException("Cannot cast type " + type.toTypeString() + " to " + Type.Double);
+    }
+
+    /** Transforms this ValueVector to a List of objects using {{@link #valueAsObject} for each entry. */
+    default List<Object> toList()
+    {
+        int size = size();
+        List<Object> result = new ArrayList<>(size);
+        for (int i = 0; i < size; i++)
+        {
+            result.add(valueAsObject(i));
+        }
+        return result;
     }
 
     /** Return csv (tab separated) of this value vector */

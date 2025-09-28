@@ -131,7 +131,7 @@ public class ESQueryUtilsTest extends Assert
 
         // Null outer values should yield a dummy value
         assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"terms\":{\"index.keyword\":[\"<index values>\"]}}],\"must_not\":[{\"term\":{\"field1\":20}}]}}}",
-                ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), null, "index.keyword", true, context));
@@ -140,14 +140,14 @@ public class ESQueryUtilsTest extends Assert
 
         // Non quote
         assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"terms\":{\"index.keyword\":[1,2]}}],\"must_not\":[{\"term\":{\"field1\":20}}]}}}",
-                ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), indexSeekValues, "index.keyword", false, context));
 
         // Quote
         assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"terms\":{\"index.keyword\":[\"1\",\"2\"]}}],\"must_not\":[{\"term\":{\"field1\":20}}]}}}",
-                ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), indexSeekValues, "index.keyword", true, context));
@@ -156,12 +156,12 @@ public class ESQueryUtilsTest extends Assert
     @Test
     public void test_search_body_singleType()
     {
-        assertEquals("{\"sort\":[\"_doc\"]}", ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), emptyList(), null, null, false, context));
+        assertEquals("{\"sort\":[\"_doc\"]}", ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), emptyList(), null, null, false, context));
         assertEquals(
                 // CSOFF
                 "{\"sort\":[{\"@timestamp\":{\"order\":\"desc\",\"missing\":\"_last\"}},{\"count\":{\"order\":\"asc\"}},{\"nested.object.value\":{\"order\":\"asc\",\"nested\":{\"path\":\"nested.object\"}}},{\"text.keyword\":{\"order\":\"asc\"}}]}",
                 // CSON
-                ESQueryUtils.getSearchBody(false, new GenericStrategy(), asList(
+                ESQueryUtils.getSearchBody(new GenericStrategy(), asList(
                         // Null order
                         sortItem("@timestamp", "int", null, Order.DESC, NullOrder.LAST),
                         // No null order
@@ -176,27 +176,27 @@ public class ESQueryUtilsTest extends Assert
                 // CSOFF
                 "{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"wildcard\":{\"field4\":{\"value\":\"other*string?end\"}}},{\"wildcard\":{\"field3\":{\"value\":\"some*string?end\"}}},{\"terms\":{\"field\":[1,2,3]}},{\"term\":{\"count\":10}},{\"range\":{\"timestamp\":{\"lte\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"gte\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"lt\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"gt\":\"20201010T10:10:10:000Z\"}}}],\"must_not\":[{\"terms\":{\"field7\":[4,5,6]}},{\"wildcard\":{\"field6\":{\"value\":\"other?string*end\"}}},{\"wildcard\":{\"field5\":{\"value\":\"some?string*end\"}}},{\"term\":{\"field2\":true}},{\"term\":{\"field1\":20}}]}}}",
                 // CSON
-                ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock.neq("field1", 20));
-        assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"must_not\":[{\"term\":{\"field1\":20}}]}}}", ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
+        assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"must_not\":[{\"term\":{\"field1\":20}}]}}}", ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), pairs.stream()
                 .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                         .toString(), p, false))
                 .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock.notLike("field5", "some_string%end"));
         assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"must_not\":[{\"wildcard\":{\"field5\":{\"value\":\"some?string*end\"}}}]}}}",
-                ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock.like("field4", "other%string_end"));
         assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"wildcard\":{\"field4\":{\"value\":\"other*string?end\"}}}]}}}",
-                ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), null, null, false, context));
@@ -206,10 +206,9 @@ public class ESQueryUtilsTest extends Assert
         assertTrue(PropertyPredicate.isSupported(pairs.get(0), "es"));
         assertFalse(PropertyPredicate.isSupported(pairs.get(0), "sys"));
 
-        assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"match\":{\"field4\":\"some phrase\"}}]}}}",
-                ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
-                        .map(p -> new PropertyPredicate("", p, true))
-                        .collect(toList()), null, null, false, context));
+        assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"match\":{\"field4\":\"some phrase\"}}]}}}", ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), pairs.stream()
+                .map(p -> new PropertyPredicate("", p, true))
+                .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock.function("es", "query", asList("field4:'some phrase'")));
 
@@ -217,13 +216,13 @@ public class ESQueryUtilsTest extends Assert
         assertFalse(PropertyPredicate.isSupported(pairs.get(0), "sys"));
 
         assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"query_string\":{\"query\":\"field4:'some phrase'\"}}]}}}",
-                ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate("", p, true))
                         .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock._null("field1", false), IPredicateMock._null("field2", true));
         assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"exists\":{\"field\":\"field2\"}}],\"must_not\":[{\"exists\":{\"field\":\"field1\"}}]}}}",
-                ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new GenericStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), null, null, false, context));
@@ -238,14 +237,14 @@ public class ESQueryUtilsTest extends Assert
         List<IPredicate> pairs = asList(IPredicateMock.neq("field1", 20));
         // Non quote
         assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"terms\":{\"index.keyword\":[1,2]}}],\"must_not\":[{\"term\":{\"field1\":20}}]}}}",
-                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), indexSeekValues, "index.keyword", false, context));
 
         // Quote
         assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"terms\":{\"index.keyword\":[\"1\",\"2\"]}}],\"must_not\":[{\"term\":{\"field1\":20}}]}}}",
-                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), indexSeekValues, "index.keyword", true, context));
@@ -254,12 +253,12 @@ public class ESQueryUtilsTest extends Assert
     @Test
     public void test_search_body()
     {
-        assertEquals("{\"sort\":[\"_doc\"]}", ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), emptyList(), null, null, false, context));
+        assertEquals("{\"sort\":[\"_doc\"]}", ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), emptyList(), null, null, false, context));
         assertEquals(
                 // CSOFF
                 "{\"sort\":[{\"@timestamp\":{\"order\":\"desc\",\"missing\":\"_first\"}},{\"count\":{\"order\":\"asc\"}},{\"nested.object.value\":{\"order\":\"asc\",\"nested_path\":\"nested.object\"}},{\"text.raw\":{\"order\":\"asc\"}}]}",
                 // CSON
-                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), asList(
+                ESQueryUtils.getSearchBody(new Elastic1XStrategy(), asList(
                         // Null order
                         sortItem("@timestamp", "int", null, Order.DESC, NullOrder.FIRST),
                         // No null order
@@ -274,33 +273,33 @@ public class ESQueryUtilsTest extends Assert
                 // CSOFF
                 "{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"wildcard\":{\"field4\":{\"value\":\"other*string?end\"}}},{\"wildcard\":{\"field3\":{\"value\":\"some*string?end\"}}},{\"terms\":{\"field\":[1,2,3]}},{\"term\":{\"count\":10}},{\"range\":{\"timestamp\":{\"lte\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"gte\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"lt\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"gt\":\"20201010T10:10:10:000Z\"}}}],\"must_not\":[{\"terms\":{\"field7\":[4,5,6]}},{\"wildcard\":{\"field6\":{\"value\":\"other?string*end\"}}},{\"wildcard\":{\"field5\":{\"value\":\"some?string*end\"}}},{\"term\":{\"field2\":true}},{\"term\":{\"field1\":20}}]}}}",
                 // CSON
-                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock.neq("field1", 20));
-        assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"field1\":20}}]}}}", ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+        assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must_not\":[{\"term\":{\"field1\":20}}]}}}", ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                 .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                         .toString(), p, false))
                 .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock.eq("field1", 20));
-        assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"term\":{\"field1\":20}}]}}}", ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+        assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"term\":{\"field1\":20}}]}}}", ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                 .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                         .toString(), p, false))
                 .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock.notLike("field5", "some_string%end"));
         assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must_not\":[{\"wildcard\":{\"field5\":{\"value\":\"some?string*end\"}}}]}}}",
-                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock.like("field4", "other%string_end"));
         assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"wildcard\":{\"field4\":{\"value\":\"other*string?end\"}}}]}}}",
-                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), null, null, false, context));
@@ -310,25 +309,25 @@ public class ESQueryUtilsTest extends Assert
 
         pairs = asList(IPredicateMock.function("es", "match", asList(col, "some phrase")));
         assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"match\":{\"field4\":\"some phrase\"}}]}}}",
-                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate("", p, true))
                         .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock.function("es", "match", asList("field4,field5", "some phrase")));
         assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"multi_match\":{\"fields\":[\"field4\",\"field5\"],\"query\":\"some phrase\"}}]}}}",
-                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate("", p, true))
                         .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock.function("es", "query", asList("field4:'some phrase'")));
         assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"query_string\":{\"query\":\"field4:'some phrase'\"}}]}}}",
-                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate("", p, true))
                         .collect(toList()), null, null, false, context));
 
         pairs = asList(IPredicateMock._null("field1", false), IPredicateMock._null("field2", true));
         assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"exists\":{\"field\":\"field2\"}}],\"must_not\":[{\"exists\":{\"field\":\"field1\"}}]}}}",
-                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+                ESQueryUtils.getSearchBody(new Elastic1XStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate(p.getQualifiedColumn()
                                 .toString(), p, false))
                         .collect(toList()), null, null, false, context));

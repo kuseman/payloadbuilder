@@ -139,7 +139,7 @@ class ESDatasource implements IDatasource
                         sortItems.stream()
                                 .map(Object::toString)
                                 .collect(joining(", "))),
-                entry("Query", ESQueryUtils.getSearchBody(true, strategy, sortItems, propertyPredicates, null, indexField, quoteValues, context)));
+                entry("Query", ESQueryUtils.getSearchBody(strategy, sortItems, propertyPredicates, null, indexField, quoteValues, context)));
 
         Data data = context.getStatementContext()
                 .getNodeData(nodeId);
@@ -189,7 +189,7 @@ class ESDatasource implements IDatasource
 
         boolean quoteValues = indexProperty == null
                 || indexProperty.shouldQuoteValues();
-        String body = ESQueryUtils.getSearchBody(false, strategy, sortItems, propertyPredicates, indexSeekValues, indexField, quoteValues, context);
+        String body = ESQueryUtils.getSearchBody(strategy, sortItems, propertyPredicates, indexSeekValues, indexField, quoteValues, context);
         data.actualQuery = body;
         return getScrollingIterator(context, strategy, catalogAlias, esType.endpoint, data, searchUrl, scrollUrl, body);
     }

@@ -6,6 +6,7 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.TimeZone;
 
 import org.junit.Test;
@@ -25,6 +26,13 @@ import se.kuseman.payloadbuilder.test.VectorTestUtils;
 /** Test of {@link ValueVector} */
 public class ValueVectorTest extends APhysicalPlanTest
 {
+
+    @Test
+    public void test_toList()
+    {
+        assertEquals(List.of(1, 2, 3), vv(Type.Int, 1, 2, 3).toList());
+    }
+
     @Test
     public void test_range()
     {
