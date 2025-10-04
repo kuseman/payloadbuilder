@@ -124,10 +124,10 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
         session.setDefaultCatalogAlias(TEST);
     }
 
-    protected ILogicalPlan getPlanBeforeColumnResolver(String query)
+    protected ILogicalPlan getPlanBeforeRule(String query, Class<? extends ALogicalPlanOptimizer<?>> clazz)
     {
         ILogicalPlan plan = s(query);
-        return LogicalPlanOptimizer.optimizeInternal(context, plan, new HashMap<>(), new HashMap<>(), ColumnResolver.class);
+        return LogicalPlanOptimizer.optimizeInternal(context, plan, new HashMap<>(), new HashMap<>(), clazz);
     }
 
     protected ILogicalPlan getSchemaResolvedPlan(String query)

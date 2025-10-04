@@ -1,7 +1,11 @@
 package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptySet;
+import static se.kuseman.payloadbuilder.api.QualifiedName.of;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
+
+import java.util.Set;
 
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
@@ -10,11 +14,13 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
+import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
@@ -81,8 +87,6 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
-        // Assert that we actual got any paris populated
-        // assertTrue(actual.getPredicatePairs().size() > 0);
         assertEquals(expected, actual);
     }
 
@@ -115,6 +119,85 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    /**
+     * Test for a regression found were filters inside sub queries didn't get any pushed down predicates because of
+     * scope issues when going down one level due to subquery.
+     */
+    @Test
+    public void test_filter_inside_subquery()
+    {
+        //@formatter:off
+        /*
+         * select *
+         * from tableA a
+         * outer apply (
+         *   select *
+         *   from tableB b
+         *   where b.col >10
+         * ) x
+         * where a.col1 > 10
+         */
+        ILogicalPlan plan = getPlanBeforeRule("""
+                select *
+                from tableA a
+                outer apply (
+                  select *
+                  from tableB b
+                  where b.col = 666
+                ) x
+                where a.col1 > 10
+                """, PredicatePushDown.class);
+        //@formatter:on
+
+        ILogicalPlan actual = optimize(plan);
+
+        TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", of("tableB"), "b");
+        TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", of("x"), "x");
+
+        Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+
+        //@formatter:off
+        ILogicalPlan expected = new Projection(
+                new Join(
+                    new Filter(
+                        tableScan(schemaA, tableA),
+                        tableA,                                     // Verify filter got connected to tableA
+                        gt(cre("col1", tableA), intLit(10))),
+                    subQuery(
+                        new Projection(
+                            new Filter(
+                                tableScan(schemaB, tableB),
+                                tableB,                             // Verify filter got connected to tableB
+                                eq(cre("col", tableB), intLit(666))),
+                            asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableB))),
+                            subQueryX
+                        ),
+                        subQueryX
+                    ),
+                    Join.Type.LEFT,
+                    null,
+                    null,
+                    emptySet(),
+                    false,
+                    schemaA),
+                asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableA, tableB))),
+                null
+                );
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);

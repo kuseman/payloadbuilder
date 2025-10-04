@@ -115,7 +115,8 @@ class ConditionAnalyzer
             List<SeekPredicateItem> items = IntStream.range(0, size)
                     .mapToObj(i -> new SeekPredicate.SeekPredicateItem(splitResult.indexColumns.get(i), innerValueExpressions.get(i), List.of(outerValueExpressions.get(i))))
                     .toList();
-            return new SeekPredicate(splitResult.index, items, true);
+            return new SeekPredicate(scan.getTableSource()
+                    .getId(), splitResult.index, items, true);
         }
 
         // Try IN pairs
@@ -134,7 +135,8 @@ class ConditionAnalyzer
                     IInExpression ine = (IInExpression) pair.getExpressionPair(tableSource)
                             .getValue();
                     List<SeekPredicateItem> items = singletonList(new SeekPredicate.SeekPredicateItem(column, ine.getExpression(), ine.getArguments()));
-                    return new SeekPredicate(index, items, true);
+                    return new SeekPredicate(scan.getTableSource()
+                            .getId(), index, items, true);
                 }
             }
         }
@@ -250,7 +252,7 @@ class ConditionAnalyzer
             List<SeekPredicateItem> items = IntStream.range(0, size)
                     .mapToObj(i -> new SeekPredicate.SeekPredicateItem(splitResult.indexColumns.get(i), innerValueExpressions.get(i), List.of(outerValueExpressions.get(i))))
                     .toList();
-            seekPredicate = new SeekPredicate(splitResult.index, items);
+            seekPredicate = new SeekPredicate(tableSource.getId(), splitResult.index, items);
         }
         return new Result(outerValueExpressions, innerValueExpressions, seekPredicate);
     }

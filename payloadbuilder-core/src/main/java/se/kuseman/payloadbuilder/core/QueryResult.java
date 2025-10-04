@@ -3,9 +3,8 @@ package se.kuseman.payloadbuilder.core;
 import se.kuseman.payloadbuilder.api.OutputWriter;
 
 /**
- * Definition of a query result. This interface is an implementation of iterator pattern where
- * the client traverses all produced result sets in a while-mode fashion checking for {{@link #hasMoreResults()}
- * and then writing to an output via {{@link #writeResult(OutputWriter)}.
+ * Definition of a query result. This interface is an implementation of iterator pattern where the client traverses all produced result sets in a while-mode fashion checking for
+ * {{@link #hasMoreResults()} and then writing to an output via {{@link #writeResult(OutputWriter)}.
  *
  * <pre>
  *  OutputWriter writer = ......

@@ -21,6 +21,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.execution.StatementContext;
 
 /** Scan operator that scans datasource */
 public class TableScan implements IPhysicalPlan
@@ -81,7 +82,10 @@ public class TableScan implements IPhysicalPlan
     public TupleIterator execute(IExecutionContext context)
     {
         final int batchSize = context.getBatchSize(options);
+        final StatementContext statementContext = (StatementContext) context.getStatementContext();
         final TupleIterator iterator = datasource.execute(context);
+        // Clear any seek keys after we executed the data source to make sure they are not misused
+        statementContext.setIndexSeekKeys(tableSource.getId(), null);
         return new TupleIterator()
         {
             @Override

@@ -27,6 +27,8 @@ import it.unimi.dsi.fastutil.ints.IntLinkedOpenCustomHashSet;
 /** Index predicate used on {@link IndexType#SEEK_EQ} index types when creating index operators from catalogs */
 class SeekPredicate implements ISeekPredicate
 {
+    /** Table source reference id that this predicate belongs to. */
+    private final int tableSourceReferenceId;
     /** Index used in this predicate */
     private final Index index;
     /** Columns used in index */
@@ -38,13 +40,14 @@ class SeekPredicate implements ISeekPredicate
      */
     private final boolean isPushDown;
 
-    SeekPredicate(Index index, List<SeekPredicateItem> predicateItems)
+    SeekPredicate(int tableSourceReferenceId, Index index, List<SeekPredicateItem> predicateItems)
     {
-        this(index, predicateItems, false);
+        this(tableSourceReferenceId, index, predicateItems, false);
     }
 
-    SeekPredicate(Index index, List<SeekPredicateItem> predicateItems, boolean isPushDown)
+    SeekPredicate(int tableSourceReferenceId, Index index, List<SeekPredicateItem> predicateItems, boolean isPushDown)
     {
+        this.tableSourceReferenceId = tableSourceReferenceId;
         this.index = requireNonNull(index, "index");
         this.predicateItems = requireNonNull(predicateItems, "predicateItems");
         this.isPushDown = isPushDown;
@@ -74,11 +77,12 @@ class SeekPredicate implements ISeekPredicate
     @Override
     public List<ISeekKey> getSeekKeys(IExecutionContext context)
     {
-        List<ISeekKey> seekKeys = ((StatementContext) context.getStatementContext()).getIndexSeekKeys();
+        List<ISeekKey> seekKeys = ((StatementContext) context.getStatementContext()).getIndexSeekKeys(tableSourceReferenceId);
         if (seekKeys == null)
         {
             seekKeys = getSeekKeysInternal(context);
-            ((StatementContext) context.getStatementContext()).setIndexSeekKeys(seekKeys);
+            // Cache up the seek keys when first generated
+            ((StatementContext) context.getStatementContext()).setIndexSeekKeys(tableSourceReferenceId, seekKeys);
         }
         return seekKeys;
     }
@@ -254,7 +258,8 @@ class SeekPredicate implements ISeekPredicate
         }
         else if (obj instanceof SeekPredicate that)
         {
-            return index.equals(that.index)
+            return tableSourceReferenceId == that.tableSourceReferenceId
+                    && index.equals(that.index)
                     && predicateItems.equals(that.predicateItems)
                     && isPushDown == that.isPushDown;
         }

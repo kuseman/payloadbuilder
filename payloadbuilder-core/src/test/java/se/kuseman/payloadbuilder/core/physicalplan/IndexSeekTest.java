@@ -34,6 +34,22 @@ import se.kuseman.payloadbuilder.test.VectorTestUtils;
 public class IndexSeekTest extends APhysicalPlanTest
 {
     @Test
+    public void test_no_keys()
+    {
+        TableSourceReference tsf = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tbl"), "t");
+        TupleVector tv1 = TupleVector.of(Schema.of(Column.of("col1", Type.Int)), List.of(VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
+        IDatasource ds = schemaLessDS(() ->
+        {
+        }, tv1);
+        ISeekPredicate predicate = mock(ISeekPredicate.class);
+        when(predicate.getSeekKeys(context)).thenReturn(emptyList());
+
+        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", false, predicate, ds, emptyList());
+        assertFalse(is.execute(context)
+                .hasNext());
+    }
+
+    @Test
     public void test()
     {
         TableSourceReference tsf = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tbl"), "t");
@@ -45,9 +61,21 @@ public class IndexSeekTest extends APhysicalPlanTest
         ISeekPredicate predicate = mock(ISeekPredicate.class);
         when(predicate.getSeekKeys(context)).thenReturn(List.of(() -> VectorTestUtils.vv(Type.Int, 1, 2, 3)));
 
+        // This needs to be redone sometimes, either move SeekPredicate into physicalplan package or make it public, or some
+        // other solution :)
+        // we are mocking away the SeekPredicate class that caches
+        // up seek keys so we fake the cache to verify that the IndexSeek operator clears the cache after execution
+        context.getStatementContext()
+                .setIndexSeekKeys(0, List.of(() -> VectorTestUtils.vv(Type.Int, 1, 2, 3)));
+
         IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", false, predicate, ds, emptyList());
 
+        assertNotNull(context.getStatementContext()
+                .getIndexSeekKeys(0));
         TupleIterator it = is.execute(context);
+        assertNull(context.getStatementContext()
+                .getIndexSeekKeys(0));
+
         assertTrue(it.hasNext());
 
         TupleVector tv1Expected = TupleVector.of(Schema.of(CoreColumn.of("col1", ResolvedType.of(Type.Int), tsf)), List.of(VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
@@ -65,6 +93,10 @@ public class IndexSeekTest extends APhysicalPlanTest
         AtomicInteger closedCount = new AtomicInteger(0);
         IDatasource ds = schemaLessDS(() -> closedCount.incrementAndGet(), ctx ->
         {
+            // We should have our keys when executing the data source
+            assertNotNull(context.getStatementContext()
+                    .getIndexSeekKeys(0));
+
             // First batch
             if (closedCount.get() == 0)
             {
@@ -101,6 +133,11 @@ public class IndexSeekTest extends APhysicalPlanTest
         while (it.hasNext())
         {
             TupleVector v = it.next();
+
+            // Keys should be cleared after each batch
+            assertNull(context.getStatementContext()
+                    .getIndexSeekKeys(0));
+
             VectorTestUtils.assertTupleVectorsEquals(expectedVectors.get(batchCount), v);
             rowCount += v.getRowCount();
             batchCount++;
@@ -120,6 +157,45 @@ public class IndexSeekTest extends APhysicalPlanTest
         assertEquals(3, batchCount);
         assertEquals(5, rowCount);
         assertEquals(3, closedCount.get());
+    }
+
+    @Test
+    public void test_batch_close_in_middle_of_stream()
+    {
+        TableSourceReference tsf = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tbl"), "t");
+
+        Schema schema = Schema.of(Column.of("col1", Type.Int));
+        AtomicInteger closedCount = new AtomicInteger(0);
+        IDatasource ds = schemaLessDS(() -> closedCount.incrementAndGet(), ctx ->
+        {
+            // First batch
+            if (closedCount.get() == 0)
+            {
+                return new TupleVector[] { TupleVector.of(schema, vv(Type.Int, 10)), TupleVector.of(schema, vv(Type.Int, 20)) };
+            }
+
+            throw new RuntimeException("Should not come here!");
+        });
+        ISeekPredicate predicate = mock(ISeekPredicate.class);
+        when(predicate.getSeekKeys(context)).thenReturn(List.of(() -> VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
+
+        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", false, predicate, ds, List.of(new Option(IExecutionContext.BATCH_SIZE, new LiteralIntegerExpression(2))));
+
+        TupleIterator it = is.execute(context);
+        assertEquals(3, it.estimatedBatchCount());
+        assertEquals(5, it.estimatedRowCount());
+
+        int batchCount = 0;
+        int rowCount = 0;
+        assertTrue(it.hasNext());
+        TupleVector v = it.next();
+        rowCount += v.getRowCount();
+        batchCount++;
+        it.close();
+
+        assertEquals(1, batchCount);
+        assertEquals(2, rowCount);
+        assertEquals(1, closedCount.get());
     }
 
     @Test

@@ -72,6 +72,12 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
         return right;
     }
 
+    @Override
+    public boolean isOuterReference()
+    {
+        return left.isOuterReference();
+    }
+
     public int getOrdinal()
     {
         return ordinal;

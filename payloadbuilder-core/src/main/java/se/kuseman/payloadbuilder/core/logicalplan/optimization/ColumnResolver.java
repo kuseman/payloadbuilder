@@ -122,9 +122,8 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         Deque<TableSourceReference> subQueryTableSource = new ArrayDeque<>();
 
         /**
-         * Set with expanded aggregated asterisks. This is used to to skip resolving those since an
-         * expanded asterisk should NOTE be a single value to match a schema less query which would make
-         * those columns arrays.
+         * Set with expanded aggregated asterisks. This is used to to skip resolving those since an expanded asterisk should NOTE be a single value to match a schema less query which would make those
+         * columns arrays.
          *
          * <pre>
          * Ie.

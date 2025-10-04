@@ -139,9 +139,10 @@ class ElasticQueryBuilder
         }
 
         @Override
-        public void appendBooleanClause(ElasticStrategy strategy, StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context)
+        public void appendBooleanClause(boolean describe, ElasticStrategy strategy, StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context)
         {
             PredicateQueryBuilderVisitor.Context ctx = new PredicateQueryBuilderVisitor.Context();
+            ctx.describe = describe;
             ctx.strategy = strategy;
             ctx.resolvedProperties = resolvedProperties;
             ctx.context = context;
@@ -180,6 +181,7 @@ class ElasticQueryBuilder
 
         static class Context
         {
+            boolean describe;
             ElasticStrategy strategy;
             Map<QualifiedName, ResolvedProperty> resolvedProperties;
             IExecutionContext context;
@@ -220,21 +222,30 @@ class ElasticQueryBuilder
         public Void visit(IComparisonExpression expression, Context context)
         {
             QualifiedName qname = expression.getLeft()
-                    .getQualifiedColumn();
+                    .isOuterReference() ? null
+                            : expression.getLeft()
+                                    .getQualifiedColumn();
             IExpression valueExpression = expression.getRight();
 
             // Switch
             if (qname == null)
             {
                 qname = expression.getRight()
-                        .getQualifiedColumn();
+                        .isOuterReference() ? null
+                                : expression.getRight()
+                                        .getQualifiedColumn();
                 valueExpression = expression.getLeft();
             }
             assert (qname != null);
             assert (valueExpression != null);
 
             boolean not = expression.getComparisonType() == IComparisonExpression.Type.NOT_EQUAL;
-            ValueVector vector = evalExpression(valueExpression, context.context);
+
+            // If we are describing the query and the value is an outer reference we cannot evaluate it since
+            // it will always be null and we would generate a no match filter which will be wrong so instead just add the expression string
+            ValueVector vector = context.describe
+                    && valueExpression.isOuterReference() ? ValueVector.literalString("<" + valueExpression.toString() + ">", 1)
+                            : evalExpression(valueExpression, context.context);
             if (vector.isNull(0))
             {
                 // if we have null here this means we have a
@@ -612,7 +623,6 @@ class ElasticQueryBuilder
                 String[] fields = arg0.split(",");
 
                 // TODO: - options argument
-                // prependNested(sb);
                 if (fields.length == 1)
                 {
                     sb.append("{\"match\":{\"")
@@ -634,7 +644,6 @@ class ElasticQueryBuilder
                             .append("\"")
                             .append("}}");
                 }
-                // appendNested(sb);
             }
             else
             {
@@ -862,10 +871,16 @@ class ElasticQueryBuilder
         public Boolean visit(IComparisonExpression expression, Context context)
         {
             Type type = expression.getComparisonType();
+            // Treat outer reference as non existing qualifier since those ones doesn't belong
+            // to this data source
             QualifiedName leftQname = expression.getLeft()
-                    .getQualifiedColumn();
+                    .isOuterReference() ? null
+                            : expression.getLeft()
+                                    .getQualifiedColumn();
             QualifiedName rightQname = expression.getRight()
-                    .getQualifiedColumn();
+                    .isOuterReference() ? null
+                            : expression.getRight()
+                                    .getQualifiedColumn();
 
             // This expression is not directly referencing columns, nested and/ors etc.
             // This is not supported because there could be an expression like this:
@@ -897,7 +912,9 @@ class ElasticQueryBuilder
 
             context.nestLevel++;
             // Check other side
-            if (!other.accept(this, context))
+            // Note! If the other side is an outer reference it's ok
+            if (!other.isOuterReference()
+                    && !other.accept(this, context))
             {
                 context.nestLevel--;
                 return false;
