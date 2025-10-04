@@ -33,6 +33,8 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
 
     private String string;
 
+    private boolean hashIsZero;
+    private int hash;
     private byte[] bytes;
     private int offset;
     private int length;
@@ -135,12 +137,26 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
         // hash code from string and bytes since then hash match don't work
         getBytesInternal();
 
-        // TODO: cache
-        int result = START;
-        final int end = offset + length;
-        for (int i = offset; i < end; i++)
+        int result = hash;
+        if (hash == 0
+                && !hashIsZero)
         {
-            result = result * CONSTANT + bytes[i];
+            result = START;
+            int end = offset + length;
+            for (int i = offset; i < end; i++)
+            {
+                result = result * CONSTANT + bytes[i];
+            }
+
+            if (result == 0)
+            {
+                hashIsZero = true;
+            }
+            else
+            {
+                hash = result;
+            }
+
         }
         return result;
     }
