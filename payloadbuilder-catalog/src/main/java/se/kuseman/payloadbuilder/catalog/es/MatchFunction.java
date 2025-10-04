@@ -21,6 +21,12 @@ class MatchFunction extends ScalarFunctionInfo
     }
 
     @Override
+    public Arity arity()
+    {
+        return Arity.TWO;
+    }
+
+    @Override
     public String getDescription()
     {
         return "Function that is used in Elastic search query context (predicates) and utilizes Elastic 'match/multi_match' query. " + System.lineSeparator()

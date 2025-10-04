@@ -21,6 +21,12 @@ class QueryFunction extends ScalarFunctionInfo
     }
 
     @Override
+    public Arity arity()
+    {
+        return Arity.ONE;
+    }
+
+    @Override
     public String getDescription()
     {
         return "Function that is used in Elastic search query context (predicates) and utilizes Elastic 'query_string' query. " + System.lineSeparator()
