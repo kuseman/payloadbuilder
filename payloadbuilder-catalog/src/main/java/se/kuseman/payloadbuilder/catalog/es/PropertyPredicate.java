@@ -73,7 +73,7 @@ class PropertyPredicate implements IPropertyPredicate
     }
 
     @Override
-    public void appendBooleanClause(ElasticStrategy strategy, StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context)
+    public void appendBooleanClause(boolean describe, ElasticStrategy strategy, StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context)
     {
         if (predicate.getType() == IPredicate.Type.COMPARISION)
         {

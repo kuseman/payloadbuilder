@@ -193,6 +193,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     true);
         //@formatter:on
 
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
                 .isEqualTo(expected);
@@ -1490,7 +1493,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
         
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(1,
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
 
@@ -1731,7 +1734,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(0,
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
 
@@ -1788,7 +1791,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(0,
                 new Index(QualifiedName.of("tableB"), emptyList(), ColumnsType.WILDCARD), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
 
@@ -1845,7 +1848,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(0,
                 new Index(QualifiedName.of("tableB"),  List.of("COL"), ColumnsType.ALL), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
 
@@ -1904,7 +1907,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(0,
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
                         new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(3)))
                         ), true);
@@ -1969,7 +1972,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(index, List.of(
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(0, index, List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(3))),
                 new SeekPredicate.SeekPredicateItem("col2", cre("col2", tableB), List.of(intLit(10)))
                 ), true);
@@ -2034,7 +2037,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(1,
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
         
@@ -2107,7 +2110,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
         //@formatter:off
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(1,
                 new Index(QualifiedName.of("tableB"), asList("col", "active"), ColumnsType.ALL), List.of(
                     new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA))),
                     new SeekPredicate.SeekPredicateItem("active", cre("active", tableB), List.of(cre("active", tableA)))));
@@ -2179,7 +2182,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
         //@formatter:off
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(1,
                 new Index(QualifiedName.of("tableB"), asList(), ColumnsType.WILDCARD), asList(
                 new SeekPredicate.SeekPredicateItem("active", cre("active", tableB), List.of(cre("active", tableA))),
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
@@ -2332,10 +2335,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaC = Schema.of(ast("c", ResolvedType.of(Type.Any), tableC));
 
         //@formatter:off
-        SeekPredicate expectedSeekPredicateB = new SeekPredicate(
+        SeekPredicate expectedSeekPredicateB = new SeekPredicate(2,
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
-        SeekPredicate expectedSeekPredicateC = new SeekPredicate(
+        SeekPredicate expectedSeekPredicateC = new SeekPredicate(3,
                 new Index(QualifiedName.of("tableC"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableC), List.of(cre("col", tableB)))));
 
@@ -2440,7 +2443,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
         //@formatter:off
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(1,
                 new Index(QualifiedName.of("tableB"), asList("col", "col2"), ColumnsType.ANY_IN_ORDER), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA))),
                 new SeekPredicate.SeekPredicateItem("col2", cre("col2", tableB), List.of(cre("col2", tableA)))));

@@ -47,6 +47,15 @@ public abstract class AExpressionTest extends Assert
         return new UnresolvedColumnExpression(QualifiedName.of(parts), -1, null);
     }
 
+    /** Return a simple reflective outer referenced column expression that resolve values runtime by name with type */
+    protected ColumnExpression oce(String col)
+    {
+        return ColumnExpression.Builder.of(col, ResolvedType.ANY)
+                .withColumn(col)
+                .withOuterReference(true)
+                .build();
+    }
+
     /** Return a simple reflective column expression that resolve values runtime by name */
     protected ColumnExpression ce(String col)
     {

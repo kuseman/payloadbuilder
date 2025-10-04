@@ -26,6 +26,19 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 public class DereferenceExpressionTest extends APhysicalPlanTest
 {
     @Test
+    public void test_outerreference()
+    {
+        IExpression e = DereferenceExpression.create(ce("a"), QualifiedName.of("b"), null);
+        assertFalse(e.isOuterReference());
+
+        e = DereferenceExpression.create(oce("a"), QualifiedName.of("b"), null);
+        assertTrue(e.isOuterReference());
+
+        e = DereferenceExpression.create(oce("a"), QualifiedName.of("b", "c"), null);
+        assertTrue(e.isOuterReference());
+    }
+
+    @Test
     public void test_dereference_map()
     {
         TupleVector tv;

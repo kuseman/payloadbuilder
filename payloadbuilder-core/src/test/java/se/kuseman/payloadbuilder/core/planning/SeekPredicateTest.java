@@ -28,7 +28,7 @@ public class SeekPredicateTest extends APhysicalPlanTest
     public void test_fail_with_empty_items()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col1", "col2"), ColumnsType.ANY);
-        new SeekPredicate(index, emptyList());
+        new SeekPredicate(0, index, emptyList());
     }
 
     @Test
@@ -40,7 +40,7 @@ public class SeekPredicateTest extends APhysicalPlanTest
 
         List<SeekPredicate.SeekPredicateItem> items = List.of(new SeekPredicate.SeekPredicateItem("col1", colValue, List.of(colValue)));
 
-        SeekPredicate p = new SeekPredicate(index, items);
+        SeekPredicate p = new SeekPredicate(0, index, items);
 
         assertEquals(index, p.getIndex());
         assertEquals(asList("col1"), p.getIndexColumns());
@@ -67,7 +67,7 @@ public class SeekPredicateTest extends APhysicalPlanTest
 
         List<SeekPredicate.SeekPredicateItem> items = List.of(new SeekPredicate.SeekPredicateItem("col1", colValue, List.of(intLit(10))));
 
-        SeekPredicate p = new SeekPredicate(index, items, true);
+        SeekPredicate p = new SeekPredicate(0, index, items, true);
 
         assertEquals(index, p.getIndex());
         assertEquals(asList("col1"), p.getIndexColumns());
@@ -89,7 +89,7 @@ public class SeekPredicateTest extends APhysicalPlanTest
 
         List<SeekPredicate.SeekPredicateItem> items = List.of(new SeekPredicate.SeekPredicateItem("col1", colValue, List.of(stringLit("10"), intLit(20), intLit(30))));
 
-        SeekPredicate p = new SeekPredicate(index, items, true);
+        SeekPredicate p = new SeekPredicate(0, index, items, true);
 
         assertEquals(index, p.getIndex());
         assertEquals(asList("col1"), p.getIndexColumns());

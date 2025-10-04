@@ -74,7 +74,7 @@ public class IndexSeek extends TableScan
             return super.execute(context);
         }
 
-        StatementContext statementContext = (StatementContext) context.getStatementContext();
+        final StatementContext statementContext = (StatementContext) context.getStatementContext();
 
         return new TupleIterator()
         {
@@ -98,8 +98,10 @@ public class IndexSeek extends TableScan
             @Override
             public void close()
             {
-                // Put back original keys
-                statementContext.setIndexSeekKeys(seekKeys);
+                if (currentIterator != null)
+                {
+                    currentIterator.close();
+                }
             }
 
             @Override
@@ -151,8 +153,10 @@ public class IndexSeek extends TableScan
                             ValueVector batchVector = SelectedValueVector.select(seekKey.getValue(), selection);
                             batchSeekKeys.add(() -> batchVector);
                         }
-                        statementContext.setIndexSeekKeys(batchSeekKeys);
+                        statementContext.setIndexSeekKeys(tableSource.getId(), batchSeekKeys);
                         currentIterator = datasource.execute(context);
+                        // Clear any seek keys after we executed the data source to make sure they are not misused
+                        statementContext.setIndexSeekKeys(tableSource.getId(), null);
                         continue;
                     }
                     else if (!currentIterator.hasNext())

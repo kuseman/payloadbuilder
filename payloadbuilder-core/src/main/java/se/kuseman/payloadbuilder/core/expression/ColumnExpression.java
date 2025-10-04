@@ -111,6 +111,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
         return ordinal;
     }
 
+    @Override
     public boolean isOuterReference()
     {
         return outerReference;

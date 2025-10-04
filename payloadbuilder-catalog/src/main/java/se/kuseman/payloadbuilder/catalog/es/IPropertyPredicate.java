@@ -13,6 +13,6 @@ interface IPropertyPredicate
 
     String getDescription();
 
-    void appendBooleanClause(ElasticStrategy strategy, StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context);
+    void appendBooleanClause(boolean describe, ElasticStrategy strategy, StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context);
 }
 // CSON

@@ -395,7 +395,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "from tableA a";
         //@formatter:on
 
-        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
+        ILogicalPlan plan = getPlanBeforeRule(query, ColumnResolver.class);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -521,7 +521,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "  on b.col1 = a.col1 ";
         //@formatter:on
 
-        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
+        ILogicalPlan plan = getPlanBeforeRule(query, ColumnResolver.class);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -843,7 +843,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         +"where id = 1";
         //@formatter:on
 
-        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
+        ILogicalPlan plan = getPlanBeforeRule(query, ColumnResolver.class);
 
         try
         {
@@ -958,7 +958,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
 
         session.setCatalogProperty(TEST, STABLE_D_ID, 3);
 
-        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
+        ILogicalPlan plan = getPlanBeforeRule(query, ColumnResolver.class);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -1732,7 +1732,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "  on b.col2 = a.col2 ";
         //@formatter:on
 
-        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
+        ILogicalPlan plan = getPlanBeforeRule(query, ColumnResolver.class);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -1816,7 +1816,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 """;
         //@formatter:off
 
-        ILogicalPlan actual = getPlanBeforeColumnResolver(query);
+        ILogicalPlan actual = getPlanBeforeRule(query, ColumnResolver.class);
         actual = optimize(context, actual);
 
         //@formatter:off
@@ -1960,7 +1960,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "from tableA a ";
         //@formatter:on
 
-        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
+        ILogicalPlan plan = getPlanBeforeRule(query, ColumnResolver.class);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -2016,7 +2016,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 """;
         //@formatter:on
 
-        ILogicalPlan actual = getPlanBeforeColumnResolver(query);// optimize(context, plan);
+        ILogicalPlan actual = getPlanBeforeRule(query, ColumnResolver.class);// optimize(context, plan);
         actual = optimize(context, actual);
 
         //@formatter:off
@@ -2072,7 +2072,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "from tableA a ";
         //@formatter:on
 
-        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
+        ILogicalPlan plan = getPlanBeforeRule(query, ColumnResolver.class);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -2130,7 +2130,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "from tableA a ";
         //@formatter:on
 
-        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
+        ILogicalPlan plan = getPlanBeforeRule(query, ColumnResolver.class);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -3002,7 +3002,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                        + ") x "
                        + "where x.col2 = a.col2 ";
 
-        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
+        ILogicalPlan plan = getPlanBeforeRule(query, ColumnResolver.class);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");

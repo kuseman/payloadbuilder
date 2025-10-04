@@ -7,6 +7,7 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -50,7 +51,7 @@ public class StatementContext implements IStatementContext
     /** Reference to outer tuple used in index seek operations where the inner operator picks it's values from. */
     private TupleVector indexSeekTupleVector;
     /** Cache of seeks keys for index seek predicate. Used to avoid multiple calculations if called twice. */
-    private List<ISeekPredicate.ISeekKey> indexSeekKeys;
+    private Map<Integer, List<ISeekPredicate.ISeekKey>> indexSeekKeysByTableSourceReferenceId;
 
     public StatementContext()
     {
@@ -88,7 +89,7 @@ public class StatementContext implements IStatementContext
         lambdaValues = null;
         nodeDataById.clear();
         indexSeekTupleVector = null;
-        indexSeekKeys = null;
+        indexSeekKeysByTableSourceReferenceId = null;
     }
 
     public Map<Integer, ? extends NodeData> getNodeData()
@@ -165,17 +166,27 @@ public class StatementContext implements IStatementContext
         }
 
         this.indexSeekTupleVector = indexSeekTupleVector;
-        this.indexSeekKeys = null;
+        this.indexSeekKeysByTableSourceReferenceId = null;
     }
 
-    public List<ISeekPredicate.ISeekKey> getIndexSeekKeys()
+    /** Get seek keys for provided table source id. */
+    public List<ISeekPredicate.ISeekKey> getIndexSeekKeys(int tableSourceReferenceId)
     {
-        return indexSeekKeys;
+        if (indexSeekKeysByTableSourceReferenceId == null)
+        {
+            indexSeekKeysByTableSourceReferenceId = new HashMap<>();
+        }
+        return indexSeekKeysByTableSourceReferenceId.get(tableSourceReferenceId);
     }
 
-    public void setIndexSeekKeys(List<ISeekKey> indexSeekKeys)
+    /** Store seek keys for provided table source id. */
+    public void setIndexSeekKeys(int tableSourceReferenceId, List<ISeekKey> indexSeekKeys)
     {
-        this.indexSeekKeys = indexSeekKeys;
+        if (this.indexSeekKeysByTableSourceReferenceId == null)
+        {
+            this.indexSeekKeysByTableSourceReferenceId = new HashMap<>();
+        }
+        indexSeekKeysByTableSourceReferenceId.put(tableSourceReferenceId, indexSeekKeys);
     }
 
     /**

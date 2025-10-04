@@ -6,6 +6,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
 import static se.kuseman.payloadbuilder.catalog.es.ESDatasource.MAPPER;
 import static se.kuseman.payloadbuilder.test.ExpressionTestUtils.ce;
 import static se.kuseman.payloadbuilder.test.ExpressionTestUtils.col;
@@ -19,12 +22,14 @@ import java.util.Map;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
@@ -32,6 +37,8 @@ import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMetaUtils.MappedPropert
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
+import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
+import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.parser.QueryParser;
 import se.kuseman.payloadbuilder.test.ExpressionTestUtils;
 import se.kuseman.payloadbuilder.test.IPredicateMock;
@@ -106,7 +113,7 @@ public class ElasticQueryBuilderTest
         {
             int l1 = filter.length();
             int l2 = filterNot.length();
-            pp.appendBooleanClause(ElasticsearchMeta.Version._1X.getStrategy(), filter, filterNot, context);
+            pp.appendBooleanClause(false, ElasticsearchMeta.Version._1X.getStrategy(), filter, filterNot, context);
             if (l1 != filter.length())
             {
                 filter.append(',');
@@ -345,7 +352,8 @@ public class ElasticQueryBuilderTest
                 IPredicateMock.undefined(e("msg < datediff(hour, '2010-10-10T10:10:10', '2010-10-11T10:10:10')")),
                 IPredicateMock.undefined(e("msg < datediff(minute, '2010-10-10T10:10:10', '2010-10-11T10:10:10' at time zone 'Europe/Stockholm')")),
                 IPredicateMock.undefined(e("msg <= datepart(minute, '2010-10-10T10:10:10')")),
-                IPredicateMock.undefined(e("nest.field = cast(@var as string)"))
+                IPredicateMock.undefined(e("nest.field = cast(@var as string)")),
+                IPredicateMock.undefined(oe("level = o.level", List.of("o.level")))
         ));
         //@formatter:on
         List<IPredicate> copyPredicates = new ArrayList<>(predicates);
@@ -367,7 +375,7 @@ public class ElasticQueryBuilderTest
         {
             int l1 = filter.length();
             int l2 = filterNot.length();
-            pp.appendBooleanClause(ElasticsearchMeta.Version._8X.getStrategy(), filter, filterNot, context);
+            pp.appendBooleanClause(false, ElasticsearchMeta.Version._8X.getStrategy(), filter, filterNot, context);
             if (l1 != filter.length())
             {
                 filter.append(',');
@@ -388,7 +396,7 @@ public class ElasticQueryBuilderTest
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> filterActual = ESDatasource.MAPPER.readValue("[" + filter + "]", List.class);
-        assertEquals(35, filterActual.size());
+        assertEquals(36, filterActual.size());
 
         assertPredicate("""
                 {
@@ -770,7 +778,14 @@ public class ElasticQueryBuilderTest
                     }
                   }
                 }
-                                 """, filterActual.get(34));
+                """, filterActual.get(34));
+        assertPredicate("""
+                {
+                  "term" : {
+                    "level" : "o.level"
+                  }
+                }
+                """, filterActual.get(35));
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> filterNotActual = ESDatasource.MAPPER.readValue("[" + filterNot + "]", List.class);
@@ -828,6 +843,31 @@ public class ElasticQueryBuilderTest
     private IExpression e(String expression)
     {
         return PARSER.parseExpression(expression);
+    }
+
+    /** Create an outer reference expression. */
+    private IExpression oe(String expression, List<String> columnsToMakeOuter)
+    {
+        IExpression e = e(expression);
+        return e.accept(new ARewriteExpressionVisitor<Void>()
+        {
+            @Override
+            public IExpression visit(UnresolvedColumnExpression expression, Void context)
+            {
+                String column = expression.getColumn()
+                        .toDotDelimited()
+                        .toLowerCase();
+                if (columnsToMakeOuter.contains(column))
+                {
+                    UnresolvedColumnExpression spy = Mockito.spy(expression);
+                    when(spy.isOuterReference()).thenReturn(true);
+                    doReturn(ValueVector.literalAny(column)).when(spy)
+                            .eval(any(IExecutionContext.class));
+                    return spy;
+                }
+                return expression;
+            }
+        }, null);
     }
 
     private void assertPredicate(String expected, Map<String, Object> actual) throws JsonMappingException, JsonProcessingException

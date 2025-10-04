@@ -2,7 +2,9 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Collections.emptySet;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,6 +21,7 @@ import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
 import se.kuseman.payloadbuilder.core.logicalplan.Join.Type;
+import se.kuseman.payloadbuilder.core.logicalplan.SubQuery;
 import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 
@@ -76,20 +79,20 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
          *  1. Where
          *     Extract b.field = 1 with constraint: None
          *  2. Join (Left => constrain predicates to all inner table sources)
-         *     Extract a.vlaue = 1 with constraint: tableB
-         *     Extract b.value = 1 with constraint: tableB
          *     Set constrainedTableSources to tableB
+         *     Extract a.value = 1 with constraint: tableB (no hit)
+         *     Extract b.value = 1 with constraint: tableB
          *  4. Create tableA
          *     Fetch predicates for tableA => none
          *  4. Create tableB
          *     Fetch predicates for tableB => Only match is b.value = 1
          * </pre>
          */
-        Set<TableSourceReference> constrainedTableSources = new HashSet<>();
+        Deque<Set<TableSourceReference>> constrainedTableSources = new ArrayDeque<>();
 
         /**
          * List with pair of analyzed predicates (from WHERE or JOIN etc.) along with a set of allowed push down table sources
-         * 
+         *
          * <pre>
          * The allowed table sources is used when having a left join
          * to disallow push downs from the joined condition to the outer table source.
@@ -103,20 +106,17 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
          *                         only pushdowns to the inner table source (tableB) are allowed
          * </pre>
          */
-        List<Pair<Set<TableSourceReference>, AnalyzeResult>> analyzeResults = null;
+        List<Pair<Set<TableSourceReference>, AnalyzeResult>> analyzeResults = new ArrayList<>();
 
         Ctx(IExecutionContext context)
         {
             super(context);
+            constrainedTableSources.push(new HashSet<>());
         }
 
         /** Add analyze result returning the index of the result for later use */
         int add(AnalyzeResult analyzeResult, Set<TableSourceReference> constrainedTableSources)
         {
-            if (analyzeResults == null)
-            {
-                analyzeResults = new ArrayList<>();
-            }
             analyzeResults.add(Pair.of(constrainedTableSources, analyzeResult));
             return analyzeResults.size() - 1;
         }
@@ -131,7 +131,7 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
         /** Extract all analyze pairs for provided alias */
         List<AnalyzePair> extractPushDownPredicate(TableSourceReference tableSource)
         {
-            if (analyzeResults == null)
+            if (analyzeResults.isEmpty())
             {
                 return null;
             }
@@ -139,7 +139,8 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
             // If we have a constraint on input table source
             // we can only extract those anaylyze results that has that table source constrained
             // else we can only extract those results with no constraints
-            boolean checkConstrainedTableSources = constrainedTableSources.contains(tableSource);
+            boolean checkConstrainedTableSources = constrainedTableSources.peek()
+                    .contains(tableSource);
 
             // Extract pairs from all analyze result and combine a predicate
             List<AnalyzePair> pairs = new ArrayList<>();
@@ -217,6 +218,16 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
     }
 
     @Override
+    public ILogicalPlan visit(SubQuery plan, Ctx context)
+    {
+        // constrainedTableSources only applies per nest level so push a new set to the stack before going down
+        context.constrainedTableSources.push(new HashSet<>());
+        ILogicalPlan result = super.visit(plan, context);
+        context.constrainedTableSources.pop();
+        return result;
+    }
+
+    @Override
     public ILogicalPlan visit(TableScan plan, Ctx context)
     {
         TableSourceReference tableSource = plan.getTableSource();
@@ -253,22 +264,23 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
     {
         boolean isLeft = plan.getType() == Type.LEFT;
 
-        Set<TableSourceReference> constrainedTableSoueces = emptySet();
+        Set<TableSourceReference> constrainedTableSources = emptySet();
 
         // We don't push anything down to a LEFT join
         // That is up to the user to optimize at the moment.
         if (isLeft)
         {
-            constrainedTableSoueces = extractTableSources(plan.getInner());
+            constrainedTableSources = extractTableSources(plan.getInner());
         }
 
-        Set<TableSourceReference> prevConstrainedTableSources = new HashSet<>(context.constrainedTableSources);
+        Set<TableSourceReference> joinConstrainedTableSources = new HashSet<>(context.constrainedTableSources.peek());
+        joinConstrainedTableSources.addAll(constrainedTableSources);
 
-        context.constrainedTableSources.addAll(constrainedTableSoueces);
+        context.constrainedTableSources.push(joinConstrainedTableSources);
 
         // Add to result then visit down stream plans
         // CSOFF
-        int resultIndex = context.add(PredicateAnalyzer.analyze(plan.getCondition()), constrainedTableSoueces);
+        int resultIndex = context.add(PredicateAnalyzer.analyze(plan.getCondition()), constrainedTableSources);
         // CSON
 
         ILogicalPlan outer = plan.getOuter()
@@ -277,7 +289,7 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
                 .accept(this, context);
 
         // Restore previous values
-        context.constrainedTableSources = prevConstrainedTableSources;
+        context.constrainedTableSources.pop();
 
         // Extract remaining predicate pairs and use when re-creating join
         AnalyzeResult analyzeResult = context.analyzeResults.remove(resultIndex)

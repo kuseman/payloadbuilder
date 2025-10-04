@@ -84,6 +84,30 @@ public interface IExpression
         return null;
     }
 
+    /**
+     * Returns true if this expression is a pointer to an outer reference. This is true for expressions that are located inside a correlated
+     * construct (subquery) and hence references something outside of the current scope. For example when building a query for a catalog implementation
+     * regarding predicates this is crucial to know since this expression is constant in that sense and can indeed be used as pushed down predicate.
+     *
+     * <pre>
+     * Example:
+     *
+     * select *
+     * from tableA a
+     * outer apply (
+     *      select *
+     *      from tableB b
+     *      where b.col1 = a.col1           <----- Here a.col1 is an outer reference and can be used as a predicate
+     *                                             for tableB since inside the subquery that expression can be seen as constant
+     * ) x
+     *
+     * </pre>
+     */
+    default boolean isOuterReference()
+    {
+        return false;
+    }
+
     /** Return a verbose string that can be used in plan printing etc. for easier debugging. */
     default String toVerboseString()
     {
