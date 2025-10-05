@@ -64,6 +64,9 @@
         "into #temp with (indices=array(array('newCol1'))) ",
         "from source",
         "",
+        "select * ",
+        "from sys#tables ",
+        "",
         "select * from #temp ",
         "",
         "describe ",
@@ -78,6 +81,9 @@
         "  on t.newCol1 = d.id "
       ],
       "expectedResultSets": [
+        [
+          [{ "key": "name", "value": "temp" }, { "key": "schema", "value": "newCol1 (Int), newCol2 (Int)" }, { "key": "indices", "value": "ALL: [newCol1]" }, { "key": "rows", "value": 3 } ]
+        ],
         [
           [{ "key": "newCol1", "value": 2 }, { "key": "newCol2", "value": 20 } ],
           [{ "key": "newCol1", "value": 6 }, { "key": "newCol2", "value": 40 } ],

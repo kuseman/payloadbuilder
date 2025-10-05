@@ -462,26 +462,25 @@ public class TestHarnessRunner
                         ((ExecutionContext) context).setVariable(optionName.getFirst(), option);
                     }
 
-                    ObjectTupleVector tupleVector = new ObjectTupleVector(data.getSchema()
-                            .orElse(schema), rowCount, (row, col) ->
-                            {
-                                Column column = schema.getColumns()
-                                        .get(col);
+                    ObjectTupleVector tupleVector = new ObjectTupleVector(schema, rowCount, (row, col) ->
+                    {
+                        Column column = schema.getColumns()
+                                .get(col);
 
-                                // Return values based on projection for this datasource
-                                if (projection.type() == ProjectionType.NONE)
-                                {
-                                    return null;
-                                }
-                                else if (projection.type() == ProjectionType.COLUMNS
-                                        && !projection.columns()
-                                                .contains(column.getName()))
-                                {
-                                    return null;
-                                }
+                        // Return values based on projection for this datasource
+                        if (projection.type() == ProjectionType.NONE)
+                        {
+                            return null;
+                        }
+                        else if (projection.type() == ProjectionType.COLUMNS
+                                && !projection.columns()
+                                        .contains(column.getName()))
+                        {
+                            return null;
+                        }
 
-                                return rows.get(row)[col];
-                            });
+                        return rows.get(row)[col];
+                    });
                     return TupleIterator.singleton(tupleVector);
                 }
             };
@@ -519,44 +518,43 @@ public class TestHarnessRunner
             if (SYS_TABLES.equalsIgnoreCase(type))
             {
                 List<TestTable> tables = catalog.getTables();
-                vector = new ObjectTupleVector(data.getSchema()
-                        .get(), tables.size(), (row, col) ->
+                vector = new ObjectTupleVector(SYS_TABLES_SCHEMA, tables.size(), (row, col) ->
+                {
+                    TestTable t = tables.get(row);
+                    if (col == 0)
+                    {
+                        return t.getName();
+                    }
+                    return new ValueVector()
+                    {
+                        @Override
+                        public ResolvedType type()
                         {
-                            TestTable t = tables.get(row);
-                            if (col == 0)
-                            {
-                                return t.getName();
-                            }
-                            return new ValueVector()
-                            {
-                                @Override
-                                public ResolvedType type()
-                                {
-                                    return ResolvedType.of(Type.String);
-                                }
+                            return ResolvedType.of(Type.String);
+                        }
 
-                                @Override
-                                public int size()
-                                {
-                                    return t.getColumns()
-                                            .size();
-                                }
+                        @Override
+                        public int size()
+                        {
+                            return t.getColumns()
+                                    .size();
+                        }
 
-                                @Override
-                                public boolean isNull(int row)
-                                {
-                                    return t.getColumns()
-                                            .get(row) == null;
-                                }
+                        @Override
+                        public boolean isNull(int row)
+                        {
+                            return t.getColumns()
+                                    .get(row) == null;
+                        }
 
-                                @Override
-                                public Object getAny(int row)
-                                {
-                                    return t.getColumns()
-                                            .get(row);
-                                }
-                            };
-                        });
+                        @Override
+                        public Object getAny(int row)
+                        {
+                            return t.getColumns()
+                                    .get(row);
+                        }
+                    };
+                });
             }
             else if (SYS_COLUMNS.equalsIgnoreCase(type))
             {
@@ -566,27 +564,25 @@ public class TestHarnessRunner
                                 .stream()
                                 .map(c -> Pair.of(t, c)))
                         .collect(toList());
-                vector = new ObjectTupleVector(data.getSchema()
-                        .get(), columns.size(), (row, col) ->
-                        {
-                            Pair<TestTable, String> p = columns.get(row);
-                            if (col == 0)
-                            {
-                                return p.getKey()
-                                        .getName();
-                            }
-                            else if (col == 1)
-                            {
-                                return p.getValue();
-                            }
-                            return p.getValue()
-                                    .length();
-                        });
+                vector = new ObjectTupleVector(SYS_COLUMNS_SCHEMA, columns.size(), (row, col) ->
+                {
+                    Pair<TestTable, String> p = columns.get(row);
+                    if (col == 0)
+                    {
+                        return p.getKey()
+                                .getName();
+                    }
+                    else if (col == 1)
+                    {
+                        return p.getValue();
+                    }
+                    return p.getValue()
+                            .length();
+                });
             }
             else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
             {
-                vector = getFunctionsTupleVector(data.getSchema()
-                        .get());
+                vector = getFunctionsTupleVector(SYS_FUNCTIONS_SCHEMA);
             }
             else if (SYS_INDICES.equalsIgnoreCase(type))
             {

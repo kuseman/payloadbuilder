@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import org.junit.Test;
 
@@ -24,6 +25,28 @@ import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 /** Test {@link TableFunctionScan} */
 public class TableFunctionScanTest extends APhysicalPlanTest
 {
+    @Test
+    public void test_no_such_element()
+    {
+        Schema schema = Schema.of(col("Value", ResolvedType.of(Type.Int), table));
+        IPhysicalPlan plan = new TableFunctionScan(0, schema, table, "", "System", SystemCatalog.get()
+                .getTableFunction("range"), asList(intLit(1), intLit(10)), emptyList());
+
+        TupleIterator it = plan.execute(context);
+        while (it.hasNext())
+        {
+            it.next();
+        }
+        try
+        {
+            it.next();
+            fail("No such element");
+        }
+        catch (NoSuchElementException e)
+        {
+        }
+    }
+
     @Test
     public void test_that_a_table_source_is_attched_on_schema()
     {

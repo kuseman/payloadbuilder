@@ -62,6 +62,6 @@ class QueryFunction extends TableFunctionInfo
 
         SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
 
-        return JdbcDatasource.getIterator(dialect, catalog, context, catalogAlias, null, query, parameters, context.getBatchSize(options));
+        return JdbcDatasource.getIterator(dialect, catalog, context, catalogAlias, query, parameters, context.getBatchSize(options));
     }
 }

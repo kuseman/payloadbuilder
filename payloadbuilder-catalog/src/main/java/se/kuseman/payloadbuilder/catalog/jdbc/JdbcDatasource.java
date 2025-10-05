@@ -52,7 +52,6 @@ class JdbcDatasource implements IDatasource
     private static final Logger LOGGER = LoggerFactory.getLogger(JdbcDatasource.class);
     private final JdbcCatalog catalog;
     private final String catalogAlias;
-    private final Schema schema;
     private final QualifiedName table;
     private final Projection projection;
     private final List<IPredicate> predicates;
@@ -61,12 +60,11 @@ class JdbcDatasource implements IDatasource
     private final IExpression tableHintsOption;
     private final List<Option> options;
 
-    JdbcDatasource(JdbcCatalog catalog, String catalogAlias, Schema schema, QualifiedName table, ISeekPredicate indexPredicate, Projection projection, List<IPredicate> predicates,
-            List<ISortItem> sortItems, IExpression tableHintsOption, List<Option> options)
+    JdbcDatasource(JdbcCatalog catalog, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, Projection projection, List<IPredicate> predicates, List<ISortItem> sortItems,
+            IExpression tableHintsOption, List<Option> options)
     {
         this.catalog = catalog;
         this.catalogAlias = catalogAlias;
-        this.schema = schema;
         this.table = table;
         this.indexPredicate = indexPredicate;
         this.predicates = predicates;
@@ -107,7 +105,7 @@ class JdbcDatasource implements IDatasource
         SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
         String sql = buildSql(dialect, context, false);
         LOGGER.debug("Table: {}, sql: {}", table, sql);
-        return getIterator(dialect, catalog, context, catalogAlias, schema, sql, null, context.getBatchSize(options));
+        return getIterator(dialect, catalog, context, catalogAlias, sql, null, context.getBatchSize(options));
     }
 
     // CSOFF
@@ -299,8 +297,7 @@ class JdbcDatasource implements IDatasource
     }
 
     /** Returns a row iterator with provided query and parameters */
-    static TupleIterator getIterator(SqlDialect dialect, JdbcCatalog catalog, IExecutionContext context, String catalogAlias, Schema plannedSchema, String query, List<Object> parameters,
-            int batchSize)
+    static TupleIterator getIterator(SqlDialect dialect, JdbcCatalog catalog, IExecutionContext context, String catalogAlias, String query, List<Object> parameters, int batchSize)
     {
         final String database = context.getSession()
                 .getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
@@ -380,13 +377,9 @@ class JdbcDatasource implements IDatasource
                     JdbcUtils.printWarnings(connection, context.getSession()
                             .getPrintWriter());
 
-                    Schema schema = plannedSchema;
-                    if (schema == null)
-                    {
-                        schema = new Schema(Arrays.stream(columns)
-                                .map(c -> Column.of(c, Type.Any))
-                                .collect(toList()));
-                    }
+                    Schema schema = new Schema(Arrays.stream(columns)
+                            .map(c -> Column.of(c, Type.Any))
+                            .collect(toList()));
                     return new ObjectTupleVector(schema, batch.size(), (row, col) -> batch.get(row)[col]);
                 }
                 catch (Exception e)

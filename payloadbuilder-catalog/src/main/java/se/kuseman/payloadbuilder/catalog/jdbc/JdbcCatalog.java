@@ -142,8 +142,7 @@ public class JdbcCatalog extends Catalog
         }
         else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
         {
-            return ctx -> TupleIterator.singleton(getFunctionsTupleVector(data.getSchema()
-                    .get()));
+            return ctx -> TupleIterator.singleton(getFunctionsTupleVector(SYS_FUNCTIONS_SCHEMA));
         }
 
         throw new RuntimeException(type + " is not supported");
@@ -179,8 +178,7 @@ public class JdbcCatalog extends Catalog
                 .findAny()
                 .orElse(null);
 
-        return new JdbcDatasource(this, catalogAlias, data.getSchema()
-                .orElse(null), table, seekPredicate, projection, predicates, sortItems, tableHintsOption, data.getOptions());
+        return new JdbcDatasource(this, catalogAlias, table, seekPredicate, projection, predicates, sortItems, tableHintsOption, data.getOptions());
     }
 
     private Projection getOptionProjection(List<Option> options)

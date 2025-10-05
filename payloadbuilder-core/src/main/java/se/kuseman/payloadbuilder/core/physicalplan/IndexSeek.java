@@ -169,36 +169,34 @@ public class IndexSeek extends TableScan
                     // Concat the data source up to batch size, this might happen if catalog don't implement batch size correct
                     TupleVector vector = PlanUtils.concat(context, currentIterator, batchSize);
                     Schema vectorSchema = vector.getSchema();
-                    validate(context, vectorSchema, vector.getRowCount());
-                    if (!asteriskSchema)
+                    validate(vectorSchema, vector.getRowCount());
+
+                    // If asterisk schema then recreate the schema and attach a table source to make resolved columns properly detect it
+                    // if not use the planned schema which already has table source attached
+                    final Schema actualSchema = asteriskSchema ? TableScan.recreateSchema(tableSource, vectorSchema)
+                            : schema;
+
+                    next = new TupleVector()
                     {
-                        next = vector;
-                    }
-                    else
-                    {
-                        // Attach table source to all asterisk columns in the vector to make column evaluation work properly
-                        final Schema schema = recreateSchema(tableSource, vectorSchema);
-                        next = new TupleVector()
+                        @Override
+                        public Schema getSchema()
                         {
-                            @Override
-                            public Schema getSchema()
-                            {
-                                return schema;
-                            }
+                            return actualSchema;
+                        }
 
-                            @Override
-                            public int getRowCount()
-                            {
-                                return vector.getRowCount();
-                            }
+                        @Override
+                        public int getRowCount()
+                        {
+                            return vector.getRowCount();
+                        }
 
-                            @Override
-                            public ValueVector getColumn(int column)
-                            {
-                                return vector.getColumn(column);
-                            }
-                        };
-                    }
+                        @Override
+                        public ValueVector getColumn(int column)
+                        {
+                            return vector.getColumn(column);
+                        }
+                    };
+                    // }
                 }
                 return true;
             }

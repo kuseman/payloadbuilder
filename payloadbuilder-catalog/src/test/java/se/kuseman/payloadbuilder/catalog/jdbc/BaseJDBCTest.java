@@ -20,7 +20,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 import javax.sql.DataSource;
 
@@ -246,7 +245,7 @@ abstract class BaseJDBCTest extends Assert
     {
         IExecutionContext context = mockExecutionContext();
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.columns(asList("col2")), emptyList()));
+                new DatasourceData(0, emptyList(), emptyList(), Projection.columns(asList("col2")), emptyList()));
         TupleIterator it = ds.execute(context);
 
         List<String> col2Expected = asList("one", "two", "three", "four", "five");
@@ -284,8 +283,7 @@ abstract class BaseJDBCTest extends Assert
 
         List<Option> options = List.of(new Option(JdbcCatalog.PROJECTION, new LiteralStringExpression("col2")));
 
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL, options));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE), new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, options));
         TupleIterator it = ds.execute(context);
 
         List<String> col2Expected = asList("one", "two", "three", "four", "five");
@@ -328,8 +326,7 @@ abstract class BaseJDBCTest extends Assert
             options = List.of(new Option(JdbcCatalog.PROJECTION, new LiteralStringExpression("*")), new Option(JdbcCatalog.TABLE_HINTS, new LiteralStringExpression("WITH(NOLOCK)")));
         }
 
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Projection.ALL, options));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE), new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, options));
         TupleIterator it = ds.execute(context);
 
         List<Integer> col1Expected = asList(1, 2, 3, 4, 5);
@@ -369,8 +366,7 @@ abstract class BaseJDBCTest extends Assert
     {
         IExecutionContext context = mockExecutionContext();
         List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of("col1"), Order.DESC)));
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Projection.ALL, emptyList()));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE), new DatasourceData(0, emptyList(), sortItems, Projection.ALL, emptyList()));
 
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());
@@ -399,8 +395,7 @@ abstract class BaseJDBCTest extends Assert
         IExecutionContext context = mockExecutionContext();
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("col1"), Order.DESC)));
         List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.in("col2", asList("one", "four"))));
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, Optional.empty(), predicates, sortItems, Projection.ALL, emptyList()));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE), new DatasourceData(0, predicates, sortItems, Projection.ALL, emptyList()));
 
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());
@@ -430,7 +425,7 @@ abstract class BaseJDBCTest extends Assert
         IExecutionContext context = mockExecutionContext();
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, asList("col1"), Arrays.<Object[]>asList(new Object[] { 1, 3, 5 }));
         List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of("col1"), Order.DESC)));
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Projection.ALL, emptyList()));
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, emptyList(), sortItems, Projection.ALL, emptyList()));
 
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());
@@ -459,7 +454,7 @@ abstract class BaseJDBCTest extends Assert
         IExecutionContext context = mockExecutionContext();
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, asList("col1", "col2"), Arrays.<Object[]>asList(new Object[] { 1, 3, 5 }, new Object[] { "one", "five", "three" }));
         List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of("col1"), Order.DESC)));
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Projection.ALL, emptyList()));
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, emptyList(), sortItems, Projection.ALL, emptyList()));
 
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());
