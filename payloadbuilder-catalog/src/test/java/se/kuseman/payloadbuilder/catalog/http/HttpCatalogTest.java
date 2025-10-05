@@ -381,7 +381,7 @@ public class HttpCatalogTest
 
         try
         {
-            function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createNullExpression()), emptyList());
+            function.execute(context, "http", List.of(ExpressionTestUtils.createNullExpression()), emptyList());
             fail("Should fail");
         }
         catch (IllegalArgumentException e)
@@ -404,7 +404,7 @@ public class HttpCatalogTest
         assertEquals(Arity.ONE, function.arity());
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), emptyList());
+        TupleIterator it = function.execute(context, "http", List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -444,7 +444,7 @@ public class HttpCatalogTest
 
         try
         {
-            function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), emptyList());
+            function.execute(context, "http", List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), emptyList());
             fail("Should fail");
         }
         catch (RuntimeException e)
@@ -466,7 +466,7 @@ public class HttpCatalogTest
 
         try
         {
-            function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:12345")), emptyList());
+            function.execute(context, "http", List.of(ExpressionTestUtils.createStringExpression("http://localhost:12345")), emptyList());
             fail("Should fail");
         }
         catch (RuntimeException e)
@@ -484,7 +484,7 @@ public class HttpCatalogTest
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:12345")),
+        TupleIterator it = function.execute(context, "http", List.of(ExpressionTestUtils.createStringExpression("http://localhost:12345")),
                 asList(new Option(HttpCatalog.FAIL_ON_NON_200, ExpressionTestUtils.createStringExpression("false"))));
         assertFalse(it.hasNext());
     }
@@ -503,7 +503,7 @@ public class HttpCatalogTest
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())),
+        TupleIterator it = function.execute(context, "http", List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())),
                 asList(new Option(HttpCatalog.FAIL_ON_NON_200, ExpressionTestUtils.createStringExpression("false"))));
         assertFalse(it.hasNext());
         mockServer.verify(mocks[0].getId());
@@ -530,7 +530,7 @@ public class HttpCatalogTest
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
         //@formatter:off
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), List.of(
+        TupleIterator it = function.execute(context, "http", List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), List.of(
                 new Option(HttpCatalog.METHOD, methodExpression),
                 new Option(QueryFunction.BODY, bodyExpression),
                 new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), x_headerExpression))
@@ -577,7 +577,7 @@ public class HttpCatalogTest
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         //@formatter:off
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), List.of(
+        TupleIterator it = function.execute(context, "http", List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), List.of(
                 new Option(HttpCatalog.METHOD, methodExpression),
                 new Option(QualifiedName.of("jsonpath"), jsonpathExpression),
                 new Option(QueryFunction.BODY, bodyExpression),
@@ -621,7 +621,7 @@ public class HttpCatalogTest
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/csv")), emptyList());
+        TupleIterator it = function.execute(context, "http", List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/csv")), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -667,7 +667,7 @@ public class HttpCatalogTest
         IExpression xmlPathExpression = createStringExpression("/keys/key");
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/xml")),
+        TupleIterator it = function.execute(context, "http", List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/xml")),
                 List.of(new Option(QualifiedName.of("xmlpath"), xmlPathExpression)));
 
         int rowCount = 0;
@@ -708,7 +708,7 @@ public class HttpCatalogTest
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/csv")),
+        TupleIterator it = function.execute(context, "http", List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/csv")),
                 List.of(new Option(QualifiedName.of("columnseparator"), columnSeparatorExpression)));
 
         int rowCount = 0;

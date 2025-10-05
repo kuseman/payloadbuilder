@@ -1,7 +1,6 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
-import java.util.Optional;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Option;
@@ -56,7 +55,7 @@ class OpenTableFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
     {
         final ValueVector vector = arguments.get(0)
                 .eval(context);
@@ -72,7 +71,7 @@ class OpenTableFunction extends TableFunctionInfo
             @Override
             public Schema getSchema()
             {
-                return schema.orElse(table.getSchema());
+                return table.getSchema();
             }
 
             @Override

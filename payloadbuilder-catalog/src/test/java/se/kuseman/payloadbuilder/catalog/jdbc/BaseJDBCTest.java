@@ -192,7 +192,7 @@ abstract class BaseJDBCTest extends Assert
         IExecutionContext context = mockExecutionContext(writer);
         QueryFunction query = new QueryFunction(catalog);
 
-        TupleIterator it = query.execute(context, CATALOG_ALIAS, Optional.empty(), asList(ExpressionTestUtils.createStringExpression("""
+        TupleIterator it = query.execute(context, CATALOG_ALIAS, asList(ExpressionTestUtils.createStringExpression("""
                 raiserror('warn 0', 0, 2);       -- Warn level
                 create table vals
                 (

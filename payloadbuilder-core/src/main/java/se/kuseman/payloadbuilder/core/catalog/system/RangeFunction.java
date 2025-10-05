@@ -2,7 +2,6 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -39,7 +38,7 @@ class RangeFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
     {
         ValueVector vv;
 
@@ -82,7 +81,7 @@ class RangeFunction extends TableFunctionInfo
 
         if (rowCount <= batchSize)
         {
-            return TupleIterator.singleton(getVector(schema.get(), start, stop));
+            return TupleIterator.singleton(getVector(SCHEMA, start, stop));
         }
 
         final int batchCount = rowCount / batchSize;
@@ -132,7 +131,7 @@ class RangeFunction extends TableFunctionInfo
 
                     int batchStart = start + (batchSize * batchNumber);
                     int batchStop = Math.min(batchStart + batchSize, stop);
-                    next = getVector(schema.get(), batchStart, batchStop);
+                    next = getVector(SCHEMA, batchStart, batchStop);
                     batchNumber++;
                 }
                 return true;
