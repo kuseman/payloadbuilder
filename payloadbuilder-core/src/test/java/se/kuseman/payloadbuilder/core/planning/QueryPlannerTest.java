@@ -14,7 +14,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 
@@ -993,7 +992,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new Limit(
                 1,
-                new TableScan(0, schema, tableA, "System", true, new TemporaryTableDataSource(Optional.of(schema), QualifiedName.of("tablea"), null),
+                new TableScan(0, schema, tableA, "System", true, new TemporaryTableDataSource(QualifiedName.of("tablea"), null),
                 emptyList()),
                 intLit(100));
         //@formatter:on

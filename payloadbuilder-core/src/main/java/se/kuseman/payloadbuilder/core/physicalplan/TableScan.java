@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -31,7 +30,7 @@ public class TableScan implements IPhysicalPlan
     /** The actual catalog name resolved during compile time */
     private final String catalogName;
     protected final IDatasource datasource;
-    private final Schema schema;
+    protected final Schema schema;
     protected final boolean tempTable;
     protected final List<Option> options;
     protected final boolean asteriskSchema;
@@ -111,20 +110,17 @@ public class TableScan implements IPhysicalPlan
                 // Concat the data source up to batch size, this might happen if catalog don't implement batch size correct
                 final TupleVector next = PlanUtils.concat(context, iterator, batchSize);
                 Schema vectorSchema = next.getSchema();
-                validate(context, vectorSchema, next.getRowCount());
-                if (!asteriskSchema)
-                {
-                    return next;
-                }
-
-                // Attach table source to all asterisk columns in the vector to make column evaluation work properly
-                final Schema schema = recreateSchema(tableSource, vectorSchema);
+                validate(vectorSchema, next.getRowCount());
+                // If asterisk schema then recreate the schema and attach a table source to make resolved columns properly detect it
+                // if not use the planned schema which already has table source attached
+                final Schema actualSchema = asteriskSchema ? TableScan.recreateSchema(tableSource, vectorSchema)
+                        : schema;
                 return new TupleVector()
                 {
                     @Override
                     public Schema getSchema()
                     {
-                        return schema;
+                        return actualSchema;
                     }
 
                     @Override
@@ -161,25 +157,25 @@ public class TableScan implements IPhysicalPlan
         return emptyList();
     }
 
-    protected void validate(IExecutionContext context, Schema vectorSchema, int rowCount)
+    protected void validate(Schema vectorSchema, int rowCount)
     {
         if (!asteriskSchema
-                && rowCount > 0
-                && !schema.equals(vectorSchema))
+                && rowCount > 0)
         {
-            throw new QueryException("Schema for table: '" + tableSource
-                                     + "' doesn't match the planned schema. Check implementation of Catalog: "
-                                     + catalogName
-                                     + System.lineSeparator()
-                                     + "Expected: "
-                                     + schema
-                                     + System.lineSeparator()
-                                     + "Actual: "
-                                     + vectorSchema
-                                     + System.lineSeparator()
-                                     + "Make sure to use the schema provided in '"
-                                     + DatasourceData.class.getSimpleName()
-                                     + "' when data source is created.");
+            if (!schemaEqualsRegardingTypeAndName(schema, vectorSchema))
+            {
+                throw new QueryException("Schema for table: '" + tableSource
+                                         + "' doesn't match the planned schema. Check implementation of Catalog: "
+                                         + catalogName
+                                         + System.lineSeparator()
+                                         + "Expected: "
+                                         + schema
+                                         + System.lineSeparator()
+                                         + "Actual: "
+                                         + vectorSchema
+                                         + System.lineSeparator()
+                                         + "Make sure to use the schema returned from Catalog#getTableSchema during planning.");
+            }
         }
         else if (asteriskSchema
                 && vectorSchema.getSize() <= 0
@@ -191,6 +187,34 @@ public class TableScan implements IPhysicalPlan
                                      + System.lineSeparator()
                                      + "Make sure to provide the actual runtime schema of the vector when using an asterisk schema.");
         }
+    }
+
+    static boolean schemaEqualsRegardingTypeAndName(Schema expected, Schema actual)
+    {
+        int size = expected.getSize();
+        if (size != actual.getSize())
+        {
+            return false;
+        }
+        else
+        {
+            for (int i = 0; i < size; i++)
+            {
+                Column schemaColumn = expected.getColumns()
+                        .get(i);
+                Column vectorColumn = actual.getColumns()
+                        .get(i);
+
+                if (!schemaColumn.getType()
+                        .equals(vectorColumn.getType())
+                        || !schemaColumn.getName()
+                                .equals(vectorColumn.getName()))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     static Schema recreateSchema(TableSourceReference tableSource, Schema schema)

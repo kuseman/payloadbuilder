@@ -7,8 +7,8 @@ import static java.util.stream.Collectors.joining;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
-import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -98,6 +98,11 @@ public class TableFunctionScan implements IPhysicalPlan
             @Override
             public TupleVector next()
             {
+                if (!iterator.hasNext())
+                {
+                    throw new NoSuchElementException();
+                }
+
                 // Concat the data source up to batch size, this might happen if catalog don't implement batch size correct
                 final TupleVector next = PlanUtils.concat(context, iterator, batchSize);
                 Schema vectorSchema = next.getSchema();
@@ -154,38 +159,12 @@ public class TableFunctionScan implements IPhysicalPlan
         return emptyList();
     }
 
-    private boolean validate(IExecutionContext context, Schema vectorSchema, int rowCount)
+    private void validate(IExecutionContext context, Schema vectorSchema, int rowCount)
     {
         if (!asteriskSchema
                 && rowCount > 0)
         {
-            int size = schema.getSize();
-            boolean valid = true;
-            if (size != vectorSchema.getSize())
-            {
-                valid = false;
-            }
-            else
-            {
-                for (int i = 0; i < size; i++)
-                {
-                    Column schemaColumn = schema.getColumns()
-                            .get(i);
-                    Column vectorColumn = vectorSchema.getColumns()
-                            .get(i);
-
-                    if (!schemaColumn.getType()
-                            .equals(vectorColumn.getType())
-                            || !schemaColumn.getName()
-                                    .equals(vectorColumn.getName()))
-                    {
-                        valid = false;
-                        break;
-                    }
-                }
-            }
-
-            if (!valid)
+            if (!TableScan.schemaEqualsRegardingTypeAndName(schema, vectorSchema))
             {
                 throw new QueryException("Schema for function: '" + functionInfo.getName()
                                          + "' doesn't match the planned schema. Check implementation of Catalog: "
@@ -197,7 +176,7 @@ public class TableFunctionScan implements IPhysicalPlan
                                          + "Actual: "
                                          + vectorSchema
                                          + System.lineSeparator()
-                                         + "Make sure to use the schema returned from getSchema during planning.");
+                                         + "Make sure to use the schema returned from TableFunctionInfo#getSchema during planning.");
             }
         }
         else if (asteriskSchema
@@ -210,7 +189,6 @@ public class TableFunctionScan implements IPhysicalPlan
                                      + System.lineSeparator()
                                      + "Make sure to provide the actual runtime schema of the vector when using an asterisk schema.");
         }
-        return true;
     }
 
     @Override

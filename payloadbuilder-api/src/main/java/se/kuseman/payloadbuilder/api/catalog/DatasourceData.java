@@ -6,7 +6,6 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.execution.IStatementContext;
@@ -18,16 +17,14 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 public class DatasourceData
 {
     private final int nodeId;
-    private final Optional<Schema> schema;
     private final List<IPredicate> predicates;
     private final List<? extends ISortItem> sortItems;
     private final Projection projection;
     private final List<Option> options;
 
-    public DatasourceData(int nodeId, Optional<Schema> schema, List<IPredicate> predicates, List<? extends ISortItem> sortItems, Projection projection, List<Option> options)
+    public DatasourceData(int nodeId, List<IPredicate> predicates, List<? extends ISortItem> sortItems, Projection projection, List<Option> options)
     {
         this.nodeId = nodeId;
-        this.schema = requireNonNull(schema, "schema");
         this.predicates = requireNonNull(predicates, "predicates");
         this.sortItems = requireNonNull(sortItems, "sortItems");
         this.projection = requireNonNull(projection, "projection");
@@ -40,15 +37,6 @@ public class DatasourceData
     public int getNodeId()
     {
         return nodeId;
-    }
-
-    /**
-     * Return the planned schema for this data source. If the table was planned with a non asterisk schema then this schema should be used in the returned {@link TupleVector}'s. Otherwise this value
-     * is {@link Optional#empty()} and the actual runtime schema should be provided in tuples.
-     */
-    public Optional<Schema> getSchema()
-    {
-        return schema;
     }
 
     /** Return predicates if any to push down to data source if supported by catalog */

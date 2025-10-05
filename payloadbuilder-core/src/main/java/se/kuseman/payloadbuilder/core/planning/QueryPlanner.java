@@ -7,7 +7,7 @@ import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiFunction;
 
@@ -21,7 +21,6 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
@@ -38,7 +37,6 @@ import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
-import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
@@ -261,9 +259,6 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         int nodeId = context.getNextNodeId();
 
-        final Optional<Schema> schema = SchemaUtils.isAsterisk(plan.getSchema()) ? Optional.empty()
-                : Optional.of(plan.getSchema());
-
         if (plan.isTempTable())
         {
             QualifiedName tableName = plan.getTableSource()
@@ -276,7 +271,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                 context.seekPredicate = null;
             }
 
-            dataSource = new TemporaryTableDataSource(schema, tableName, seekPredicate);
+            dataSource = new TemporaryTableDataSource(tableName, seekPredicate);
         }
         else
         {
@@ -286,7 +281,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                     context.getSession()
                             .getDefaultCatalogAlias());
 
-            DatasourceData data = new DatasourceData(nodeId, schema, predicatePairs, sortItems, plan.getProjection(), plan.getOptions());
+            DatasourceData data = new DatasourceData(nodeId, predicatePairs, sortItems, plan.getProjection(), plan.getOptions());
 
             if (context.seekPredicate != null)
             {
@@ -732,13 +727,11 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     /** Datasource used for temporary tables */
     static class TemporaryTableDataSource implements IDatasource
     {
-        private final Optional<Schema> plannedSchema;
         private final QualifiedName name;
         private final ISeekPredicate seekPredicate;
 
-        TemporaryTableDataSource(Optional<Schema> plannedSchema, QualifiedName name, ISeekPredicate seekPredicate)
+        TemporaryTableDataSource(QualifiedName name, ISeekPredicate seekPredicate)
         {
-            this.plannedSchema = plannedSchema;
             this.name = name;
             this.seekPredicate = seekPredicate;
         }
@@ -749,81 +742,19 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             TemporaryTable temporaryTable = ((ExecutionContext) context).getSession()
                     .getTemporaryTable(name);
             TupleVector vector = temporaryTable.getTupleVector();
-
-            Schema vectorSchema = vector.getSchema();
-            final Schema schema = plannedSchema.orElse(vectorSchema);
-
             if (seekPredicate != null)
             {
-                final TupleIterator indexIterator = temporaryTable.getIndexIterator(context, seekPredicate);
-                return new TupleIterator()
-                {
-                    @Override
-                    public int estimatedBatchCount()
-                    {
-                        return indexIterator.estimatedBatchCount();
-                    }
-
-                    @Override
-                    public int estimatedRowCount()
-                    {
-                        return indexIterator.estimatedRowCount();
-                    }
-
-                    @Override
-                    public TupleVector next()
-                    {
-                        return wrap(schema, indexIterator.next());
-                    }
-
-                    @Override
-                    public boolean hasNext()
-                    {
-                        return indexIterator.hasNext();
-                    }
-                };
+                return temporaryTable.getIndexIterator(context, seekPredicate);
             }
 
             // Return the tuple vector from context with the planned schema
-            return TupleIterator.singleton(wrap(schema, vector));
-        }
-
-        private TupleVector wrap(Schema schema, TupleVector temporaryTableVector)
-        {
-            final Schema vectorSchema = temporaryTableVector.getSchema();
-            return new TupleVector()
-            {
-                @Override
-                public Schema getSchema()
-                {
-                    return schema;
-                }
-
-                @Override
-                public int getRowCount()
-                {
-                    return temporaryTableVector.getRowCount();
-                }
-
-                @Override
-                public ValueVector getColumn(int column)
-                {
-                    if (column >= vectorSchema.getSize())
-                    {
-                        return ValueVector.literalNull(plannedSchema.get()
-                                .getColumns()
-                                .get(column)
-                                .getType(), temporaryTableVector.getRowCount());
-                    }
-                    return temporaryTableVector.getColumn(column);
-                }
-            };
+            return TupleIterator.singleton(vector);
         }
 
         @Override
         public int hashCode()
         {
-            return plannedSchema.hashCode();
+            return name.hashCode();
         }
 
         @Override
@@ -837,11 +768,10 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             {
                 return false;
             }
-            else if (obj instanceof TemporaryTableDataSource)
+            else if (obj instanceof TemporaryTableDataSource that)
             {
-                TemporaryTableDataSource that = (TemporaryTableDataSource) obj;
-                return plannedSchema.equals(that.plannedSchema)
-                        && name.equals(that.name);
+                return name.equals(that.name)
+                        && Objects.equals(seekPredicate, that.seekPredicate);
             }
             return false;
         }

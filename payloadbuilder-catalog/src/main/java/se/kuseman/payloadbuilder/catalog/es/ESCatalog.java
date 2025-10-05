@@ -113,13 +113,11 @@ public class ESCatalog extends Catalog
         }
         else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
         {
-            return context -> TupleIterator.singleton(getFunctionsTupleVector(data.getSchema()
-                    .get()));
+            return context -> TupleIterator.singleton(getFunctionsTupleVector(SYS_FUNCTIONS_SCHEMA));
         }
         else if (SYS_INDICES.equalsIgnoreCase(type))
         {
-            return getIndicesDatasource(session, catalogAlias, data.getSchema()
-                    .get());
+            return getIndicesDatasource(session, catalogAlias, INDICES_SCHEMA.getSchema());
         }
 
         throw new RuntimeException(table + " is not supported");
