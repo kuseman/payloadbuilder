@@ -10,7 +10,6 @@ import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
@@ -40,14 +39,14 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     public void test_empty_on_null()
     {
         assertEquals(Arity.ONE, f.arity());
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("null")), emptyList());
+        TupleIterator it = f.execute(context, "", asList(e("null")), emptyList());
         assertFalse(it.hasNext());
     }
 
     @Test
     public void test_empty_xml()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 '<xml />'
                 """)), List.of(new Option(OpenXmlFunction.XMLPATH, e("'/'"))));
 
@@ -66,7 +65,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_empty_xml_node_but_with_attributes()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 '<xml attr1="1234" />'
                 """)), List.of(new Option(OpenXmlFunction.XMLPATH, e("'/'"))));
 
@@ -94,7 +93,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_batch_size()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -148,7 +147,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_batch_size_with_only_new_columns()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -202,7 +201,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_complex_xml_cdata()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                                 `<records>
                                   <record>
                                       <value attr1="666">123</value>
@@ -268,7 +267,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -309,7 +308,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_columns_option()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -351,7 +350,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     public void test_columns_option_2()
     {
         // Columns should come in the order specified in options and not in the order present in XML
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -393,7 +392,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_columns_option_with_null_values()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -432,7 +431,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_pointer_to_a_deep_nested_element()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                       <record>
@@ -476,7 +475,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_no_path()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -517,7 +516,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_root_path()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -558,7 +557,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_totally_different_columns_on_rows()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -604,7 +603,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_not_found_path()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -627,7 +626,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     {
         // Here we will get an array of values since <record> exists multiple times
         // under the xmlpath
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -668,7 +667,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_arrays()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <campaigns>
                       <value>camp1</value>
@@ -703,7 +702,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_arrays_from_attributes()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <campaigns>
                       <value attr="camp1" />
@@ -738,7 +737,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_single_scalar_value_pointer()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <campaigns>
                       <value>camp1</value>
@@ -773,7 +772,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_single_scalar_value_pointer_2()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <campaign>
                       <name>camp1</name>
@@ -807,7 +806,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_single_scalar_value_pointer_3()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <campaign>
                       <name>camp1</name>
@@ -847,7 +846,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_new_columns_second_row()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 `<?xml version="1.0" encoding="UTF-8"?>
                   <records>
                   <record>
@@ -894,7 +893,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     @Test
     public void test_product()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null),
+        TupleIterator it = f.execute(context, "",
                 asList(e(
                         """
                                 `<?xml version="1.0" encoding="UTF-8"?>
@@ -1087,7 +1086,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
         Mockito.when(arg.eval(Mockito.any()))
                 .thenReturn(VectorTestUtils.vv(Column.Type.Any, reader));
 
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), List.of(new Option(OpenXmlFunction.XMLPATH, e("'/records/record'"))));
+        TupleIterator it = f.execute(context, "", asList(arg), List.of(new Option(OpenXmlFunction.XMLPATH, e("'/records/record'"))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -1143,7 +1142,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
         Mockito.when(arg.eval(Mockito.any()))
                 .thenReturn(VectorTestUtils.vv(Column.Type.Any, baos));
 
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), List.of(new Option(OpenXmlFunction.XMLPATH, e("'/records/record'"))));
+        TupleIterator it = f.execute(context, "", asList(arg), List.of(new Option(OpenXmlFunction.XMLPATH, e("'/records/record'"))));
 
         int rowCount = 0;
         while (it.hasNext())

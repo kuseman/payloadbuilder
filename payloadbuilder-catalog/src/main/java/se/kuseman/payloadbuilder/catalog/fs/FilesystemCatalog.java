@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 
 import org.apache.commons.io.FileUtils;
 
@@ -80,7 +79,7 @@ public class FilesystemCatalog extends Catalog
         }
 
         @Override
-        public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
+        public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
         {
             ValueVector value = arguments.get(0)
                     .eval(context);
@@ -92,7 +91,7 @@ public class FilesystemCatalog extends Catalog
             Path path = FileSystems.getDefault()
                     .getPath(strPath);
             Object[] values = ListFunction.fromPath(path);
-            return TupleIterator.singleton(new ObjectTupleVector(schema.get(), 1, (row, col) -> values[col]));
+            return TupleIterator.singleton(new ObjectTupleVector(SCHEMA, 1, (row, col) -> values[col]));
         }
     }
 
@@ -190,7 +189,7 @@ public class FilesystemCatalog extends Catalog
         }
 
         @Override
-        public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
+        public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
         {
             ValueVector value = arguments.get(0)
                     .eval(context);
@@ -261,7 +260,7 @@ public class FilesystemCatalog extends Catalog
                             @Override
                             public Schema getSchema()
                             {
-                                return schema.get();
+                                return SCHEMA;
                             }
 
                             @Override
@@ -278,8 +277,7 @@ public class FilesystemCatalog extends Catalog
                                     @Override
                                     public ResolvedType type()
                                     {
-                                        return schema.get()
-                                                .getColumns()
+                                        return SCHEMA.getColumns()
                                                 .get(column)
                                                 .getType();
                                     }

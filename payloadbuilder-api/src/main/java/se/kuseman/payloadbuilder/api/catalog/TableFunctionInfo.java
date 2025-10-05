@@ -44,22 +44,25 @@ public abstract class TableFunctionInfo extends FunctionInfo
      * @see #execute(IExecutionContext, String, Optional, List, IDatasourceOptions, int)
      * @param nodeId The id of the functions node id the query plan tree. Can be used to get hold of node data from {@link IStatementContext} to store statistics during execution etc.
      */
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options, int nodeId)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options, int nodeId)
     {
-        return execute(context, catalogAlias, schema, arguments, options);
+        return execute(context, catalogAlias, arguments, options);
     }
 
     /**
      * Execute table function.
      *
+     * <pre>
+     * NOTE! If {{@link #getSchema(List,List)} returned a NON empty schema the {@link TupleVector}'s return from this {@link TupleIterator} MUST
+     * have the same set of columns regarding type and name.
+     * </pre>
+     *
      * @param context Execution context
      * @param catalogAlias The query specific catalog alias used in this invocation
-     * @param schema Planned schema for this table function. If this has a value then the schema should be used when returning {@link TupleVector}' from {@link TupleIterator}. Else value will be
-     * {@link Optional#empty()} and the actual runtime schema should be return for vectors.
      * @param arguments Function arguments
      * @param options Options for this table source such as batch size etc.
      */
-    public abstract TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options);
+    public abstract TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options);
 
     /**
      * Returns a map with describe properties that is used during describe/analyze statements

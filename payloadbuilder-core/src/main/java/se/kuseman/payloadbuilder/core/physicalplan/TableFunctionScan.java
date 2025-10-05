@@ -7,8 +7,8 @@ import static java.util.stream.Collectors.joining;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -79,10 +79,8 @@ public class TableFunctionScan implements IPhysicalPlan
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
-        Optional<Schema> schema = asteriskSchema ? Optional.empty()
-                : Optional.of(this.schema);
         final int batchSize = context.getBatchSize(options);
-        final TupleIterator iterator = functionInfo.execute(context, catalogAlias, schema, arguments, options, nodeId);
+        final TupleIterator iterator = functionInfo.execute(context, catalogAlias, arguments, options, nodeId);
         return new TupleIterator()
         {
             @Override
@@ -104,19 +102,16 @@ public class TableFunctionScan implements IPhysicalPlan
                 final TupleVector next = PlanUtils.concat(context, iterator, batchSize);
                 Schema vectorSchema = next.getSchema();
                 validate(context, vectorSchema, next.getRowCount());
-                if (!asteriskSchema)
-                {
-                    return next;
-                }
-
-                // Recreate the schema and attach a table source to make resolved columns properly detect it
-                final Schema schema = TableScan.recreateSchema(tableSource, next.getSchema());
+                // If asterisk schema then recreate the schema and attach a table source to make resolved columns properly detect it
+                // if not use the planned schema which already has table source attached
+                final Schema actualSchema = asteriskSchema ? TableScan.recreateSchema(tableSource, vectorSchema)
+                        : schema;
                 return new TupleVector()
                 {
                     @Override
                     public Schema getSchema()
                     {
-                        return schema;
+                        return actualSchema;
                     }
 
                     @Override
@@ -162,20 +157,48 @@ public class TableFunctionScan implements IPhysicalPlan
     private boolean validate(IExecutionContext context, Schema vectorSchema, int rowCount)
     {
         if (!asteriskSchema
-                && rowCount > 0
-                && !schema.equals(vectorSchema))
+                && rowCount > 0)
         {
-            throw new QueryException("Schema for function: '" + functionInfo.getName()
-                                     + "' doesn't match the planned schema. Check implementation of Catalog: "
-                                     + catalogName
-                                     + System.lineSeparator()
-                                     + "Expected: "
-                                     + schema
-                                     + System.lineSeparator()
-                                     + "Actual: "
-                                     + vectorSchema
-                                     + System.lineSeparator()
-                                     + "Make sure to use the schema provided in execute method.");
+            int size = schema.getSize();
+            boolean valid = true;
+            if (size != vectorSchema.getSize())
+            {
+                valid = false;
+            }
+            else
+            {
+                for (int i = 0; i < size; i++)
+                {
+                    Column schemaColumn = schema.getColumns()
+                            .get(i);
+                    Column vectorColumn = vectorSchema.getColumns()
+                            .get(i);
+
+                    if (!schemaColumn.getType()
+                            .equals(vectorColumn.getType())
+                            || !schemaColumn.getName()
+                                    .equals(vectorColumn.getName()))
+                    {
+                        valid = false;
+                        break;
+                    }
+                }
+            }
+
+            if (!valid)
+            {
+                throw new QueryException("Schema for function: '" + functionInfo.getName()
+                                         + "' doesn't match the planned schema. Check implementation of Catalog: "
+                                         + catalogName
+                                         + System.lineSeparator()
+                                         + "Expected: "
+                                         + schema
+                                         + System.lineSeparator()
+                                         + "Actual: "
+                                         + vectorSchema
+                                         + System.lineSeparator()
+                                         + "Make sure to use the schema returned from getSchema during planning.");
+            }
         }
         else if (asteriskSchema
                 && vectorSchema.getSize() <= 0

@@ -5,7 +5,6 @@ import static java.util.Objects.requireNonNull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
-import java.util.Optional;
 
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -91,6 +90,6 @@ public abstract class ATableFunctionForwardResponseTransformer implements IRespo
             }
         };
 
-        return openJsonFunction.execute(context, Catalog.SYSTEM_CATALOG_ALIAS, Optional.empty(), List.of(arg), options);
+        return openJsonFunction.execute(context, Catalog.SYSTEM_CATALOG_ALIAS, List.of(arg), options);
     }
 }

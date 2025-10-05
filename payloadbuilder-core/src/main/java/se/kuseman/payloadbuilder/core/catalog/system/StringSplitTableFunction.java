@@ -3,7 +3,6 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -44,7 +43,7 @@ class StringSplitTableFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
     {
         final ValueVector value = arguments.get(0)
                 .eval(context);
@@ -77,6 +76,6 @@ class StringSplitTableFunction extends TableFunctionInfo
             resultVector.setString(i, UTF8String.from(parts[i]));
         }
 
-        return TupleIterator.singleton(TupleVector.of(schema.get(), List.of(resultVector, ValueVector.range(0, length))));
+        return TupleIterator.singleton(TupleVector.of(SCHEMA, List.of(resultVector, ValueVector.range(0, length))));
     }
 }

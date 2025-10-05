@@ -5,8 +5,6 @@ import static java.util.Collections.emptyList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import java.util.Optional;
-
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -32,7 +30,7 @@ public class RangeFunctionTest extends APhysicalPlanTest
     public void test()
     {
         Schema schema = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
-        TupleIterator it = f.execute(context, "", Optional.of(schema), asList(intLit(1), intLit(10)), emptyList());
+        TupleIterator it = f.execute(context, "", asList(intLit(1), intLit(10)), emptyList());
 
         int count = 0;
         while (it.hasNext())
@@ -52,7 +50,7 @@ public class RangeFunctionTest extends APhysicalPlanTest
     {
         Schema schema = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
         context.setVariable("batch", ValueVector.literalInt(3, 1));
-        TupleIterator it = f.execute(context, "", Optional.of(schema), asList(intLit(1), intLit(11)), asList(new Option(QualifiedName.of("batch_size"), new VariableExpression("batch"))));
+        TupleIterator it = f.execute(context, "", asList(intLit(1), intLit(11)), asList(new Option(QualifiedName.of("batch_size"), new VariableExpression("batch"))));
 
         int count = 0;
         while (it.hasNext())

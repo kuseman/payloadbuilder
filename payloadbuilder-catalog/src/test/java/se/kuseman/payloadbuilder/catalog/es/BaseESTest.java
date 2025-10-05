@@ -357,7 +357,7 @@ abstract class BaseESTest extends Assert
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, Optional.empty(), asList(body), emptyList());
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -392,7 +392,7 @@ abstract class BaseESTest extends Assert
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, Optional.empty(), asList(body, scroll), List.of(new Option(IExecutionContext.BATCH_SIZE, ExpressionTestUtils.createIntegerExpression(2))));
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body, scroll), List.of(new Option(IExecutionContext.BATCH_SIZE, ExpressionTestUtils.createIntegerExpression(2))));
 
         int batchCount = 0;
         int rowCount = 0;
@@ -470,7 +470,7 @@ abstract class BaseESTest extends Assert
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, Optional.empty(), asList(body, scroll), emptyList());
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body, scroll), emptyList());
 
         int batchCount = 0;
         int rowCount = 0;
@@ -534,7 +534,7 @@ abstract class BaseESTest extends Assert
         IExpression catSpecArg = mock(IExpression.class);
         when(catSpecArg.eval(context)).thenReturn(VectorTestUtils.vv(Type.String, "/nodes"));
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, Optional.empty(), asList(catSpecArg), emptyList());
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(catSpecArg), emptyList());
         int count = 0;
         while (it.hasNext())
         {

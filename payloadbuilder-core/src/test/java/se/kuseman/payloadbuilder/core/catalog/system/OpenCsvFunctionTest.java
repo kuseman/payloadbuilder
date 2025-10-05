@@ -9,7 +9,6 @@ import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
@@ -37,14 +36,14 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     public void test_empty_on_null()
     {
         assertEquals(Arity.ONE, f.arity());
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("null")), emptyList());
+        TupleIterator it = f.execute(context, "", asList(e("null")), emptyList());
         assertFalse(it.hasNext());
     }
 
     @Test
     public void test_only_headers()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 'col1,col2,col3
                 '
                 """)), emptyList());
@@ -73,7 +72,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     @Test
     public void test_batch_size()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 'key
                 123
                 456
@@ -117,7 +116,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     @Test
     public void test_missing_column_value()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 'key,key2
                 123
                 1230,4560
@@ -149,7 +148,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     @Test
     public void test()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 'key,key2
                 123,1230
                 1230,4560
@@ -181,7 +180,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     @Test
     public void test_column_separator()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 'key;key2
                 123;1230
                 1230;4560
@@ -213,7 +212,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     @Test
     public void test_column_separator_headers()
     {
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+        TupleIterator it = f.execute(context, "", asList(e("""
                 '123;1230
                 1230;4560
                 '
@@ -263,7 +262,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
         Mockito.when(arg.eval(Mockito.any()))
                 .thenReturn(VectorTestUtils.vv(Column.Type.Any, reader));
 
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), emptyList());
+        TupleIterator it = f.execute(context, "", asList(arg), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())
@@ -311,7 +310,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
         Mockito.when(arg.eval(Mockito.any()))
                 .thenReturn(VectorTestUtils.vv(Column.Type.Any, baos));
 
-        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(arg), emptyList());
+        TupleIterator it = f.execute(context, "", asList(arg), emptyList());
 
         int rowCount = 0;
         while (it.hasNext())

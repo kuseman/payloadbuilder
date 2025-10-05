@@ -15,7 +15,6 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.TimeZone;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -369,7 +368,7 @@ public class TestHarnessRunner
                 }
 
                 @Override
-                public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, List<Option> options)
+                public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
                 {
                     // Returns a tuple vector with all options evaluated
                     List<Column> columns = new ArrayList<>();
