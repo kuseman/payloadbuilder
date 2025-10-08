@@ -85,9 +85,9 @@ public interface IExpression
     }
 
     /**
-     * Returns true if this expression is a pointer to an outer reference. This is true for expressions that are located inside a correlated
-     * construct (subquery) and hence references something outside of the current scope. For example when building a query for a catalog implementation
-     * regarding predicates this is crucial to know since this expression is constant in that sense and can indeed be used as pushed down predicate.
+     * Returns true if this expression is a pointer to an outer reference. This is true for expressions that are located inside a correlated construct (subquery) and hence references something outside
+     * of the current scope. For example when building a query for a catalog implementation regarding predicates this is crucial to know since this expression is constant in that sense and can indeed
+     * be used as pushed down predicate.
      *
      * <pre>
      * Example:

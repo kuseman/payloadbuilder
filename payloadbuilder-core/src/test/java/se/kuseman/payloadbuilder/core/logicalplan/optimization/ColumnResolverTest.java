@@ -546,7 +546,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                             false,
                             Schema.EMPTY),
                         new OperatorFunctionScan(
-                            Schema.of(col("__expr0", ResolvedType.table(Schema.of(ast("", "b.*", Type.Any, tableB))), null, true)),
+                            Schema.of(ast("__expr0", ResolvedType.table(Schema.of(ast("", "b.*", Type.Any, tableB))), null, true)),
                             projection(
                                 ConstantScan.ONE_ROW_EMPTY_SCHEMA,
                                 List.of(new AsteriskExpression(QualifiedName.of("b"), null, Set.of(tableB)))),
@@ -613,7 +613,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
                 col("col", ResolvedType.of(Type.Any), tableA),
-                new CoreColumn("", ResolvedType.of(Type.Int), "count(a.col2)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("", ResolvedType.of(Type.Int), "count(a.col2)", false, tableA, CoreColumn.Type.REGULAR),
                 col("col3", ResolvedType.array(Type.Any), tableA)
                 ));
         //@formatter:on
@@ -3217,7 +3217,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         TableSourceReference tableB = of(1, "es", "tableB", "b");
         TableSourceReference subQueryX = new TableSourceReference(2, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
 
-        Schema schemaA = Schema.of(ast("col", Type.Any, tableA), col("col1", Type.Any, tableA));
+        Schema schemaA = Schema.of(ast("col", Type.Any, tableA));
         Schema schemaB = Schema.of(ast("col", Type.Any, tableB));
 
         //@formatter:off

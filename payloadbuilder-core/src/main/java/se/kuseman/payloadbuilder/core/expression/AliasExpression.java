@@ -15,7 +15,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 
 /** An aliased expression */
-public class AliasExpression implements IExpression, HasAlias, HasColumnReference
+public class AliasExpression implements IExpression, HasAlias
 {
     private final IExpression expression;
     private final String alias;
@@ -59,16 +59,6 @@ public class AliasExpression implements IExpression, HasAlias, HasColumnReferenc
     public IExpression getExpression()
     {
         return expression;
-    }
-
-    @Override
-    public ColumnReference getColumnReference()
-    {
-        if (expression instanceof HasColumnReference htsr)
-        {
-            return htsr.getColumnReference();
-        }
-        return null;
     }
 
     @Override
