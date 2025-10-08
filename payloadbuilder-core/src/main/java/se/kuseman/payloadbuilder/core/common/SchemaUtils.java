@@ -325,20 +325,43 @@ public class SchemaUtils
         TableSourceReference tableSourceReference = null;
         CoreColumn.Type columnType = isAsteriskExpression(expression) ? CoreColumn.Type.ASTERISK
                 : CoreColumn.Type.REGULAR;
-        if (expression instanceof HasColumnReference hcr)
+
+        ColumnReference cr = getColumnReference(expression);
+        if (cr != null)
         {
-            ColumnReference cr = hcr.getColumnReference();
-            if (cr != null)
-            {
-                tableSourceReference = cr.tableSourceReference();
-                columnType = cr.columnType();
-            }
+            tableSourceReference = cr.tableSourceReference();
+            columnType = cr.columnType();
         }
         if (tableSourceReference == null)
         {
             tableSourceReference = parentTableSource;
         }
         return new CoreColumn(name, type, outputName, expression.isInternal(), tableSourceReference, columnType);
+    }
+
+    private static ColumnReference getColumnReference(IExpression e)
+    {
+        List<IExpression> queue = new ArrayList<>();
+        queue.add(e);
+        while (!queue.isEmpty())
+        {
+            IExpression expr = queue.remove(0);
+            if (expr instanceof HasColumnReference hcr)
+            {
+                ColumnReference cr = hcr.getColumnReference();
+                if (cr != null)
+                {
+                    return cr;
+                }
+            }
+            // Only dig down into unary expressions
+            List<IExpression> children = expr.getChildren();
+            if (children.size() == 1)
+            {
+                queue.addAll(expr.getChildren());
+            }
+        }
+        return null;
     }
 
     private static boolean isAsteriskExpression(IExpression expression)

@@ -389,7 +389,6 @@ public abstract class AExpressionTest extends Assert
         return new CoreColumn(name, ResolvedType.of(type), outputName, false, tableSourceReference, CoreColumn.Type.ASTERISK);
     }
 
-    /** Construct a column */
     protected CoreColumn ast(String name, TableSourceReference tableSourceReference)
     {
         return new CoreColumn(name, ResolvedType.of(Type.Any), "", false, tableSourceReference, CoreColumn.Type.ASTERISK);
@@ -398,6 +397,11 @@ public abstract class AExpressionTest extends Assert
     protected CoreColumn ast(String name, ResolvedType type, TableSourceReference tableSourceReference)
     {
         return new CoreColumn(name, type, "", false, tableSourceReference, CoreColumn.Type.ASTERISK);
+    }
+
+    protected CoreColumn ast(String name, ResolvedType type, TableSourceReference tableSourceReference, boolean internal)
+    {
+        return new CoreColumn(name, type, "", internal, tableSourceReference, CoreColumn.Type.ASTERISK);
     }
 
     // CSOFF

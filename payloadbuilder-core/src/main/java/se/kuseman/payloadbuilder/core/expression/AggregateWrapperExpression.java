@@ -16,7 +16,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 
 /** An aggregate expression that wrapps a ordinary expression and turns it into an aggregate result */
-public class AggregateWrapperExpression implements IAggregateExpression, HasAlias, HasColumnReference
+public class AggregateWrapperExpression implements IAggregateExpression, HasAlias
 {
     private final IExpression expression;
 
@@ -60,16 +60,6 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
     }
 
     @Override
-    public ColumnReference getColumnReference()
-    {
-        if (expression instanceof HasColumnReference htsr)
-        {
-            return htsr.getColumnReference();
-        }
-        return null;
-    }
-
-    @Override
     public Alias getAlias()
     {
         if (expression instanceof HasAlias)
@@ -95,7 +85,7 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
         }
         if (e instanceof IAggregateExpression)
         {
-            return ((IAggregateExpression) e).getType();
+            return e.getType();
         }
 
         // We return a value vector if it's not a single value

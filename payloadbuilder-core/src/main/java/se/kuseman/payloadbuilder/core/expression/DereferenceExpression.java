@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.List;
 import java.util.Objects;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -87,6 +88,12 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
     public Alias getAlias()
     {
         return new Alias(right, "");
+    }
+
+    @Override
+    public List<IExpression> getChildren()
+    {
+        return List.of(left);
     }
 
     /** Returns true if this deref. has an explicitly set {@link ColumnReference}. */

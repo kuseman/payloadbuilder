@@ -20,7 +20,7 @@ import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
 /** Subscript. index acces etc. ie "array[0]" */
-public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasColumnReference
+public class SubscriptExpression implements ISubscriptExpression, HasAlias
 {
     private final IExpression value;
     private final IExpression subscript;
@@ -47,16 +47,6 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
     public List<IExpression> getChildren()
     {
         return asList(value, subscript);
-    }
-
-    @Override
-    public ColumnReference getColumnReference()
-    {
-        if (value instanceof HasColumnReference htsr)
-        {
-            return htsr.getColumnReference();
-        }
-        return null;
     }
 
     @Override

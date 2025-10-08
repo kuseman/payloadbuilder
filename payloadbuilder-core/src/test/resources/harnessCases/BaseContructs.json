@@ -1043,6 +1043,81 @@
       ]
     },
     {
+      "name": "Asterisk select in subquery with for object",
+      "query": [
+          "--set @@debugplan = true ",
+          "select d.data, s.col2, ( select * from (s2) dRow FOR OBJECT) value2 ",
+          "from data d ",
+          "inner join source s ",
+          "  on s.col1 = d.id ",
+          "inner populate join data s2 ",
+          "  on s2.id = s.col1 "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "data", "value": "3_1" }, { "key": "col2", "value": 4 }, { "key": "value2", "value": {"id":3, "row_id":1, "data": "3_1"} }],
+          [{ "key": "data", "value": "3_2" }, { "key": "col2", "value": 4 }, { "key": "value2", "value": {"id":3, "row_id":1, "data": "3_1"} }],
+          [{ "key": "data", "value": "3_3" }, { "key": "col2", "value": 4 }, { "key": "value2", "value": {"id":3, "row_id":1, "data": "3_1"} }],
+          [{ "key": "data", "value": "1_1" }, { "key": "col2", "value": 2 }, { "key": "value2", "value": {"id":1, "row_id":1, "data": "1_1"} }],
+          [{ "key": "data", "value": "1_2" }, { "key": "col2", "value": 2 }, { "key": "value2", "value": {"id":1, "row_id":1, "data": "1_1"} }]
+        ]
+      ]
+    },
+    {
+      "name": "Multiple subquery expressions inside a subquery expression with a table source",
+      "description": [
+        "This is a regression test where we first resolve a column from current scope and since that was not an alias match",
+        "we must also search in the outer scope which yielded an ambiguity which crashed but that is ok since we got a match in current scope",
+        "and the query as a whole should work"
+      ],
+      "query": [
+          "--set @@debugplan = true ",
+          "select (select (select dRow.id for object) obj1, (select dRow.data for array) arr1 from (s2) dRow FOR OBJECT_ARRAY) value2 ",
+          "from source s ",
+          "inner join data d2 ",
+          "  on d2.id = s.col1 ",
+          "inner populate join data s2 ",
+          "  on s2.id = s.col1 "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "value2", "value": [{"obj1":{"id":3}, "arr1":["3_1"]}, {"obj1":{"id":3}, "arr1":["3_2"]}, {"obj1":{"id":3}, "arr1":["3_3"]}]}],
+          [{ "key": "value2", "value": [{"obj1":{"id":3}, "arr1":["3_1"]}, {"obj1":{"id":3}, "arr1":["3_2"]}, {"obj1":{"id":3}, "arr1":["3_3"]}]}],
+          [{ "key": "value2", "value": [{"obj1":{"id":3}, "arr1":["3_1"]}, {"obj1":{"id":3}, "arr1":["3_2"]}, {"obj1":{"id":3}, "arr1":["3_3"]}]}],
+          [{ "key": "value2", "value": [{"obj1":{"id":1}, "arr1":["1_1"]}, {"obj1":{"id":1}, "arr1":["1_2"]}]}],
+          [{ "key": "value2", "value": [{"obj1":{"id":1}, "arr1":["1_1"]}, {"obj1":{"id":1}, "arr1":["1_2"]}]}]
+        ]
+      ]
+    },
+    {
+      "name": "Mismatch schema and vectors",
+      "description": [
+        "Regression test where a projections planned schema did not matched the vecors due to ",
+        "cast expression did not properly resolved a columnreference. Now we dig through all unary expressions and ",
+        "try to find a one that has a column reference "
+      ],
+      "query": [
+          "--set @@debugplan = true ",
+          "select ( ",
+          "  select s2.col1 one ",
+          ", s2.col2 two ",
+          "  from ( ",
+          "   select cast(s2.col1 as int) col1, cast(s2.col2 as int) col2",
+          "   from source s2 ",
+          ") s2 ",
+          "  for object_array ",
+          " ) ourData",
+          "from source s "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "ourData", "value": [{"one":1, "two":2}, {"one":3, "two":4}, {"one":5, "two":6}]}],
+          [{ "key": "ourData", "value": [{"one":1, "two":2}, {"one":3, "two":4}, {"one":5, "two":6}]}],
+          [{ "key": "ourData", "value": [{"one":1, "two":2}, {"one":3, "two":4}, {"one":5, "two":6}]}]
+        ]
+      ]
+    },
+    {
       "name": "Subquery expression order by column expression",
       "query": [
           "select d.id, (select s2Row.row_id from (s2) s2Row order by s2Row.row_id desc for array) val ",

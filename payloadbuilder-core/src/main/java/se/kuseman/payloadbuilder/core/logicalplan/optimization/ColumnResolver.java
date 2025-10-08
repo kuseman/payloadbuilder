@@ -691,15 +691,21 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
 
-        Column column = plan.getSchema()
+        Column planColumn = plan.getSchema()
                 .getColumns()
                 .get(0);
+        String name = planColumn.getName();
+        boolean isInternal = SchemaUtils.isInternal(planColumn);
 
-        boolean isInternal = SchemaUtils.isInternal(column);
-
+        Column resolvedColumn = context.getSchema(input)
+                .getSchema()
+                .getColumns()
+                .get(0);
+        CoreColumn.Type columnType = SchemaUtils.getColumnType(resolvedColumn);
         // Recreate the operator schema
-        Schema schema = Schema.of(new CoreColumn(column.getName(), pair.getValue()
-                .getType(input.getSchema()), "", isInternal, null, CoreColumn.Type.REGULAR));
+        // Use type from the resolved input and name from the plans schema
+        Schema schema = Schema.of(new CoreColumn(name, pair.getValue()
+                .getType(input.getSchema()), "", isInternal, null, columnType));
 
         context.planSchema.push(new ResolveSchema(schema));
         return new OperatorFunctionScan(schema, input, plan.getCatalogAlias(), plan.getFunction(), plan.getLocation());
@@ -1156,7 +1162,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             ResolveResult resolveResult = null;
             if (schema != null)
             {
-                resolveResult = resolve(context, expression.getColumn(), schema, alias, column, null, expression.getLocation());
+                resolveResult = resolve(context, expression.getColumn(), schema, alias, column, null, expression.getLocation(), true);
             }
 
             boolean aliasMatch = resolveResult != null
@@ -1171,7 +1177,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             {
                 ResolveResult scopeResult = resolveResult;
                 Set<Column> outerReferences = new HashSet<>();
-                ResolveResult outerResult = resolve(context, expression.getColumn(), outerSchema, alias, column, outerReferences, expression.getLocation());
+                ResolveResult outerResult = resolve(context, expression.getColumn(), outerSchema, alias, column, outerReferences, expression.getLocation(), false);
                 resolveResult = getHighestPrecedence(scopeResult, outerResult);
 
                 // If we picked the outer scoped result, add the the resulting column to the outer references collection
@@ -1217,7 +1223,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                                     || outerSchema.isEmpty())
                             && schema.schemas.size() == 1)
                     {
-                        resolveResult = resolve(context, expression.getColumn(), schema, schema.schemas.get(0).alias, column, null, expression.getLocation());
+                        resolveResult = resolve(context, expression.getColumn(), schema, schema.schemas.get(0).alias, column, null, expression.getLocation(), true);
                     }
                 }
 
@@ -1336,7 +1342,8 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
          * Ordinals can only be used if the schema doesn't contain any asterisk columns
          * @formatter:on
          */
-        private ResolveResult resolve(ColumnResolver.Ctx context, QualifiedName originalQname, ResolveSchema schema, String alias, String column, Set<Column> outerReferences, Location location)
+        private ResolveResult resolve(ColumnResolver.Ctx context, QualifiedName originalQname, ResolveSchema schema, String alias, String column, Set<Column> outerReferences, Location location,
+                boolean throwOnAmbiguity)
         {
             int asteriskIndexMatch = -1;
             int nonAsteriskIndexMatch = -1;
@@ -1353,6 +1360,16 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 Column schemaColumn = p.getValue();
                 // We only look for direct asterisk columns here
                 boolean isAsterisk = SchemaUtils.getColumnType(schemaColumn) == CoreColumn.Type.ASTERISK;
+
+                // We treat internal columns as non asterisk when resolving even if their schema is asterisk due
+                // to it's input.
+                // This happens when a subquery expression is pushed down to a join and is getting a generated name (__expr0 etc.)
+                // and we hit that column, if that one is asterisk we must treat it like a non asterisk match
+                if (SchemaUtils.isInternal(schemaColumn))
+                {
+                    isAsterisk = false;
+                }
+
                 String schemaAlias = p.getKey();
                 // If the schema doesn't have an alias check to see if the column has a TableSourceReference
                 // attached and if so use the as schemaAlias
@@ -1413,6 +1430,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 else if (!isAsterisk)
                 {
                     boolean columnMatch = column.equalsIgnoreCase(schemaColumn.getName());
+
                     // A full non asterisk match => no need to look any more
                     if ((aliasMatch
                             && columnMatch))
@@ -1451,6 +1469,10 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             if (nonAsteriskIndexMatch == -1
                     && multipleAsterisk)
             {
+                if (!throwOnAmbiguity)
+                {
+                    return null;
+                }
                 throw new ParseException("Ambiguous column: " + originalQname, location);
             }
             else if (nonAsteriskIndexMatch == -1

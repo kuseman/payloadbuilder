@@ -125,8 +125,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     /**
-     * Test for a regression found were filters inside sub queries didn't get any pushed down predicates because of
-     * scope issues when going down one level due to subquery.
+     * Test for a regression found were filters inside sub queries didn't get any pushed down predicates because of scope issues when going down one level due to subquery.
      */
     @Test
     public void test_filter_inside_subquery()
