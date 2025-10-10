@@ -36,19 +36,16 @@ public interface TupleVector
             ValueVector vector = getColumn(i);
             Type type = vector.type()
                     .getType();
-            ResolvedType schemaType = schema.getColumns()
-                    .get(i)
-                    .getType();
             if (vector.isNull(row))
             {
-                vectors.add(ValueVector.literalNull(schemaType, 1));
+                vectors.add(ValueVector.literalNull(vector.type(), 1));
                 continue;
             }
 
             vectors.add(switch (type)
             {
                 case Any -> ValueVector.literalAny(1, vector.getAny(row));
-                case Array -> ValueVector.literalArray(vector.getArray(row), schemaType, 1);
+                case Array -> ValueVector.literalArray(vector.getArray(row), 1);
                 case Boolean -> ValueVector.literalBoolean(vector.getBoolean(row), 1);
                 case DateTime -> vector.getDateTime(row);
                 case DateTimeOffset -> vector.getDateTimeOffset(row);
@@ -59,10 +56,10 @@ public interface TupleVector
                 case Int -> ValueVector.literalInt(vector.getInt(row), 1);
                 case Long -> ValueVector.literalLong(vector.getLong(row), 1);
                 case Object -> ValueVector.literalObject(vector.getObject(row), 1);
-                case Table -> ValueVector.literalTable(vector.getTable(row), schemaType, 1);
+                case Table -> ValueVector.literalTable(vector.getTable(row), 1);
             });
         }
-        return of(schema, vectors);
+        return TupleVector.of(schema, vectors);
     }
 
     static final TupleVector EMPTY = new TupleVector()
@@ -166,11 +163,28 @@ public interface TupleVector
 
             for (int i = 0; i < columnSize; i++)
             {
-                if (!schema.getColumns()
+                ResolvedType schemaType = schema.getColumns()
                         .get(i)
-                        .getType()
-                        .equals(columns.get(i)
-                                .type()))
+                        .getType();
+
+                // Don't validate any types, they can differ, implicit cast will kick in
+                if (schemaType.getType() == Type.Any)
+                {
+                    continue;
+                }
+
+                Schema innerSchema = columns.get(i)
+                        .type()
+                        .getSchema();
+
+                // Skip validation of empty schemas
+                if (Schema.EMPTY.equals(innerSchema))
+                {
+                    continue;
+                }
+
+                if (!schemaType.equals(columns.get(i)
+                        .type()))
                 {
                     throw new IllegalArgumentException("Schema type for column: " + schema.getColumns()
                             .get(i)

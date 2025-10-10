@@ -14,8 +14,10 @@ import java.io.PrintWriter;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TimeZone;
+import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
@@ -56,6 +58,7 @@ import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.ExpressionMath;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
 import se.kuseman.payloadbuilder.core.execution.vector.VectorFactory;
 import se.kuseman.payloadbuilder.core.test.AObjectOutputWriter.ColumnValue;
@@ -64,11 +67,12 @@ import se.kuseman.payloadbuilder.core.test.AObjectOutputWriter.ColumnValue;
 @RunWith(Parameterized.class)
 public class TestHarnessRunner
 {
-    private static final ObjectMapper MAPPER = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    static final ObjectMapper MAPPER = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final TestHarness harness;
     private final TestCase testCase;
     private final boolean schemaLess;
+    private final boolean typedVectors;
 
     /** Test */
     @Parameterized.Parameters(
@@ -108,13 +112,20 @@ public class TestHarnessRunner
                             || testCase.getSchemaLess()
                                     .booleanValue() == schemaLess.booleanValue())
                     {
-                        params.add(new Object[] {
-                                harness, testCase, harness.getName() + "#"
-                                                   + testCase.getName()
-                                                   + (" schema-" + (schemaLess ? "less"
-                                                           : "full")
-                                                      + ")"),
-                                schemaLess });
+                        for (Boolean typedVectors : asList(true, false))
+                        {
+                            if (testCase.getTypedVectors() == null
+                                    || testCase.getTypedVectors()
+                                            .booleanValue() == typedVectors.booleanValue())
+                            {
+                                String name = "%s#%s#%s".formatted(testCase.getName(), schemaLess ? "schema-less"
+                                        : "schema-full",
+                                        typedVectors ? "typed-vectors"
+                                                : "any-vectors");
+
+                                params.add(new Object[] { harness, testCase, name, schemaLess, typedVectors });
+                            }
+                        }
                     }
                 }
             }
@@ -124,11 +135,12 @@ public class TestHarnessRunner
         return params;
     }
 
-    public TestHarnessRunner(TestHarness harness, TestCase testCase, @SuppressWarnings("unused") String name, boolean schemaLess)
+    public TestHarnessRunner(TestHarness harness, TestCase testCase, String name, boolean schemaLess, boolean typedVectors)
     {
         this.harness = harness;
         this.testCase = testCase;
         this.schemaLess = schemaLess;
+        this.typedVectors = typedVectors;
     }
 
     @Test
@@ -145,7 +157,7 @@ public class TestHarnessRunner
         CatalogRegistry registry = new CatalogRegistry();
         for (TestCatalog catalog : harness.getCatalogs())
         {
-            registry.registerCatalog(catalog.getAlias(), new TCatalog(catalog, schemaLess));
+            registry.registerCatalog(catalog.getAlias(), new TCatalog(catalog, schemaLess, typedVectors));
         }
 
         List<List<List<ColumnValue>>> actualResultSets = new ArrayList<>();
@@ -348,12 +360,14 @@ public class TestHarnessRunner
         private static final Schema SYS_INDICES_SCHEMA = Schema.EMPTY;
         private final TestCatalog catalog;
         private final boolean schemaLess;
+        private final boolean typedVectors;
 
-        TCatalog(TestCatalog catalog, boolean schemaLess)
+        TCatalog(TestCatalog catalog, boolean schemaLess, boolean typedVectors)
         {
             super("Test#" + catalog.getAlias());
             this.catalog = catalog;
             this.schemaLess = schemaLess;
+            this.typedVectors = typedVectors;
 
             registerFunction(new ScalarFunctionInfo("testFunc", FunctionType.SCALAR)
             {
@@ -423,9 +437,23 @@ public class TestHarnessRunner
 
         private Schema getSchema(TestTable table)
         {
-            return new Schema(table.getColumns()
-                    .stream()
-                    .map(c -> Column.of(c, ResolvedType.of(Type.Any)))
+            if (typedVectors)
+            {
+                if (table.getTypes()
+                        .isEmpty())
+                {
+                    throw new IllegalArgumentException("Missing types for table: " + table.getName());
+                }
+            }
+
+            int size = table.getColumns()
+                    .size();
+            return new Schema(IntStream.range(0, size)
+                    .mapToObj(i -> Column.of(table.getColumns()
+                            .get(i),
+                            typedVectors ? table.getTypes()
+                                    .get(i)
+                                    : ResolvedType.of(Type.Any)))
                     .collect(toList()));
         }
 
@@ -479,7 +507,34 @@ public class TestHarnessRunner
                             return null;
                         }
 
-                        return rows.get(row)[col];
+                        Object value = rows.get(row)[col];
+
+                        if (typedVectors
+                                && column.getType()
+                                        .getType() == Column.Type.Table)
+                        {
+                            @SuppressWarnings("unchecked")
+                            final List<Map<String, Object>> table = (List<Map<String, Object>>) value;
+                            final int rowCount = table.size();
+                            final Schema tableSchema = column.getType()
+                                    .getSchema();
+                            return new ObjectTupleVector(tableSchema, rowCount, (r, c) ->
+                            {
+                                Map<String, Object> m = table.get(r);
+                                String mc = tableSchema.getColumns()
+                                        .get(c)
+                                        .getName();
+                                return m.get(mc);
+                            });
+                        }
+                        else if (typedVectors
+                                && column.getType()
+                                        .getType() == Column.Type.Object)
+                        {
+                            return VectorUtils.convertToObjectVector(value);
+                        }
+
+                        return value;
                     });
                     return TupleIterator.singleton(tupleVector);
                 }

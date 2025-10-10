@@ -19,6 +19,7 @@ import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.ObjectVector;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
@@ -26,7 +27,6 @@ import se.kuseman.payloadbuilder.test.VectorTestUtils;
 /** Test of {@link ValueVector} */
 public class ValueVectorTest extends APhysicalPlanTest
 {
-
     @Test
     public void test_toList()
     {
@@ -729,5 +729,17 @@ public class ValueVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Type.Double), 10_000D, 10_000D), ValueVector.literalDouble(10_000D, 2));
         assertVectorsEquals(vv(ResolvedType.of(Type.String), "hello", "hello"), ValueVector.literalString("hello", 2));
         assertVectorsEquals(vv(ResolvedType.of(Type.Int), null, null), ValueVector.literalNull(ResolvedType.of(Type.Int), 2));
+
+        // These types implement ValueVector interface and was previous returned as themselves (for performance reasons)
+        // when size = 1 which caused compatibility problems in certain places where there was no
+        // way of differentiate between an Array of the type and the single value.
+        UTF8String str = UTF8String.from("string");
+        assertNotSame(str, ValueVector.literalString(str, 1));
+        EpochDateTime dt = EpochDateTime.now();
+        assertNotSame(dt, ValueVector.literalDateTime(dt, 1));
+        EpochDateTimeOffset dto = EpochDateTimeOffset.now();
+        assertNotSame(dto, ValueVector.literalDateTimeOffset(dto, 1));
+        Decimal dc = Decimal.from(10.0d);
+        assertNotSame(dc, ValueVector.literalDecimal(dc, 1));
     }
 }

@@ -7,6 +7,7 @@
         {
           "name": "source",
           "columns": [ "col1", "col2" ],
+          "types": [ { "type": "Int" }, { "type": "Int" } ],
           "rows": [
             [1, 2],
             [3, 4],
@@ -16,6 +17,7 @@
         {
           "name": "data",
           "columns": [ "id", "row_id", "data" ],
+          "types": [ { "type": "Int" }, { "type": "Int" }, { "type": "String" } ],
           "rows": [
             [1, 1, "1_1"],
             [1, 2, "1_2"],
@@ -28,6 +30,7 @@
         {
           "name": "strings",
           "columns": [ "id", "string1", "string2" ],
+          "types": [ { "type": "Int" }, { "type": "String" }, { "type": "String" } ],
           "rows": [
             [1, "some string 1", "123abc"],
             [2,  "hello world", "asd"],

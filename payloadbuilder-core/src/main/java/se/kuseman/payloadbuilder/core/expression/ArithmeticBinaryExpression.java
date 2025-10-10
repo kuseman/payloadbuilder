@@ -261,11 +261,6 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
             @Override
             public Object getAny(int row)
             {
-                if (resultType != Column.Type.Any)
-                {
-                    throw new IllegalArgumentException("getValue should not be called for typed vectors");
-                }
-
                 switch (type)
                 {
                     case ADD:

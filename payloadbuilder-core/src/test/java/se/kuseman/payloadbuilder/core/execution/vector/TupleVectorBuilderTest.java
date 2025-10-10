@@ -1,9 +1,11 @@
 package se.kuseman.payloadbuilder.core.execution.vector;
 
 import static java.util.Arrays.asList;
+import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertTupleVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.BitSet;
+import java.util.List;
 
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
@@ -12,7 +14,12 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
+import se.kuseman.payloadbuilder.api.execution.ObjectVector;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
@@ -21,9 +28,137 @@ import se.kuseman.payloadbuilder.test.VectorTestUtils;
 public class TupleVectorBuilderTest extends APhysicalPlanTest
 {
     @Test
+    public void test_append_single_table_and_object_with_empty_schema()
+    {
+        TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
+
+        //@formatter:off
+        Schema objectSchema = Schema.of(Column.of("objCol", Type.Int));
+        Schema tableSchema = Schema.of(Column.of("tblCol", Type.Float));
+
+        Schema schema = Schema.of(
+                Column.of("col1", ResolvedType.object(objectSchema)),
+                Column.of("col2", ResolvedType.table(tableSchema))
+                );
+
+        List<ValueVector> vectors = List.of(
+                vv(ResolvedType.object(Schema.EMPTY), ObjectVector.EMPTY),
+                vv(ResolvedType.table(Schema.EMPTY), TupleVector.EMPTY)
+                );
+        //@formatter:off
+        b.append(new TupleVector()
+        {
+            @Override
+            public Schema getSchema()
+            {
+                return schema;
+            }
+
+            @Override
+            public int getRowCount()
+            {
+                return 1;
+            }
+
+            @Override
+            public ValueVector getColumn(int column)
+            {
+               return vectors.get(column);
+            }
+        });
+        //@formatter:on
+
+        TupleVector actual = b.build();
+
+        assertEquals(1, actual.getRowCount());
+        assertEquals(schema, actual.getSchema());
+        for (int i = 0; i < schema.getSize(); i++)
+        {
+            VectorTestUtils.assertVectorsEquals("Vector: " + i, vectors.get(i), actual.getColumn(i));
+        }
+    }
+
+    @Test
+    public void test_append_single_row_different_schema_and_vector_types()
+    {
+        TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
+
+        //@formatter:off
+        Schema schema = Schema.of(
+                Column.of("col1", Type.Any),    // Any
+                Column.of("col2", Type.Any),    // Array
+                Column.of("col3", Type.Any),    // BOolean
+                Column.of("col4", Type.Any),    // DateTime
+                Column.of("col5", Type.Any),    // DateTimeOffset
+                Column.of("col6", Type.Any),    // Decimal
+                Column.of("col7", Type.Any),    // String
+                Column.of("col8", Type.Any),    // Double
+                Column.of("col9", Type.Any),    // Float
+                Column.of("col10", Type.Any),   // Int
+                Column.of("col11", Type.Any),   // Long
+                Column.of("col12", Type.Any),   // Object
+                Column.of("col13", Type.Any),   // Table
+                Column.of("col14", Type.Any)    // Int (Null)
+                );
+
+        Schema objectSchema = Schema.of(Column.of("col1", Type.Int));
+        Schema tableSchema = Schema.of(Column.of("col2", Type.Boolean));
+
+        List<ValueVector> vectors = List.of(
+                vv(Type.Any, 1.0F),
+                vv(ResolvedType.array(Type.String),
+                        vv(Type.String, "hello", "world")),
+                vv(Type.Boolean, true),
+                vv(Type.DateTime, EpochDateTime.from(16000000000L)),
+                vv(Type.DateTimeOffset, EpochDateTimeOffset.from(16000000000L)),
+                vv(Type.Decimal, Decimal.from(100.10D)),
+                vv(Type.String, UTF8String.from("hello")),
+                vv(Type.Double, 666.66D),
+                vv(Type.Float, 1337.00F),
+                vv(Type.Int, 1000),
+                vv(Type.Long, 10000L),
+                vv(ResolvedType.object(objectSchema), ObjectVector.wrap(TupleVector.of(objectSchema, List.of(vv(Type.Int, 1, 2, 3))))),
+                vv(ResolvedType.table(tableSchema), TupleVector.of(tableSchema, List.of(vv(Type.Boolean, true, false, true)))),
+                vv(Type.Int, (Integer) null)
+                );
+
+        b.append(new TupleVector()
+        {
+            @Override
+            public Schema getSchema()
+            {
+                return schema;
+            }
+
+            @Override
+            public int getRowCount()
+            {
+                return 1;
+            }
+
+            @Override
+            public ValueVector getColumn(int column)
+            {
+               return vectors.get(column);
+            }
+        });
+        //@formatter:on
+
+        TupleVector actual = b.build();
+
+        assertEquals(1, actual.getRowCount());
+        assertEquals(schema, actual.getSchema());
+        for (int i = 0; i < schema.getSize(); i++)
+        {
+            VectorTestUtils.assertVectorsEquals("Vector: " + i, vectors.get(i), actual.getColumn(i));
+        }
+    }
+
+    @Test
     public void test_append_with_constant_scan_input()
     {
         TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
+        b.append(TupleVector.EMPTY);
         b.append(TupleVector.CONSTANT, vv(Type.Boolean, true));
 
         TupleVector actual = b.build();
@@ -36,6 +171,9 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
         actual = b.build();
         assertEquals(Schema.EMPTY, actual.getSchema());
         assertEquals(2, actual.getRowCount());
+
+        TupleVector a = actual;
+        assertThrows(IllegalArgumentException.class, () -> a.getColumn(0));
     }
 
     @Test
@@ -83,7 +221,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
 
         assertEquals(expectedSchema, actual.getSchema());
 
-        VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(expectedSchema, asList(
+        assertTupleVectorsEquals(TupleVector.of(expectedSchema, asList(
                 vv(Type.Int, 1, 3),
                 vv(Type.Long, 4, 6)
                 )), actual);
