@@ -133,7 +133,7 @@ class TupleVectorBuilder implements ITupleVectorBuilder
                 && singleRowTupleVector == null
                 && rowCount == 1)
         {
-            singleRowTupleVector = createSingleRowTupleVector(vector, 0);
+            singleRowTupleVector = vector.copy(0);
             return;
         }
 
@@ -388,47 +388,5 @@ class TupleVectorBuilder implements ITupleVectorBuilder
         }
 
         return mapping;
-    }
-
-    /** Copipes one row from each vector into a resulting tuple vector. */
-    private TupleVector createSingleRowTupleVector(TupleVector appendingVector, int row)
-    {
-        int size = appendingVector.getSchema()
-                .getSize();
-        List<ValueVector> vectors = new ArrayList<>(size);
-        for (int i = 0; i < size; i++)
-        {
-            ValueVector vector = appendingVector.getColumn(i);
-            Type type = vector.type()
-                    .getType();
-            ResolvedType schemaType = appendingVector.getSchema()
-                    .getColumns()
-                    .get(i)
-                    .getType();
-            if (vector.isNull(row))
-            {
-                vectors.add(ValueVector.literalNull(schemaType, 1));
-                continue;
-            }
-
-            vectors.add(switch (type)
-            {
-                case Any -> ValueVector.literalAny(1, vector.getAny(row));
-                case Array -> ValueVector.literalArray(vector.getArray(row), schemaType, 1);
-                case Boolean -> ValueVector.literalBoolean(vector.getBoolean(row), 1);
-                case DateTime -> vector.getDateTime(row);
-                case DateTimeOffset -> vector.getDateTimeOffset(row);
-                case Decimal -> vector.getDecimal(row);
-                case String -> vector.getString(row);
-                case Double -> ValueVector.literalDouble(vector.getDouble(row), 1);
-                case Float -> ValueVector.literalFloat(vector.getFloat(row), 1);
-                case Int -> ValueVector.literalInt(vector.getInt(row), 1);
-                case Long -> ValueVector.literalLong(vector.getLong(row), 1);
-                case Object -> ValueVector.literalObject(vector.getObject(row), schemaType, 1);
-                case Table -> ValueVector.literalTable(vector.getTable(row), schemaType, 1);
-            });
-        }
-
-        return TupleVector.of(appendingVector.getSchema(), vectors);
     }
 }

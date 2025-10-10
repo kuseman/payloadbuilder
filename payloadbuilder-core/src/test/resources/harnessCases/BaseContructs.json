@@ -7,6 +7,7 @@
         {
           "name": "source",
           "columns": [ "col1", "col2" ],
+          "types": [ {"type": "Int"}, {"type": "Int"} ],
           "rows": [
             [1, 2],
             [3, 4],
@@ -16,6 +17,7 @@
         {
           "name": "source2",
           "columns": [ "col1", "col2" ],
+          "types": [ {"type": "Int"}, {"type": "Int"} ],
           "rows": [
             [1, 2],
             [1, 2],
@@ -27,6 +29,7 @@
         {
           "name": "data",
           "columns": [ "id", "row_id", "data" ],
+          "types": [ {"type": "Int"}, {"type": "Int"}, {"type": "String"} ],
           "rows": [
             [1, 1, "1_1"],
             [1, 2, "1_2"],
@@ -39,6 +42,7 @@
         {
           "name": "data2",
           "columns": [ "id", "value" ],
+          "types": [ {"type": "Int"}, {"type": "Int"} ],
           "rows": [
             [1, 1],
             [1, 2],
@@ -50,6 +54,7 @@
         {
           "name": "strings",
           "columns": [ "id", "string1", "string2" ],
+          "types": [ {"type": "Int"}, {"type": "String"}, {"type": "String"} ],
           "rows": [
             [1, "some string 1", "123abc"],
             [2,  "hello world", "asd"],
@@ -60,6 +65,7 @@
         {
           "name": "agg_data",
           "columns": ["id", "value"],
+          "types": [ {"type": "Int"}, {"type": "Int"} ],
           "rows": [
             [1, 20],
             [1, 10],
@@ -72,6 +78,7 @@
         {
           "name": "map_values",
           "columns": ["id", "value"],
+          "types": [ {"type": "Int"}, {"type": "Any"} ],
           "rows": [
             [1, { "key": "03" }],
             [2, { "key": "02" }],
@@ -89,6 +96,7 @@
         {
           "name": "source",
           "columns": [ "col1", "col2" ],
+          "types": [ {"type": "Int"}, {"type": "Int"} ],
           "rows": [
             [10, 20],
             [30, 40],
@@ -103,6 +111,7 @@
         {
           "name": "table",
           "columns": [ "id", "table", "object" ],
+          "types": [ {"type": "String"}, { "type": "String" }, { "type": "Object", "schema": [ { "name": "key", "type": { "type": "Int" } } ] } ],
           "rows": [
             [ "1", "[{ \"key\": 123, \"value\": 456 },{ \"key\": 789, \"value\": 101112 }]", { "key": 666 } ],
             [ "2", "[]", null ]
@@ -116,6 +125,7 @@
         {
           "name": "product",
           "columns": [ "id", "name", "brand" ],
+          "types": [ { "type": "String" }, { "type": "String" }, { "type": "String" } ],
           "rows": [
             [ "1", "product-1", "nike" ],
             [ "2", "product-2", "adidas" ]
@@ -124,6 +134,7 @@
         {
           "name": "article",
           "columns": [ "id", "productId", "color" ],
+          "types": [ { "type": "String" }, { "type": "String" }, { "type": "String" } ],
           "rows": [
             [ "1-1", "1", "black" ],
             [ "1-2", "1", "green" ],
@@ -134,6 +145,7 @@
         {
           "name": "variant",
           "columns": [ "id", "articleId", "size" ],
+          "types": [ { "type": "String" }, { "type": "String" }, { "type": "String" } ],
           "rows": [
             [ "1-1-1", "1-1", "M" ],
             [ "1-1-2", "1-1", "L" ],
@@ -148,6 +160,7 @@
         {
           "name": "variantprice",
           "columns": [ "id", "price" ],
+          "types": [ { "type": "String" }, { "type": "Decimal" } ],
           "rows": [
             [ "1-1-1",  10.10 ],
             [ "1-1-2",  20.10 ],
@@ -560,8 +573,9 @@
       ]
     },
     {
-      "name": "Describe select, schema full",
+      "name": "Describe select, schema full, any vectors",
       "schemaLess": false,
+      "typedVectors": false,
       "query": [
         "describe ",
         "select d.id ",
@@ -1039,6 +1053,22 @@
           [{ "key": "id", "value": 3 }, { "key": "val", "value": [1, 2, 3] }],
           [{ "key": "id", "value": 1 }, { "key": "val", "value": [1, 2]    }],
           [{ "key": "id", "value": 1 }, { "key": "val", "value": [1, 2]    }]
+        ]
+      ]
+    },
+    {
+      "name": "Subquery expression with for object_array single row",
+      "query": [
+          "--set @@debugplan = true ",
+          "select ( select top 1 sRow.id id1, sRow.row_id id2 from (s2) sRow FOR OBJECT_ARRAY) value2 ",
+          "from source s ",
+          "inner populate join data s2 ",
+          "  on s2.id = s.col1 "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "value2", "value": [{"id1": 3, "id2": 1}] } ],
+          [{ "key": "value2", "value": [{"id1": 1, "id2": 1}] } ]
         ]
       ]
     },
@@ -2129,6 +2159,7 @@
     },
     {
       "name": "Table values ctor with outer references 3",
+      "typedVectors": false,
       "query": [
         "--set @@debugplan = true ",
         "select y.* ",

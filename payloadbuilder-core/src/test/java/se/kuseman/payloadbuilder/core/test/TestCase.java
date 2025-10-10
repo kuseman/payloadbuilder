@@ -15,6 +15,8 @@ class TestCase
     private boolean ignore;
     /** Filter for only run on schema or shema less */
     private Boolean schemaLess;
+    /** Filter for only run with typed vectors or not */
+    private Boolean typedVectors;
 
     private boolean onlyAssertExpectedColumns;
 
@@ -70,6 +72,16 @@ class TestCase
     void setSchemaLess(Boolean schemaLess)
     {
         this.schemaLess = schemaLess;
+    }
+
+    Boolean getTypedVectors()
+    {
+        return typedVectors;
+    }
+
+    void setTypedVectors(Boolean typedVectors)
+    {
+        this.typedVectors = typedVectors;
     }
 
     boolean isOnlyAssertExpectedColumns()

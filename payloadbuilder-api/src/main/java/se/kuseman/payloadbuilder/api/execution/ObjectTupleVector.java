@@ -66,6 +66,18 @@ public class ObjectTupleVector implements TupleVector
             {
                 return (ValueVector) getAny(row);
             }
+
+            @Override
+            public TupleVector getTable(int row)
+            {
+                return (TupleVector) getAny(row);
+            }
+
+            @Override
+            public ObjectVector getObject(int row)
+            {
+                return (ObjectVector) getAny(row);
+            }
         };
     }
 

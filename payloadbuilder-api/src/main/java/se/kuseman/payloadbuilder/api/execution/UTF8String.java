@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 
 /**
@@ -76,7 +75,7 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
     @Override
     public ResolvedType type()
     {
-        return ResolvedType.of(Type.String);
+        return ResolvedType.STRING;
     }
 
     @Override

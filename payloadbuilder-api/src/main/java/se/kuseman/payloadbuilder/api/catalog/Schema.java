@@ -50,9 +50,8 @@ public class Schema
         {
             return false;
         }
-        else if (obj instanceof Schema)
+        else if (obj instanceof Schema that)
         {
-            Schema that = (Schema) obj;
             return columns.equals(that.columns);
         }
         return false;

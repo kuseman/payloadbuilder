@@ -514,33 +514,6 @@ public interface ValueVector
         };
     }
 
-    /**
-     * Create a literal vector of type {@link Column.Type#Object} with provided value, type and size NOTE! This can create an object with a different type as the vector. This is used when having
-     * asterisk schemas and one is the planned type and the other is the runtime type.
-     */
-    static ValueVector literalObject(ObjectVector value, ResolvedType type, int size)
-    {
-        if (type.getType() != Type.Object)
-        {
-            throw new IllegalArgumentException("Expected a Object type but got: " + type);
-        }
-        requireNonNull(value, "use literalNull for null values");
-        return new LiteralValueVector(type, size)
-        {
-            @Override
-            public boolean isNull(int row)
-            {
-                return false;
-            }
-
-            @Override
-            public ObjectVector getObject(int row)
-            {
-                return value;
-            }
-        };
-    }
-
     /** Create a literal vector of type {@link Column.Type#Array} with provided value and size */
     static ValueVector literalArray(ValueVector value, int size)
     {
@@ -561,51 +534,11 @@ public interface ValueVector
         };
     }
 
-    /**
-     * Create a literal vector of type {@link Column.Type#Array} with provided value, type and size NOTE! This can create an array with a different type as the vector. This is used when having
-     * asterisk schemas and one is the planned type and the other is the runtime type.
-     */
-    static ValueVector literalArray(ValueVector value, ResolvedType type, int size)
-    {
-        if (type.getType() != Type.Array)
-        {
-            throw new IllegalArgumentException("Expected a Array type but got: " + type);
-        }
-        requireNonNull(value, "use literalNull for null values");
-        return new LiteralValueVector(type, size)
-        {
-            @Override
-            public boolean isNull(int row)
-            {
-                return false;
-            }
-
-            @Override
-            public ValueVector getArray(int row)
-            {
-                return value;
-            }
-        };
-    }
-
     /** Create a literal vector of type {@link Column.Type#Table} with provided value and size */
-    static ValueVector literalTable(TupleVector value, int size)
+    static ValueVector literalTable(final TupleVector value, int size)
     {
-        return literalTable(value, ResolvedType.table(value.getSchema()), size);
-    }
-
-    /**
-     * Create a literal vector of type {@link Column.Type#Table} with provided value, type and size NOTE! This can create a table with a different type as the vector. This is used when having asterisk
-     * schemas and one is the planned type and the other is the runtime type.
-     */
-    static ValueVector literalTable(final TupleVector value, ResolvedType type, int size)
-    {
-        if (type.getType() != Type.Table)
-        {
-            throw new IllegalArgumentException("Expected a Table type but got: " + type);
-        }
         requireNonNull(value, "use literalNull for null values");
-        return new LiteralValueVector(type, size)
+        return new LiteralValueVector(ResolvedType.table(value.getSchema()), size)
         {
             @Override
             public boolean isNull(int row)
@@ -644,11 +577,6 @@ public interface ValueVector
     static ValueVector literalDateTime(EpochDateTime value, int size)
     {
         requireNonNull(value);
-        if (size == 1)
-        {
-            return value;
-        }
-
         return new LiteralValueVector(ResolvedType.of(Type.DateTime), size)
         {
             @Override
@@ -669,11 +597,6 @@ public interface ValueVector
     static ValueVector literalDateTimeOffset(EpochDateTimeOffset value, int size)
     {
         requireNonNull(value);
-        if (size == 1)
-        {
-            return value;
-        }
-
         return new LiteralValueVector(ResolvedType.of(Type.DateTimeOffset), size)
         {
             @Override
@@ -694,11 +617,6 @@ public interface ValueVector
     static ValueVector literalDecimal(Decimal value, int size)
     {
         requireNonNull(value);
-        if (size == 1)
-        {
-            return value;
-        }
-
         return new LiteralValueVector(ResolvedType.of(Type.Decimal), size)
         {
             @Override
@@ -1035,11 +953,6 @@ public interface ValueVector
     static ValueVector literalString(UTF8String value, int size)
     {
         requireNonNull(value);
-        if (size == 1)
-        {
-            return value;
-        }
-
         return new LiteralValueVector(ResolvedType.of(Type.String), size)
         {
             @Override

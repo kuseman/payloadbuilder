@@ -7,6 +7,7 @@
         {
           "name": "source",
           "columns": [ "col1", "col2" ],
+          "types": [ { "type": "Int" }, { "type": "Int" } ],
           "rows": [
             [1, 2],
             [3, 4],
@@ -16,6 +17,7 @@
         {
           "name": "table",
           "columns": [ "col1", "col2" ],
+          "types": [ { "type": "Int" }, { "type": "Int" } ],
           "rows": [
             [1, 2],
             [null, 4],
@@ -146,6 +148,7 @@
     },
     {
       "name": "Misc. functions",
+      "typedVectors": false,
       "query": [
         "select isnull(null, 'a') a, isnull(123, null) b, isnull(null, null) c, isnull(col1, 'default') d, isnull(null, col1) e ",
         "from \"table\"",
