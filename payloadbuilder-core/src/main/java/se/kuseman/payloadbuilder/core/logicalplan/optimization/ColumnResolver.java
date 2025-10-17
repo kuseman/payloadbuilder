@@ -78,11 +78,11 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
 /**
  * Rule to optimize columns and eliminate sub queries.
- * 
+ *
  * <pre>
  * This rule binds column expressions to the input, taking care of
  * asterisk table sources etc. Correrlated sub queries and so on.
- * 
+ *
  * </pre>
  */
 class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
@@ -521,7 +521,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         TableSourceReference tableSource = plan.getTableSource();
         try
         {
-            schema = function.getSchema(expressions, plan.getOptions());
+            schema = function.getSchema(context.context, plan.getCatalogAlias(), expressions, plan.getOptions());
         }
         catch (SchemaResolveException e)
         {
@@ -1079,7 +1079,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
 
         /**
          * Resolve unbound column expression.
-         * 
+         *
          * <pre>
          * Binds the column to input. Binding has this priority
          *  - Find a suitable schema to search in

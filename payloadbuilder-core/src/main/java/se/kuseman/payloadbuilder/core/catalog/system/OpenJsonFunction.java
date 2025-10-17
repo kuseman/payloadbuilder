@@ -21,7 +21,6 @@ import com.fasterxml.jackson.core.JsonToken;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -70,7 +69,7 @@ class OpenJsonFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
     {
         ValueVector value = arguments.get(0)
                 .eval(context);
@@ -80,14 +79,14 @@ class OpenJsonFunction extends TableFunctionInfo
             return TupleIterator.EMPTY;
         }
 
-        ValueVector option = context.getOption(JSONPATH, options);
+        ValueVector option = context.getOption(JSONPATH, data.getOptions());
         JsonPointer pathPointer = option != null
                 && !option.isNull(0)
                         ? JsonPointer.compile(option.getString(0)
                                 .toString())
                         : null;
 
-        int batchSize = context.getBatchSize(options);
+        int batchSize = context.getBatchSize(data.getOptions());
 
         try
         {

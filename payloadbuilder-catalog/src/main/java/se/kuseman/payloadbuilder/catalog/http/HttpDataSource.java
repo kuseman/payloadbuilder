@@ -321,6 +321,10 @@ class HttpDataSource implements IDatasource
 
     static URI getURI(String endpoint)
     {
+        if (StringUtils.isBlank(endpoint))
+        {
+            throw new IllegalArgumentException("Endpoint can not be blank");
+        }
         try
         {
             // We first use URL to parse the endpoint since that wont throw URISyntaxException

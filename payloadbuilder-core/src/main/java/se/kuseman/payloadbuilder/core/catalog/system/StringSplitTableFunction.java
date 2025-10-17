@@ -8,7 +8,6 @@ import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -43,7 +42,7 @@ class StringSplitTableFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
     {
         final ValueVector value = arguments.get(0)
                 .eval(context);

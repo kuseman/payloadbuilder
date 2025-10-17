@@ -13,6 +13,7 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo.FunctionData;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -67,7 +68,7 @@ public class TableFunctionScan implements IPhysicalPlan
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put(IDatasource.CATALOG, catalogName);
         properties.put(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(getSchema()));
-        properties.putAll(functionInfo.getDescribeProperties(context, arguments, options));
+        properties.putAll(functionInfo.getDescribeProperties(context, catalogAlias, arguments, new FunctionData(nodeId, options)));
         return properties;
     }
 
@@ -80,7 +81,7 @@ public class TableFunctionScan implements IPhysicalPlan
     public TupleIterator execute(IExecutionContext context)
     {
         final int batchSize = context.getBatchSize(options);
-        final TupleIterator iterator = functionInfo.execute(context, catalogAlias, arguments, options, nodeId);
+        final TupleIterator iterator = functionInfo.execute(context, catalogAlias, arguments, new FunctionData(nodeId, options));
         return new TupleIterator()
         {
             @Override

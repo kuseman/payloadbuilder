@@ -49,6 +49,7 @@ import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo.FunctionData;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
@@ -355,7 +356,7 @@ abstract class BaseESTest extends Assert
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body), emptyList());
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body), new FunctionData(0, emptyList()));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -390,7 +391,8 @@ abstract class BaseESTest extends Assert
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body, scroll), List.of(new Option(IExecutionContext.BATCH_SIZE, ExpressionTestUtils.createIntegerExpression(2))));
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body, scroll),
+                new FunctionData(0, List.of(new Option(IExecutionContext.BATCH_SIZE, ExpressionTestUtils.createIntegerExpression(2)))));
 
         int batchCount = 0;
         int rowCount = 0;
@@ -468,7 +470,7 @@ abstract class BaseESTest extends Assert
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body, scroll), emptyList());
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body, scroll), new FunctionData(0, emptyList()));
 
         int batchCount = 0;
         int rowCount = 0;
@@ -532,7 +534,7 @@ abstract class BaseESTest extends Assert
         IExpression catSpecArg = mock(IExpression.class);
         when(catSpecArg.eval(context)).thenReturn(VectorTestUtils.vv(Type.String, "/nodes"));
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(catSpecArg), emptyList());
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(catSpecArg), new FunctionData(0, emptyList()));
         int count = 0;
         while (it.hasNext())
         {
