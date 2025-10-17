@@ -382,12 +382,12 @@ public class TestHarnessRunner
                 }
 
                 @Override
-                public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+                public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
                 {
                     // Returns a tuple vector with all options evaluated
                     List<Column> columns = new ArrayList<>();
                     List<ValueVector> vectors = new ArrayList<>();
-                    for (Option option : options)
+                    for (Option option : data.getOptions())
                     {
                         columns.add(new Column(option.getOption()
                                 .toDotDelimited(),

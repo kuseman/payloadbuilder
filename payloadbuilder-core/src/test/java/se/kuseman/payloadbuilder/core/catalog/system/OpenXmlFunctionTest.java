@@ -21,6 +21,7 @@ import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo.FunctionData;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -39,7 +40,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     public void test_empty_on_null()
     {
         assertEquals(Arity.ONE, f.arity());
-        TupleIterator it = f.execute(context, "", asList(e("null")), emptyList());
+        TupleIterator it = f.execute(context, "", asList(e("null")), new FunctionData(0, emptyList()));
         assertFalse(it.hasNext());
     }
 
@@ -48,7 +49,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     {
         TupleIterator it = f.execute(context, "", asList(e("""
                 '<xml />'
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, e("'/'"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, e("'/'")))));
 
         assertFalse(it.hasNext());
         try
@@ -67,7 +68,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     {
         TupleIterator it = f.execute(context, "", asList(e("""
                 '<xml attr1="1234" />'
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, e("'/'"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, e("'/'")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -106,7 +107,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(IExecutionContext.BATCH_SIZE, intLit(1))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(IExecutionContext.BATCH_SIZE, intLit(1)))));
 
         int batchCount = 0;
         int rowCount = 0;
@@ -160,7 +161,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(IExecutionContext.BATCH_SIZE, intLit(1))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(IExecutionContext.BATCH_SIZE, intLit(1)))));
 
         int batchCount = 0;
         int rowCount = 0;
@@ -225,7 +226,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
 
                                 </records>
                                 `
-                                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record"))));
+                                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -280,7 +281,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -321,8 +322,8 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)),
-                List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(OpenXmlFunction.XMLCOLUMNS, new LiteralStringExpression("KEY,non_column"))));
+                """)), new FunctionData(0,
+                List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(OpenXmlFunction.XMLCOLUMNS, new LiteralStringExpression("KEY,non_column")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -365,7 +366,8 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(OpenXmlFunction.XMLCOLUMNS, new LiteralStringExpression("key3,key2"))));
+                """)), new FunctionData(0,
+                List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(OpenXmlFunction.XMLCOLUMNS, new LiteralStringExpression("key3,key2")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -405,7 +407,8 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(OpenXmlFunction.XMLCOLUMNS, new LiteralStringExpression("KEY,key2"))));
+                """)), new FunctionData(0,
+                List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(OpenXmlFunction.XMLCOLUMNS, new LiteralStringExpression("KEY,key2")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -449,7 +452,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                       </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record/subXml/values"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record/subXml/values")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -488,7 +491,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of());
+                """)), new FunctionData(0, emptyList()));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -529,7 +532,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -570,7 +573,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -616,7 +619,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/articles/article"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/articles/article")))));
 
         assertFalse(it.hasNext());
     }
@@ -639,7 +642,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -676,7 +679,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                       <value>camp4</value>
                   </campaigns>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/campaigns"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/campaigns")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -711,7 +714,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                       <value attr="camp4" />
                   </campaigns>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/campaigns"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/campaigns")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -746,7 +749,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                       <value>camp4</value>
                   </campaigns>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/campaigns/value"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/campaigns/value")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -780,7 +783,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                       <market>SE</market>
                   </campaign>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/campaign/startDate"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/campaign/startDate")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -820,7 +823,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                       <market>SE</market>
                   </campaign>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/campaign/startDate"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/campaign/startDate")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -859,7 +862,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                   </record>
                 </records>
                 `
-                """)), List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record"))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -947,7 +950,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
                                 </records>
                                 `
                                 """)),
-                List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record"))));
+                new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -1086,7 +1089,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
         Mockito.when(arg.eval(Mockito.any()))
                 .thenReturn(VectorTestUtils.vv(Column.Type.Any, reader));
 
-        TupleIterator it = f.execute(context, "", asList(arg), List.of(new Option(OpenXmlFunction.XMLPATH, e("'/records/record'"))));
+        TupleIterator it = f.execute(context, "", asList(arg), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, e("'/records/record'")))));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -1142,7 +1145,7 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
         Mockito.when(arg.eval(Mockito.any()))
                 .thenReturn(VectorTestUtils.vv(Column.Type.Any, baos));
 
-        TupleIterator it = f.execute(context, "", asList(arg), List.of(new Option(OpenXmlFunction.XMLPATH, e("'/records/record'"))));
+        TupleIterator it = f.execute(context, "", asList(arg), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, e("'/records/record'")))));
 
         int rowCount = 0;
         while (it.hasNext())

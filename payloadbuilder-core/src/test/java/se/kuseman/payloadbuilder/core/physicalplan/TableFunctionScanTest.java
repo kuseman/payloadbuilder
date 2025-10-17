@@ -10,7 +10,6 @@ import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -67,7 +66,7 @@ public class TableFunctionScanTest extends APhysicalPlanTest
         {
 
             @Override
-            public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+            public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
             {
                 return TupleIterator.singleton(TupleVector.CONSTANT);
             }
@@ -93,7 +92,7 @@ public class TableFunctionScanTest extends APhysicalPlanTest
         {
 
             @Override
-            public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+            public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
             {
                 return TupleIterator.singleton(TupleVector.of(Schema.of(Column.of("Value1", ResolvedType.INT)), ValueVector.literalInt(1, 1)));
             }
@@ -119,7 +118,7 @@ public class TableFunctionScanTest extends APhysicalPlanTest
         {
 
             @Override
-            public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+            public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
             {
                 return TupleIterator.singleton(TupleVector.of(Schema.of(Column.of("Value1", ResolvedType.INT)), ValueVector.literalInt(1, 1)));
             }
@@ -144,7 +143,7 @@ public class TableFunctionScanTest extends APhysicalPlanTest
         IPhysicalPlan plan = new TableFunctionScan(0, schema, table, "", "System", new TableFunctionInfo("dummy")
         {
             @Override
-            public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+            public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
             {
                 return TupleIterator.singleton(TupleVector.of(Schema.of(Column.of("Value", ResolvedType.FLOAT)), ValueVector.literalFloat(1, 1)));
             }

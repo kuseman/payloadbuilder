@@ -870,7 +870,6 @@ class ElasticQueryBuilder
         @Override
         public Boolean visit(IComparisonExpression expression, Context context)
         {
-            Type type = expression.getComparisonType();
             // Treat outer reference as non existing qualifier since those ones doesn't belong
             // to this data source
             QualifiedName leftQname = expression.getLeft()
@@ -899,9 +898,6 @@ class ElasticQueryBuilder
                 return false;
             }
 
-            boolean isEqualOrNonEqual = type == IComparisonExpression.Type.EQUAL
-                    || type == IComparisonExpression.Type.NOT_EQUAL;
-
             QualifiedName qname = leftQname;
             IExpression other = expression.getRight();
             if (qname == null)
@@ -921,6 +917,9 @@ class ElasticQueryBuilder
             }
             context.nestLevel--;
 
+            Type type = expression.getComparisonType();
+            boolean isEqualOrNonEqual = type == IComparisonExpression.Type.EQUAL
+                    || type == IComparisonExpression.Type.NOT_EQUAL;
             if (isSpecialQualifier(qname))
             {
                 // Extra columns only support EQUALS/NOT_EQUALS
