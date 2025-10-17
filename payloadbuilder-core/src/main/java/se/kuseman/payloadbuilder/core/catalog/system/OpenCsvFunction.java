@@ -5,10 +5,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.CountingInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -26,6 +31,7 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.NodeData;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
@@ -51,29 +57,76 @@ class OpenCsvFunction extends TableFunctionInfo
         return Arity.ONE;
     }
 
-    Pair<Closeable, CsvParser> getParser(ValueVector value) throws IOException
+    @Override
+    public Map<String, Object> getDescribeProperties(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData functionData)
     {
-        if (value.type()
-                .getType() == Type.Any)
+        Map<String, Object> properties = new LinkedHashMap<>();
+        CsvNodeData nodeData = context.getStatementContext()
+                .getNodeData(functionData.getNodeId());
+        if (nodeData != null
+                && nodeData.totalBytes > 0)
         {
-            // See if we have a wrapped reader/inputstram. Some catalogs can wrap a lazy reader for a file etc.
-            Object obj = value.getAny(0);
-            if (obj instanceof Reader r)
-            {
-                return Pair.of(r, (CsvParser) MAPPER.createParser(r));
-            }
-            else if (obj instanceof InputStream is)
-            {
-                // Jackson determines encoding based on BOM
-                return Pair.of(is, (CsvParser) MAPPER.createParser(is));
-            }
+            float bytesPerSecond = nodeData.totalBytes / ((float) nodeData.totalMillis / 1000);
+            properties.put("Bytes Per Second", FileUtils.byteCountToDisplaySize(bytesPerSecond) + " / s");
         }
-
-        return Pair.of(null, (CsvParser) MAPPER.createParser(value.valueAsString(0)));
+        return properties;
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+    public Schema getSchema(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+    {
+        CsvSchema csvSchema = getCsvSchema(context, options);
+        List<String> columnNames = csvSchema.getColumnNames();
+        if (columnNames.isEmpty())
+        {
+            return Schema.EMPTY;
+        }
+
+        return new Schema(columnNames.stream()
+                .map(c -> Column.of(c, ResolvedType.STRING))
+                .toList());
+    }
+
+    private CsvSchema getCsvSchema(IExecutionContext context, List<Option> options)
+    {
+        ValueVector vv = context.getOption(COLUMN_SEPARATOR, options);
+        char columnSeparator = vv == null
+                || vv.isNull(0) ? CsvSchema.DEFAULT_COLUMN_SEPARATOR
+                        : vv.getString(0)
+                                .toString()
+                                .charAt(0);
+
+        vv = context.getOption(COLUMN_HEADERS, options);
+        String columnHeaders = vv == null
+                || vv.isNull(0) ? null
+                        : vv.getString(0)
+                                .toString();
+
+        CsvSchema headerSchema;
+
+        if (columnHeaders == null)
+        {
+            headerSchema = CsvSchema.emptySchema()
+                    .withColumnSeparator(columnSeparator)
+                    .withHeader();
+        }
+        else
+        {
+            String[] columns = StringUtils.split(columnHeaders, String.valueOf(columnSeparator));
+            Builder builder = CsvSchema.builder()
+                    .setColumnSeparator(columnSeparator);
+            for (String column : columns)
+            {
+                builder.addColumn(column);
+            }
+            headerSchema = builder.build();
+        }
+
+        return headerSchema;
+    }
+
+    @Override
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData functionData)
     {
         ValueVector value = arguments.get(0)
                 .eval(context);
@@ -85,42 +138,9 @@ class OpenCsvFunction extends TableFunctionInfo
 
         CsvParser parser;
         Closeable closable;
+        final CsvSchema headerSchema = getCsvSchema(context, functionData.getOptions());
         try
         {
-            // TODO: schema input
-            ValueVector vv = context.getOption(COLUMN_SEPARATOR, options);
-            char columnSeparator = vv == null
-                    || vv.isNull(0) ? CsvSchema.DEFAULT_COLUMN_SEPARATOR
-                            : vv.getString(0)
-                                    .toString()
-                                    .charAt(0);
-
-            vv = context.getOption(COLUMN_HEADERS, options);
-            String columnHeaders = vv == null
-                    || vv.isNull(0) ? null
-                            : vv.getString(0)
-                                    .toString();
-
-            CsvSchema headerSchema;
-
-            if (columnHeaders == null)
-            {
-                headerSchema = CsvSchema.emptySchema()
-                        .withColumnSeparator(columnSeparator)
-                        .withHeader();
-            }
-            else
-            {
-                String[] columns = StringUtils.split(columnHeaders, String.valueOf(columnSeparator));
-                Builder builder = CsvSchema.builder()
-                        .setColumnSeparator(columnSeparator);
-                for (String column : columns)
-                {
-                    builder.addColumn(column);
-                }
-                headerSchema = builder.build();
-            }
-
             Pair<Closeable, CsvParser> pair = getParser(value);
             closable = pair.getKey();
             parser = pair.getValue();
@@ -131,7 +151,12 @@ class OpenCsvFunction extends TableFunctionInfo
             throw new RuntimeException("Error reading CSV", e);
         }
 
-        final int batchSize = context.getBatchSize(options);
+        final CsvNodeData nodeData = functionData.getNodeId() >= 0 ? context.getStatementContext()
+                .getOrCreateNodeData(functionData.getNodeId(), () -> new CsvNodeData())
+                : new CsvNodeData();
+        final CountingInputStream cis = closable instanceof CountingInputStream ci ? ci
+                : null;
+        final int batchSize = context.getBatchSize(functionData.getOptions());
         return new TupleIterator()
         {
             TupleVector next;
@@ -165,7 +190,12 @@ class OpenCsvFunction extends TableFunctionInfo
             {
                 try
                 {
-                    return setNext();
+                    long time = System.nanoTime();
+                    boolean hasNext = setNext();
+                    nodeData.totalMillis += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
+                    nodeData.totalBytes = cis != null ? cis.getByteCount()
+                            : 0;
+                    return hasNext;
                 }
                 catch (IOException e)
                 {
@@ -270,5 +300,33 @@ class OpenCsvFunction extends TableFunctionInfo
                 return true;
             }
         };
+    }
+
+    Pair<Closeable, CsvParser> getParser(ValueVector value) throws IOException
+    {
+        if (value.type()
+                .getType() == Type.Any)
+        {
+            // See if we have a wrapped reader/inputstram. Some catalogs can wrap a lazy reader for a file etc.
+            Object obj = value.getAny(0);
+            if (obj instanceof Reader r)
+            {
+                return Pair.of(r, (CsvParser) MAPPER.createParser(r));
+            }
+            else if (obj instanceof InputStream is)
+            {
+                CountingInputStream cis = new CountingInputStream(is);
+                // Jackson determines encoding based on BOM
+                return Pair.of(cis, (CsvParser) MAPPER.createParser(cis));
+            }
+        }
+
+        return Pair.of(null, (CsvParser) MAPPER.createParser(value.valueAsString(0)));
+    }
+
+    static class CsvNodeData extends NodeData
+    {
+        long totalBytes;
+        long totalMillis;
     }
 }

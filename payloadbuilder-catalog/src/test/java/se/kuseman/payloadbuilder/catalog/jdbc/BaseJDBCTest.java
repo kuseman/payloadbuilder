@@ -41,6 +41,7 @@ import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo.FunctionData;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
@@ -207,7 +208,7 @@ abstract class BaseJDBCTest extends Assert
                 select 'done'
                 """)
 
-        ), emptyList());
+        ), new FunctionData(0, emptyList()));
 
         int batchCount = 0;
         while (it.hasNext())
@@ -485,7 +486,7 @@ abstract class BaseJDBCTest extends Assert
     private IExecutionContext mockExecutionContext(Writer writer)
     {
         //@formatter:off
-         IExecutionContext context = TestUtils.mockExecutionContext(CATALOG_ALIAS, 
+         IExecutionContext context = TestUtils.mockExecutionContext(CATALOG_ALIAS,
                  ofEntries(
                      entry(JdbcCatalog.URL             ,jdbcUrl),
                      entry(JdbcCatalog.DRIVER_CLASSNAME,driverClassName),

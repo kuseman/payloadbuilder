@@ -35,7 +35,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -87,7 +86,7 @@ class OpenXmlFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
     {
         ValueVector value = arguments.get(0)
                 .eval(context);
@@ -104,13 +103,13 @@ class OpenXmlFunction extends TableFunctionInfo
         try
         {
             // TODO: schema input
-            ValueVector vv = context.getOption(XMLPATH, options);
+            ValueVector vv = context.getOption(XMLPATH, data.getOptions());
             xmlPath = vv == null
                     || vv.isNull(0) ? ""
                             : vv.getString(0)
                                     .toString();
 
-            vv = context.getOption(XMLCOLUMNS, options);
+            vv = context.getOption(XMLCOLUMNS, data.getOptions());
             columnsOption = vv == null
                     || vv.isNull(0) ? null
                             : StringUtils.split(vv.getString(0)
@@ -139,7 +138,7 @@ class OpenXmlFunction extends TableFunctionInfo
             throw new RuntimeException("Error reading XML", e);
         }
 
-        final int batchSize = context.getBatchSize(options);
+        final int batchSize = context.getBatchSize(data.getOptions());
         final String[] xmlPathParts = StringUtils.split(xmlPath, '/');
         final String rowElementName = xmlPathParts.length > 0 ? xmlPathParts[xmlPathParts.length - 1]
                 : "";

@@ -3,7 +3,6 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -23,7 +22,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
  * SELECT field
  * FROM source s
  * CROSS APPLY open_table(s.tableColumn) y
- * 
+ *
  * </pre>
  */
 class OpenTableFunction extends TableFunctionInfo
@@ -55,7 +54,7 @@ class OpenTableFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
     {
         final ValueVector vector = arguments.get(0)
                 .eval(context);

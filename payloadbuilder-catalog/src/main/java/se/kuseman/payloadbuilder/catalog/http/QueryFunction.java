@@ -34,14 +34,18 @@ class QueryFunction extends TableFunctionInfo
     }
 
     @Override
-    public Map<String, Object> getDescribeProperties(IExecutionContext context, List<IExpression> arguments, List<Option> options)
+    public Map<String, Object> getDescribeProperties(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData functionData)
     {
         Map<String, Object> properties = new LinkedHashMap<>();
         String endpoint = getEndpoint(context, arguments.get(0));
-        HttpUriRequestBase httpRequest = HttpDataSource.getRequestBase(context, options, endpoint);
-        properties.put("Request", httpRequest.getMethod() + " " + httpRequest.getRequestUri());
-        String body = getBody(context, options);
-        properties.put("Body", body);
+        String requestString = "";
+        if (!isBlank(endpoint))
+        {
+            HttpUriRequestBase httpRequest = HttpDataSource.getRequestBase(context, functionData.getOptions(), endpoint);
+            requestString = httpRequest.getMethod() + " " + httpRequest.getRequestUri();
+        }
+        properties.put("Body", getBody(context, functionData.getOptions()));
+        properties.put("Request", requestString);
         return properties;
     }
 
@@ -52,7 +56,7 @@ class QueryFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
     {
         /*
          * @formatter:off
@@ -71,15 +75,15 @@ class QueryFunction extends TableFunctionInfo
             throw new IllegalArgumentException("endpoint must be a non null string value");
         }
 
-        HttpUriRequestBase httpRequest = HttpDataSource.getRequestBase(context, options, endpoint);
+        HttpUriRequestBase httpRequest = HttpDataSource.getRequestBase(context, data.getOptions(), endpoint);
 
-        String body = getBody(context, options);
+        String body = getBody(context, data.getOptions());
         if (body != null)
         {
             httpRequest.setEntity(new StringEntity(body, StandardCharsets.UTF_8));
         }
 
-        return HttpDataSource.createIterator(httpClient, httpRequest, responseTransformers, context, options);
+        return HttpDataSource.createIterator(httpClient, httpRequest, responseTransformers, context, data.getOptions());
     }
 
     private String getEndpoint(IExecutionContext context, IExpression expression)
