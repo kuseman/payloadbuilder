@@ -17,6 +17,7 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo.FunctionData;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -90,6 +91,6 @@ public abstract class ATableFunctionForwardResponseTransformer implements IRespo
             }
         };
 
-        return openJsonFunction.execute(context, Catalog.SYSTEM_CATALOG_ALIAS, List.of(arg), options);
+        return openJsonFunction.execute(context, Catalog.SYSTEM_CATALOG_ALIAS, List.of(arg), new FunctionData(-1, options));
     }
 }

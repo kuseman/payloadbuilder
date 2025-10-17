@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
@@ -80,7 +79,7 @@ class SearchFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, List<Option> options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
     {
         String endpoint = null;
         String index = null;
@@ -166,7 +165,7 @@ class SearchFunction extends TableFunctionInfo
             throw new IllegalArgumentException("'template' and 'body' arguments are mutual exclusive for function " + getName());
         }
 
-        int batchSize = scroll ? context.getBatchSize(options)
+        int batchSize = scroll ? context.getBatchSize(data.getOptions())
                 : -1;
 
         // Turn off the options batch size if we have a size in the body
