@@ -20,6 +20,7 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.GenericCache;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
@@ -93,7 +94,9 @@ public final class TestUtils
             public Object answer(InvocationOnMock invocation) throws Throwable
             {
                 String key = invocation.getArgument(1);
-                return ValueVector.literalAny(properties.get(key));
+                Object value = properties.get(key);
+                return value == null ? ValueVector.literalNull(ResolvedType.ANY, 1)
+                        : ValueVector.literalAny(1, value);
             }
         });
 

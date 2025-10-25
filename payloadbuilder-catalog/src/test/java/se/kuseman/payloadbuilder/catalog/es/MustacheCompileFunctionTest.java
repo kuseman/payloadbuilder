@@ -38,8 +38,8 @@ public class MustacheCompileFunctionTest extends Assert
         TupleVector input = mock(TupleVector.class);
         IExecutionContext context = mock(IExecutionContext.class);
 
-        when(templateArg.eval(input, context)).thenReturn(ValueVector.literalString(UTF8String.from("hello {{ param }}"), null));
-        when(paramsArg.eval(input, context)).thenReturn(ValueVector.literalAny(ofEntries(entry("param", "world")), ofEntries(entry("param", "world2"))));
+        when(templateArg.eval(input, context)).thenReturn(VectorTestUtils.vv(ResolvedType.STRING, UTF8String.from("hello {{ param }}"), null));
+        when(paramsArg.eval(input, context)).thenReturn(VectorTestUtils.vv(Type.Any, ofEntries(entry("param", "world")), ofEntries(entry("param", "world2"))));
 
         when(input.getRowCount()).thenReturn(2);
 

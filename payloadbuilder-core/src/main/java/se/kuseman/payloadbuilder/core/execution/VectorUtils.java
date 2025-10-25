@@ -200,13 +200,25 @@ public class VectorUtils
     /** Hash a row from an array of value vectors */
     public static int hash(ValueVector[] vectors, Column.Type[] types, int row)
     {
+        boolean[] hasNulls = new boolean[vectors.length];
+        for (int i = 0; i < hasNulls.length; i++)
+        {
+            hasNulls[i] = vectors[i].hasNulls();
+        }
+        return hash(vectors, types, hasNulls, row);
+    }
+
+    /** Hash a row from an array of value vectors */
+    public static int hash(ValueVector[] vectors, Column.Type[] types, boolean[] hasNulls, int row)
+    {
         int hash = START;
         int size = vectors.length;
         for (int i = 0; i < size; i++)
         {
             ValueVector vv = vectors[i];
 
-            if (vv.isNull(row))
+            if (hasNulls[i]
+                    && vv.isNull(row))
             {
                 hash = hash * CONSTANT;
                 continue;
@@ -432,86 +444,26 @@ public class VectorUtils
             }
         }
 
-        // CSOFF
-        switch (type)
-        // CSON
+        return switch (type)
         {
-            case Boolean:
-                if (vector1.getBoolean(row1) != vector2.getBoolean(row2))
-                {
-                    return false;
-                }
-                break;
-            case Double:
-                if (vector1.getDouble(row1) != vector2.getDouble(row2))
-                {
-                    return false;
-                }
-                break;
-            case Float:
-                if (vector1.getFloat(row1) != vector2.getFloat(row2))
-                {
-                    return false;
-                }
-                break;
-            case Int:
-                if (vector1.getInt(row1) != vector2.getInt(row2))
-                {
-                    return false;
-                }
-                break;
-            case Long:
-                if (vector1.getLong(row1) != vector2.getLong(row2))
-                {
-                    return false;
-                }
-                break;
-            case Decimal:
-                // NOTE! Use compare instead of equals here else we will get weird results
-                if (vector1.getDecimal(row1)
-                        .compareTo(vector2.getDecimal(row2)) != 0)
-                {
-                    return false;
-                }
-                break;
-            case String:
-                UTF8String astr = vector1.getString(row1);
-                UTF8String bstr = vector2.getString(row2);
-                if (!astr.equals(bstr))
-                {
-                    return false;
-                }
-                break;
-            case DateTime:
-                EpochDateTime adate = vector1.getDateTime(row1);
-                EpochDateTime bdate = vector2.getDateTime(row2);
-                if (!adate.equals(bdate))
-                {
-                    return false;
-                }
-                break;
-            case DateTimeOffset:
-                EpochDateTimeOffset adateO = vector1.getDateTimeOffset(row1);
-                EpochDateTimeOffset bdateO = vector2.getDateTimeOffset(row2);
-                if (!adateO.equals(bdateO))
-                {
-                    return false;
-                }
-                break;
-            case Any:
-                if (ExpressionMath.cmp(vector1.getAny(row1), vector2.getAny(row2)) != 0)
-                {
-                    return false;
-                }
-                break;
-            case Object:
-            case Array:
-            case Table:
-                throw new IllegalArgumentException("Performing equal of type " + vector1.type()
-                        .toTypeString() + " is not supported");
-            // No default case here!!!
-        }
-        return true;
+            case Boolean -> vector1.getBoolean(row1) == vector2.getBoolean(row2);
+            case Double -> vector1.getDouble(row1) == vector2.getDouble(row2);
+            case Float -> vector1.getFloat(row1) == vector2.getFloat(row2);
+            case Int -> vector1.getInt(row1) == vector2.getInt(row2);
+            case Long -> vector1.getLong(row1) == vector2.getLong(row2);
+            // NOTE! Use compare instead of equals here else we will get weird results
+            case Decimal -> vector1.getDecimal(row1)
+                    .compareTo(vector2.getDecimal(row2)) == 0;
+            case String -> vector1.getString(row1)
+                    .equals(vector2.getString(row2));
+            case DateTime -> vector1.getDateTime(row1)
+                    .equals(vector2.getDateTime(row2));
+            case DateTimeOffset -> vector1.getDateTimeOffset(row1)
+                    .equals(vector2.getDateTimeOffset(row2));
+            case Any -> ExpressionMath.cmp(vector1.getAny(row1), vector2.getAny(row2)) == 0;
+            default -> throw new IllegalArgumentException("Performing equal of type " + vector1.type()
+                    .toTypeString() + " is not supported");
+        };
     }
 
     /**
@@ -525,45 +477,25 @@ public class VectorUtils
      */
     public static int compare(ValueVector left, ValueVector right, Type type, int leftRow, int rightRow)
     {
-        // CSOFF
-        switch (type)
-        // CSON
+        return switch (type)
         {
-            case Boolean:
-                return Boolean.compare(left.getBoolean(leftRow), right.getBoolean(rightRow));
-            case Double:
-                return Double.compare(left.getDouble(leftRow), right.getDouble(rightRow));
-            case Float:
-                return Float.compare(left.getFloat(leftRow), right.getFloat(rightRow));
-            case Int:
-                return Integer.compare(left.getInt(leftRow), right.getInt(rightRow));
-            case Long:
-                return Long.compare(left.getLong(leftRow), right.getLong(rightRow));
-            case Decimal:
-                return left.getDecimal(leftRow)
-                        .compareTo(right.getDecimal(rightRow));
-            case String:
-                UTF8String refL = left.getString(leftRow);
-                UTF8String refR = right.getString(rightRow);
-                return refL.compareTo(refR);
-            case DateTime:
-                EpochDateTime dateL = left.getDateTime(leftRow);
-                EpochDateTime dateR = right.getDateTime(rightRow);
-                return dateL.compareTo(dateR);
-            case DateTimeOffset:
-                EpochDateTimeOffset dateOL = left.getDateTimeOffset(leftRow);
-                EpochDateTimeOffset dateOR = right.getDateTimeOffset(rightRow);
-                return dateOL.compareTo(dateOR);
-            case Any:
-                // Reflective compare
-                return ExpressionMath.cmp(left.getAny(leftRow), right.getAny(rightRow));
-            case Array:
-            case Table:
-            case Object:
-                throw new IllegalArgumentException("Cannot compare type " + type);
-            // NO default case here!!!
-        }
-        throw new IllegalArgumentException("Cannot compare type " + type);
+            case Boolean -> Boolean.compare(left.getBoolean(leftRow), right.getBoolean(rightRow));
+            case Double -> Double.compare(left.getDouble(leftRow), right.getDouble(rightRow));
+            case Float -> Float.compare(left.getFloat(leftRow), right.getFloat(rightRow));
+            case Int -> Integer.compare(left.getInt(leftRow), right.getInt(rightRow));
+            case Long -> Long.compare(left.getLong(leftRow), right.getLong(rightRow));
+            case Decimal -> left.getDecimal(leftRow)
+                    .compareTo(right.getDecimal(rightRow));
+            case String -> left.getString(leftRow)
+                    .compareTo(right.getString(rightRow));
+            case DateTime -> left.getDateTime(leftRow)
+                    .compareTo(right.getDateTime(rightRow));
+            case DateTimeOffset -> left.getDateTimeOffset(leftRow)
+                    .compareTo(right.getDateTimeOffset(rightRow));
+            // Reflective compare
+            case Any -> ExpressionMath.cmp(left.getAny(leftRow), right.getAny(rightRow));
+            default -> throw new IllegalArgumentException("Cannot compare type " + type);
+        };
     }
 
     /**

@@ -25,6 +25,12 @@ public interface ValueVector
     /** Return if value at provided row is null */
     boolean isNull(int row);
 
+    /** Returns true if this vector has nulls. */
+    default boolean hasNulls()
+    {
+        return true;
+    }
+
     /** Get string at provided row. */
     default UTF8String getString(int row)
     {
@@ -498,7 +504,7 @@ public interface ValueVector
     static ValueVector literalObject(ObjectVector value, int size)
     {
         requireNonNull(value, "use literalNull for null values");
-        return new LiteralValueVector(ResolvedType.object(value.getSchema()), size)
+        return new LiteralValueVector(ResolvedType.object(value.getSchema()), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -518,7 +524,7 @@ public interface ValueVector
     static ValueVector literalArray(ValueVector value, int size)
     {
         requireNonNull(value, "use literalNull for null values");
-        return new LiteralValueVector(ResolvedType.array(value.type()), size)
+        return new LiteralValueVector(ResolvedType.array(value.type()), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -538,7 +544,7 @@ public interface ValueVector
     static ValueVector literalTable(final TupleVector value, int size)
     {
         requireNonNull(value, "use literalNull for null values");
-        return new LiteralValueVector(ResolvedType.table(value.getSchema()), size)
+        return new LiteralValueVector(ResolvedType.table(value.getSchema()), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -554,30 +560,11 @@ public interface ValueVector
         };
     }
 
-    /** Create a literal vector of type {@link Column.Type#Table} with provided values */
-    static ValueVector literalTable(TupleVector... values)
-    {
-        return new LiteralValueVector(ResolvedType.table(values[0].getSchema()), values.length)
-        {
-            @Override
-            public boolean isNull(int row)
-            {
-                return values[row] == null;
-            }
-
-            @Override
-            public TupleVector getTable(int row)
-            {
-                return values[row];
-            }
-        };
-    }
-
     /** Create a literal vector of type {@link Column.Type#DateTime} with provided value and size */
     static ValueVector literalDateTime(EpochDateTime value, int size)
     {
         requireNonNull(value);
-        return new LiteralValueVector(ResolvedType.of(Type.DateTime), size)
+        return new LiteralValueVector(ResolvedType.of(Type.DateTime), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -597,7 +584,7 @@ public interface ValueVector
     static ValueVector literalDateTimeOffset(EpochDateTimeOffset value, int size)
     {
         requireNonNull(value);
-        return new LiteralValueVector(ResolvedType.of(Type.DateTimeOffset), size)
+        return new LiteralValueVector(ResolvedType.of(Type.DateTimeOffset), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -617,7 +604,7 @@ public interface ValueVector
     static ValueVector literalDecimal(Decimal value, int size)
     {
         requireNonNull(value);
-        return new LiteralValueVector(ResolvedType.of(Type.Decimal), size)
+        return new LiteralValueVector(ResolvedType.of(Type.Decimal), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -629,25 +616,6 @@ public interface ValueVector
             public Decimal getDecimal(int row)
             {
                 return value;
-            }
-        };
-    }
-
-    /** Create a literal vector of type {@link Column.Type#Decimal} with provided values */
-    static ValueVector literalDecimal(Decimal... values)
-    {
-        return new LiteralValueVector(ResolvedType.of(Type.Decimal), values.length)
-        {
-            @Override
-            public boolean isNull(int row)
-            {
-                return values[row] == null;
-            }
-
-            @Override
-            public Decimal getDecimal(int row)
-            {
-                return values[row];
             }
         };
     }
@@ -656,7 +624,7 @@ public interface ValueVector
     static ValueVector literalAny(int size, Object value)
     {
         requireNonNull(value);
-        return new LiteralValueVector(ResolvedType.of(Type.Any), size)
+        return new LiteralValueVector(ResolvedType.of(Type.Any), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -668,25 +636,6 @@ public interface ValueVector
             public Object getAny(int row)
             {
                 return value;
-            }
-        };
-    }
-
-    /** Create a literal vector of type {@link Column.Type#Any} with provided values */
-    static ValueVector literalAny(Object... values)
-    {
-        return new LiteralValueVector(ResolvedType.of(Type.Any), values.length)
-        {
-            @Override
-            public boolean isNull(int row)
-            {
-                return values[row] == null;
-            }
-
-            @Override
-            public Object getAny(int row)
-            {
-                return values[row];
             }
         };
     }
@@ -722,7 +671,7 @@ public interface ValueVector
 
     private static ValueVector literalNullInternal(ResolvedType type, int size)
     {
-        return new LiteralValueVector(type, size)
+        return new LiteralValueVector(type, size, true)
         {
             @Override
             public boolean isNull(int row)
@@ -776,7 +725,7 @@ public interface ValueVector
     /** Create a literal int of provided value and size */
     static ValueVector literalInt(int value, int size)
     {
-        return new LiteralValueVector(ResolvedType.of(Type.Int), size)
+        return new LiteralValueVector(ResolvedType.of(Type.Int), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -795,7 +744,7 @@ public interface ValueVector
     /** Create a literal long of provided value and size */
     static ValueVector literalLong(long value, int size)
     {
-        return new LiteralValueVector(ResolvedType.of(Type.Long), size)
+        return new LiteralValueVector(ResolvedType.of(Type.Long), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -814,7 +763,7 @@ public interface ValueVector
     /** Create a literal long of provided value and size */
     static ValueVector literalFloat(float value, int size)
     {
-        return new LiteralValueVector(ResolvedType.of(Type.Float), size)
+        return new LiteralValueVector(ResolvedType.of(Type.Float), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -833,7 +782,7 @@ public interface ValueVector
     /** Create a literal double of provided value and size */
     static ValueVector literalDouble(double value, int size)
     {
-        return new LiteralValueVector(ResolvedType.of(Type.Double), size)
+        return new LiteralValueVector(ResolvedType.of(Type.Double), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -861,7 +810,7 @@ public interface ValueVector
             literalBooleanInternal(true, 8),
             literalBooleanInternal(true, 9),
             literalBooleanInternal(true, 10)
-    );
+            );
     static final List<ValueVector> FALSE_VECTORS = List.of(
             literalBooleanInternal(false, 1),
             literalBooleanInternal(false, 2),
@@ -873,7 +822,7 @@ public interface ValueVector
             literalBooleanInternal(false, 8),
             literalBooleanInternal(false, 9),
             literalBooleanInternal(false, 10)
-    );
+            );
     //@formatter:on
 
     /** Create a literal boolean of provided value and size */
@@ -890,7 +839,7 @@ public interface ValueVector
                     : FALSE_VECTORS.get(size - 1);
         }
 
-        return new LiteralValueVector(ResolvedType.of(Type.Boolean), size)
+        return new LiteralValueVector(ResolvedType.of(Type.Boolean), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -908,7 +857,7 @@ public interface ValueVector
 
     private static ValueVector literalBooleanInternal(boolean value, int size)
     {
-        return new LiteralValueVector(ResolvedType.of(Type.Boolean), size)
+        return new LiteralValueVector(ResolvedType.of(Type.Boolean), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -931,29 +880,10 @@ public interface ValueVector
     }
 
     /** Create a literal string of provided value and size */
-    static ValueVector literalString(UTF8String... values)
-    {
-        return new LiteralValueVector(ResolvedType.of(Type.String), values.length)
-        {
-            @Override
-            public boolean isNull(int row)
-            {
-                return values[row] == null;
-            }
-
-            @Override
-            public UTF8String getString(int row)
-            {
-                return values[row];
-            }
-        };
-    }
-
-    /** Create a literal string of provided value and size */
     static ValueVector literalString(UTF8String value, int size)
     {
         requireNonNull(value);
-        return new LiteralValueVector(ResolvedType.of(Type.String), size)
+        return new LiteralValueVector(ResolvedType.of(Type.String), size, false)
         {
             @Override
             public boolean isNull(int row)
@@ -1024,17 +954,25 @@ public interface ValueVector
     {
         private final ResolvedType type;
         private final int size;
+        private boolean hasNulls;
 
-        LiteralValueVector(ResolvedType type, int size)
+        LiteralValueVector(ResolvedType type, int size, boolean hasNulls)
         {
             this.type = requireNonNull(type, "type");
             this.size = size;
+            this.hasNulls = hasNulls;
         }
 
         @Override
         public ResolvedType type()
         {
             return type;
+        }
+
+        @Override
+        public boolean hasNulls()
+        {
+            return hasNulls;
         }
 
         @Override

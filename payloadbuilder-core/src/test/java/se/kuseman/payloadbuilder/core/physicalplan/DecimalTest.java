@@ -14,6 +14,7 @@ public class DecimalTest extends org.junit.Assert
     {
         Decimal d = Decimal.from("10.10");
 
+        assertFalse(d.hasNulls());
         assertTrue(d.equals(d));
         assertFalse(d.equals(Decimal.from("10.100")));
         assertFalse(d.equals(null));

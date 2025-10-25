@@ -21,6 +21,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
+import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link AggregateMinMaxFunction} */
 public class AggregateMinFunctionTest extends APhysicalPlanTest
@@ -36,7 +37,7 @@ public class AggregateMinFunctionTest extends APhysicalPlanTest
         IExpression col1 = ce("col1", ResolvedType.of(Type.Any));
 
         //@formatter:off
-        ValueVector one = ValueVector.literalAny(
+        ValueVector one = VectorTestUtils.vv(Type.Any,
                 10, 20, -20F, -200D,
                 10_000_000,10_000_000,10_000_000,10_000_000,
                 null,null,null,null,

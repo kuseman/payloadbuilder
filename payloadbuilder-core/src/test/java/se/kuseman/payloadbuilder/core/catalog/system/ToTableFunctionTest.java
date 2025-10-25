@@ -34,7 +34,7 @@ public class ToTableFunctionTest extends APhysicalPlanTest
         // "select * from open_map_collection((@col).attribute1.buckets)";
         //@formatter:off
         context.setVariable("col",
-                ValueVector.literalAny(
+                ValueVector.literalAny(1,
                 ofEntries(
                     entry("attribute1",
                         ofEntries(

@@ -22,6 +22,7 @@ import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
+import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link AggregateCountFunction} */
 public class AggregateCountFunctionTest extends APhysicalPlanTest
@@ -42,7 +43,7 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
         assertEquals(Arity.ONE, function.arity());
 
         //@formatter:off
-        ValueVector one = ValueVector.literalAny(
+        ValueVector one = VectorTestUtils.vv(Type.Any,
                 10, 20, -20F, -200D,
                 10_000_000,10_000_000,10_000_000,10_000_000,
                 null,null,null,null,
@@ -75,7 +76,7 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
         assertEquals(Arity.ONE, function.arity());
 
         //@formatter:off
-        ValueVector one = ValueVector.literalAny(
+        ValueVector one = VectorTestUtils.vv(Type.Any,
                 10, 20, -20F, -200D,
                 10_000_000,10_000_000,10_000_000,10_000_000,
                 null,null,null,null,
@@ -108,7 +109,7 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
         assertEquals(Arity.ONE, function.arity());
 
         //@formatter:off
-        ValueVector one = ValueVector.literalAny(
+        ValueVector one = VectorTestUtils.vv(Type.Any,
                 10, 20, -20F, -200D,
                 10_000_000,10_000_000,10_000_000,10_000_000,
                 null,null,null,null,
@@ -138,7 +139,7 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
     @Test
     public void test_scalar()
     {
-        ValueVector one = ValueVector.literalAny(10, 20, null, -200D);
+        ValueVector one = VectorTestUtils.vv(Type.Any, 10, 20, null, -200D);
 
         Schema schema = schema(new Type[] { Type.Any }, "col1");
 
@@ -154,11 +155,11 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
     @Test
     public void test_scalar_value_vector()
     {
-        ValueVector one = ValueVector.literalAny(10, 20, -20F, -200D);
+        ValueVector one = VectorTestUtils.vv(Type.Any, 10, 20, -20F, -200D);
         ValueVector two = ValueVector.literalAny(4, 10_000_000);
         ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
-        ValueVector four = ValueVector.literalAny("one", "two", "three");
-        ValueVector five = ValueVector.literalAny(new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
+        ValueVector four = VectorTestUtils.vv(Type.Any, "one", "two", "three");
+        ValueVector five = VectorTestUtils.vv(Type.Any, new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
 
         Schema schema = Schema.of(Column.of("col1", ResolvedType.array(ResolvedType.of(Type.Any))));
 

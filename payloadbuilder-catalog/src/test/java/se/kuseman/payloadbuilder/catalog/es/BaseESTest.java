@@ -1469,7 +1469,7 @@ abstract class BaseESTest extends Assert
         when(seekPredicate.getIndexColumns()).thenReturn(asList(column));
         ISeekPredicate.ISeekKey seekKey = mock(ISeekPredicate.ISeekKey.class);
         when(seekPredicate.getSeekKeys(any(IExecutionContext.class))).thenReturn(asList(seekKey));
-        when(seekKey.getValue()).thenReturn(ValueVector.literalAny(values));
+        when(seekKey.getValue()).thenReturn(VectorTestUtils.vv(Type.Any, values));
 
         return seekPredicate;
     }

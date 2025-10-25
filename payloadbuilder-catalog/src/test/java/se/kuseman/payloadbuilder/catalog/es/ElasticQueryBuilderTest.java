@@ -861,7 +861,7 @@ public class ElasticQueryBuilderTest
                 {
                     UnresolvedColumnExpression spy = Mockito.spy(expression);
                     when(spy.isOuterReference()).thenReturn(true);
-                    doReturn(ValueVector.literalAny(column)).when(spy)
+                    doReturn(ValueVector.literalAny(1, column)).when(spy)
                             .eval(any(IExecutionContext.class));
                     return spy;
                 }

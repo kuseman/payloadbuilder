@@ -34,6 +34,13 @@ abstract class AMutableVector implements MutableValueVector
     }
 
     @Override
+    public boolean hasNulls()
+    {
+        return nullBuffer != null
+                && nullBuffer.getCardinality() > 0;
+    }
+
+    @Override
     public boolean isNull(int row)
     {
         if (size == 0)

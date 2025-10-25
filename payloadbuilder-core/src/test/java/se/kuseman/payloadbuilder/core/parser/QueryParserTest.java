@@ -243,7 +243,7 @@ public class QueryParserTest extends Assert
         assertExpression("cast('2020-10-10' AS datetimeoffset)", new LiteralDateTimeOffsetExpression(EpochDateTimeOffset.from("2020-10-10")));
         assertExpression("cast(123 AS string)", new LiteralStringExpression("123"));
 
-        ValueVector expected = new LiteralArrayExpression(ValueVector.literalAny(123)).getValue();
+        ValueVector expected = new LiteralArrayExpression(ValueVector.literalAny(1, 123)).getValue();
         ValueVector actual = ((LiteralArrayExpression) assertExpression("cast(123 AS array)", null)).getValue();
         VectorTestUtils.assertVectorsEquals(expected, actual);
 

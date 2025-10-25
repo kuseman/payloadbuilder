@@ -79,6 +79,12 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
     }
 
     @Override
+    public boolean hasNulls()
+    {
+        return false;
+    }
+
+    @Override
     public boolean isNull(int row)
     {
         return false;

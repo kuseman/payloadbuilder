@@ -516,7 +516,7 @@ abstract class BaseJDBCTest extends Assert
         {
             ISeekPredicate.ISeekKey seekKey = mock(ISeekPredicate.ISeekKey.class);
             seekKeys.add(seekKey);
-            when(seekKey.getValue()).thenReturn(ValueVector.literalAny(values.get(i)));
+            when(seekKey.getValue()).thenReturn(VectorTestUtils.vv(Type.Any, values.get(i)));
         }
         when(seekPredicate.getSeekKeys(any(IExecutionContext.class))).thenReturn(seekKeys);
         return seekPredicate;

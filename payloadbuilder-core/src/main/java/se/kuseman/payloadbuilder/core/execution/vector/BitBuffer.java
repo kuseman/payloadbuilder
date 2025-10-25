@@ -37,4 +37,9 @@ class BitBuffer
     {
         return bitSet.toString();
     }
+
+    int getCardinality()
+    {
+        return bitSet.cardinality();
+    }
 }

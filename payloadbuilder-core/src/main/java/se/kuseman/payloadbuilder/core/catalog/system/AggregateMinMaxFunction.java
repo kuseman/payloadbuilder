@@ -177,6 +177,7 @@ class AggregateMinMaxFunction extends ScalarFunctionInfo
         {
             int groupSize = vector.size();
 
+            boolean hasNulls = vector.hasNulls();
             boolean prevNull = false;
 
             int currentIndex = 0;
@@ -188,7 +189,8 @@ class AggregateMinMaxFunction extends ScalarFunctionInfo
             for (int j = 1; j < groupSize; j++)
             {
                 // Null => skip current
-                if (vector.isNull(j))
+                if (hasNulls
+                        && vector.isNull(j))
                 {
                     continue;
                 }
@@ -211,7 +213,7 @@ class AggregateMinMaxFunction extends ScalarFunctionInfo
                     currentIndex = j;
                 }
             }
-            ValueVector prevRow = (ValueVector) minMaxRow.valueAsObject(group);
+            ValueVector prevRow = (ValueVector) minMaxRow.getAny(group);
             // First non null group, copy this batch min/max row
             if (prevRow == null
                     && !prevNull)

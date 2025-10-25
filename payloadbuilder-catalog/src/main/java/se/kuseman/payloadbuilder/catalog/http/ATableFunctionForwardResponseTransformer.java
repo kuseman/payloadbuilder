@@ -81,7 +81,7 @@ public abstract class ATableFunctionForwardResponseTransformer implements IRespo
             @Override
             public ValueVector eval(TupleVector input, IExecutionContext context)
             {
-                return ValueVector.literalAny(is);
+                return ValueVector.literalAny(1, is);
             }
 
             @Override

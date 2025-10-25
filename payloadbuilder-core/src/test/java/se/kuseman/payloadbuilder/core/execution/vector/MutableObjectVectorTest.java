@@ -23,6 +23,8 @@ public class MutableObjectVectorTest extends Assert
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.String), 2);
 
+        assertFalse(b.hasNulls());
+
         try
         {
             b.setInt(0, 123);
@@ -41,9 +43,13 @@ public class MutableObjectVectorTest extends Assert
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Any), 2);
 
+        assertFalse(b.hasNulls());
+
         // Test nulls
         b.setNull(0);
         b.setNull(1);
+
+        assertTrue(b.hasNulls());
 
         VectorTestUtils.assertVectorsEquals(vv(Type.Any, null, null), b);
 

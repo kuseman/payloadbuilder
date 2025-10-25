@@ -60,6 +60,12 @@ public class EpochDateTimeOffset implements Comparable<EpochDateTimeOffset>, Val
     }
 
     @Override
+    public boolean hasNulls()
+    {
+        return false;
+    }
+
+    @Override
     public boolean isNull(int row)
     {
         return false;

@@ -437,7 +437,9 @@ public abstract class AExpressionTest extends Assert
                 for (Entry<String, Object> e : variables.entrySet())
                 {
                     context.setVariable(e.getKey()
-                            .toLowerCase(), ValueVector.literalAny(e.getValue()));
+                            .toLowerCase(),
+                            e.getValue() == null ? ValueVector.literalNull(ResolvedType.ANY, 1)
+                                    : ValueVector.literalAny(1, e.getValue()));
                 }
             }
 

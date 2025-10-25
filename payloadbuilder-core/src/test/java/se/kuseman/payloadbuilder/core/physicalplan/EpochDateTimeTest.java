@@ -23,6 +23,7 @@ public class EpochDateTimeTest extends Assert
     public void test()
     {
         EpochDateTime d = EpochDateTime.now();
+        assertFalse(d.hasNulls());
         assertFalse(d.equals(null));
         assertTrue(d.equals(d));
         assertFalse(d.equals(EpochDateTime.from("2010-10-10T00:10:00.00Z")));

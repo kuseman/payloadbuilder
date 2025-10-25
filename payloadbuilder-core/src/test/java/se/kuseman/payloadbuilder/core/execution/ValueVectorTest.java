@@ -6,6 +6,7 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.TimeZone;
 
@@ -36,6 +37,8 @@ public class ValueVectorTest extends APhysicalPlanTest
     @Test
     public void test_range()
     {
+        assertThrows(IllegalArgumentException.class, () -> ValueVector.range(10, 5));
+        VectorTestUtils.assertVectorsEquals(vv(Type.Int), ValueVector.range(0, 0));
         VectorTestUtils.assertVectorsEquals(vv(Type.Int, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9), ValueVector.range(0, 10));
         VectorTestUtils.assertVectorsEquals(vv(Type.Int, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19), ValueVector.range(10, 20));
     }
@@ -45,13 +48,13 @@ public class ValueVectorTest extends APhysicalPlanTest
     {
         ValueVector vv;
 
-        vv = ValueVector.literalAny(TupleVector.EMPTY);
+        vv = ValueVector.literalAny(1, TupleVector.EMPTY);
 
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, vv.getTable(0));
 
         try
         {
-            vv = ValueVector.literalAny(10);
+            vv = ValueVector.literalAny(1, 10);
             vv.getTable(0);
             fail("Should fail cause of cast");
 
@@ -120,13 +123,13 @@ public class ValueVectorTest extends APhysicalPlanTest
     {
         ValueVector vv;
 
-        vv = ValueVector.literalAny(vv(Type.Int));
+        vv = ValueVector.literalAny(1, vv(Type.Int));
 
         VectorTestUtils.assertVectorsEquals(vv(Type.Int), vv.getArray(0));
 
         try
         {
-            vv = ValueVector.literalAny(10);
+            vv = ValueVector.literalAny(1, 10);
             vv.getArray(0);
             fail("Should fail cause of cast");
 
@@ -139,7 +142,7 @@ public class ValueVectorTest extends APhysicalPlanTest
 
         try
         {
-            vv = ValueVector.literalTable(TupleVector.EMPTY);
+            vv = ValueVector.literalTable(TupleVector.EMPTY, 1);
             vv.getArray(0);
             fail("Should fail cause of cast");
 
@@ -189,13 +192,13 @@ public class ValueVectorTest extends APhysicalPlanTest
     {
         ValueVector vv;
 
-        vv = ValueVector.literalAny(ObjectVector.wrap(TupleVector.CONSTANT), 1);
+        vv = ValueVector.literalAny(1, ObjectVector.wrap(TupleVector.CONSTANT));
 
         VectorTestUtils.assertObjectVectorsEquals(ObjectVector.wrap(TupleVector.CONSTANT), vv.getObject(0));
 
         try
         {
-            vv = ValueVector.literalAny(10);
+            vv = ValueVector.literalAny(1, 10);
             vv.getObject(0);
             fail("Should fail cause of cast");
 
@@ -208,7 +211,7 @@ public class ValueVectorTest extends APhysicalPlanTest
 
         try
         {
-            vv = ValueVector.literalTable(TupleVector.EMPTY);
+            vv = ValueVector.literalTable(TupleVector.EMPTY, 1);
             vv.getObject(0);
             fail("Should fail cause of cast");
 
@@ -294,7 +297,7 @@ public class ValueVectorTest extends APhysicalPlanTest
         assertEquals(0, vv.getInt(0));
         vv = ValueVector.literalString("1", 1);
         assertEquals(1, vv.getInt(0));
-        vv = ValueVector.literalAny(Decimal.from("1.100"), 1);
+        vv = ValueVector.literalAny(1, Decimal.from("1.100"));
         assertEquals(1, vv.getInt(0));
 
         vv = ValueVector.literalDecimal(Decimal.from("1.100"), 1);
@@ -355,7 +358,7 @@ public class ValueVectorTest extends APhysicalPlanTest
         assertEquals(0, vv.getLong(0));
         vv = ValueVector.literalString("1", 1);
         assertEquals(1, vv.getLong(0));
-        vv = ValueVector.literalAny(Decimal.from("1.100"), 1);
+        vv = ValueVector.literalAny(1, Decimal.from("1.100"));
         assertEquals(1, vv.getLong(0));
 
         vv = ValueVector.literalDecimal(Decimal.from("1.100"), 1);
@@ -417,14 +420,14 @@ public class ValueVectorTest extends APhysicalPlanTest
         vv = ValueVector.literalString("1.100", 1);
         assertEquals(Decimal.from("1.100"), vv.getDecimal(0));
 
-        vv = ValueVector.literalAny(new BigDecimal("1.100"), 1);
+        vv = ValueVector.literalAny(1, new BigDecimal("1.100"));
         assertEquals(Decimal.from("1.100"), vv.getDecimal(0));
 
-        vv = ValueVector.literalAny(1.100D, 1);
+        vv = ValueVector.literalAny(1, 1.100D);
         assertEquals(Decimal.from("1.100000"), vv.getDecimal(0));
         try
         {
-            vv = ValueVector.literalAny(Instant.ofEpochMilli(1_600_000_000L), 1);
+            vv = ValueVector.literalAny(1, Instant.ofEpochMilli(1_600_000_000L));
             vv.getDecimal(0);
             fail();
         }
@@ -466,7 +469,7 @@ public class ValueVectorTest extends APhysicalPlanTest
         assertEquals(0F, vv.getFloat(0), 0);
         vv = ValueVector.literalString("1", 1);
         assertEquals(1F, vv.getFloat(0), 0);
-        vv = ValueVector.literalAny(Decimal.from("1.100"), 1);
+        vv = ValueVector.literalAny(1, Decimal.from("1.100"));
         assertEquals(1.1F, vv.getFloat(0), 0);
 
         vv = ValueVector.literalDecimal(Decimal.from("1.100"), 1);
@@ -527,7 +530,7 @@ public class ValueVectorTest extends APhysicalPlanTest
         assertEquals(0D, vv.getDouble(0), 0);
         vv = ValueVector.literalString("1", 1);
         assertEquals(1D, vv.getDouble(0), 0);
-        vv = ValueVector.literalAny(Decimal.from("1.100"), 1);
+        vv = ValueVector.literalAny(1, Decimal.from("1.100"));
         assertEquals(1.1D, vv.getDouble(0), 0);
 
         vv = ValueVector.literalDecimal(Decimal.from("1.100"), 1);
@@ -722,13 +725,80 @@ public class ValueVectorTest extends APhysicalPlanTest
     @Test
     public void test_literals()
     {
+        assertFalse(ValueVector.literalAny(1, "hello")
+                .hasNulls());
+        assertFalse(ValueVector.literalAny(1, "hello")
+                .isNull(0));
+
+        assertTrue(ValueVector.literalNull(ResolvedType.ANY, 1)
+                .hasNulls());
+        assertTrue(VectorTestUtils.vv(Type.Any, (Object) null, "hello")
+                .hasNulls());
+        assertFalse(ValueVector.literalAny(1, "hello")
+                .hasNulls());
+
+        assertEquals(0, ValueVector.literalBoolean(false, 0)
+                .size());
+        assertFalse(ValueVector.literalBoolean(false, 11)
+                .isNull(0));
+        assertFalse(ValueVector.literalBoolean(false, 11)
+                .getBoolean(0));
+        assertFalse(ValueVector.literalBoolean(false, 11)
+                .hasNulls());
+        assertFalse(ValueVector.literalInt(10, 10)
+                .hasNulls());
+        assertFalse(ValueVector.literalLong(10, 10)
+                .hasNulls());
+        assertFalse(ValueVector.literalFloat(10, 10)
+                .hasNulls());
+        assertFalse(ValueVector.literalDouble(10, 10)
+                .hasNulls());
+
+        ValueVector v = ValueVector.literalTable(TupleVector.EMPTY, 1);
+        assertVectorsEquals(vv(ResolvedType.table(Schema.EMPTY), TupleVector.EMPTY), v);
+        assertFalse(v.hasNulls());
+
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), true, true), ValueVector.literalBoolean(true, 2));
+        assertFalse(ValueVector.literalBoolean(false, 1)
+                .isNull(0));
         assertVectorsEquals(vv(ResolvedType.of(Type.Int), 10, 10), ValueVector.literalInt(10, 2));
+        assertFalse(ValueVector.literalInt(1, 1)
+                .isNull(0));
         assertVectorsEquals(vv(ResolvedType.of(Type.Long), 100L, 100L), ValueVector.literalLong(100L, 2));
+        assertFalse(ValueVector.literalLong(1, 1)
+                .isNull(0));
         assertVectorsEquals(vv(ResolvedType.of(Type.Float), 1000F, 1000F), ValueVector.literalFloat(1000F, 2));
+        assertFalse(ValueVector.literalFloat(1, 1)
+                .isNull(0));
         assertVectorsEquals(vv(ResolvedType.of(Type.Double), 10_000D, 10_000D), ValueVector.literalDouble(10_000D, 2));
+        assertFalse(ValueVector.literalDouble(1, 1)
+                .isNull(0));
         assertVectorsEquals(vv(ResolvedType.of(Type.String), "hello", "hello"), ValueVector.literalString("hello", 2));
+        assertFalse(ValueVector.literalString(UTF8String.from("helloe"), 1)
+                .isNull(0));
         assertVectorsEquals(vv(ResolvedType.of(Type.Int), null, null), ValueVector.literalNull(ResolvedType.of(Type.Int), 2));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), (Integer) null), ValueVector.literalNull(ResolvedType.of(Type.Int), 1));
+
+        assertVectorsEquals(vv(ResolvedType.of(Type.Decimal), Decimal.from(10)), ValueVector.literalDecimal(Decimal.from(10), 1));
+        assertFalse(ValueVector.literalDecimal(Decimal.from(10), 1)
+                .isNull(0));
+
+        ZonedDateTime now = ZonedDateTime.now();
+        assertVectorsEquals(vv(ResolvedType.of(Type.DateTime), EpochDateTime.from(now)), ValueVector.literalDateTime(EpochDateTime.from(now), 1));
+        assertFalse(ValueVector.literalDateTime(EpochDateTime.from(now), 1)
+                .isNull(0));
+
+        assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), EpochDateTimeOffset.from(now)), ValueVector.literalDateTimeOffset(EpochDateTimeOffset.from(now), 1));
+        assertFalse(ValueVector.literalDateTimeOffset(EpochDateTimeOffset.from(now), 1)
+                .isNull(0));
+
+        assertVectorsEquals(vv(ResolvedType.array(Type.Int), vv(Type.Int, 1, 2, 3)), ValueVector.literalArray(vv(Type.Int, 1, 2, 3), 1));
+        assertFalse(ValueVector.literalArray(vv(Type.Int, 1, 2, 3), 1)
+                .isNull(0));
+
+        assertVectorsEquals(vv(ResolvedType.object(Schema.EMPTY), ObjectVector.EMPTY), ValueVector.literalObject(ObjectVector.EMPTY, 1));
+        assertFalse(ValueVector.literalObject(ObjectVector.EMPTY, 1)
+                .isNull(0));
 
         // These types implement ValueVector interface and was previous returned as themselves (for performance reasons)
         // when size = 1 which caused compatibility problems in certain places where there was no

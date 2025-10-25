@@ -16,6 +16,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 class MutableObjectVector extends AMutableVector
 {
     private Object[] buffer;
+    private boolean hasNulls;
 
     MutableObjectVector(VectorFactory factory, int estimatedCapacity, ResolvedType type)
     {
@@ -28,6 +29,13 @@ class MutableObjectVector extends AMutableVector
         size = Math.max(size, row + 1);
         ensureSize(row + 1);
         buffer[row] = null;
+        hasNulls = true;
+    }
+
+    @Override
+    public boolean hasNulls()
+    {
+        return hasNulls;
     }
 
     @Override
@@ -50,6 +58,7 @@ class MutableObjectVector extends AMutableVector
             value = UTF8String.from(value);
         }
         buffer[row] = value;
+        hasNulls = value == null;
     }
 
     @Override
@@ -242,11 +251,13 @@ class MutableObjectVector extends AMutableVector
 
     private void copyString(int startRow, ValueVector source, int sourceRow, int length)
     {
+        boolean hasNulls = source.hasNulls();
         for (int i = 0; i < length; i++)
         {
             int sr = sourceRow + i;
             int dr = startRow + i;
-            if (source.isNull(sr))
+            if (hasNulls
+                    && source.isNull(sr))
             {
                 setNull(dr);
             }
@@ -259,11 +270,13 @@ class MutableObjectVector extends AMutableVector
 
     private void copyDecimal(int startRow, ValueVector source, int sourceRow, int length)
     {
+        boolean hasNulls = source.hasNulls();
         for (int i = 0; i < length; i++)
         {
             int sr = sourceRow + i;
             int dr = startRow + i;
-            if (source.isNull(sr))
+            if (hasNulls
+                    && source.isNull(sr))
             {
                 setNull(dr);
             }
@@ -276,11 +289,13 @@ class MutableObjectVector extends AMutableVector
 
     private void copyDateTime(int startRow, ValueVector source, int sourceRow, int length)
     {
+        boolean hasNulls = source.hasNulls();
         for (int i = 0; i < length; i++)
         {
             int sr = sourceRow + i;
             int dr = startRow + i;
-            if (source.isNull(sr))
+            if (hasNulls
+                    && source.isNull(sr))
             {
                 setNull(dr);
             }
@@ -293,11 +308,13 @@ class MutableObjectVector extends AMutableVector
 
     private void copyDateTimeOffset(int startRow, ValueVector source, int sourceRow, int length)
     {
+        boolean hasNulls = source.hasNulls();
         for (int i = 0; i < length; i++)
         {
             int sr = sourceRow + i;
             int dr = startRow + i;
-            if (source.isNull(sr))
+            if (hasNulls
+                    && source.isNull(sr))
             {
                 setNull(dr);
             }
@@ -310,11 +327,13 @@ class MutableObjectVector extends AMutableVector
 
     private void copyArray(int startRow, ValueVector source, int sourceRow, int length)
     {
+        boolean hasNulls = source.hasNulls();
         for (int i = 0; i < length; i++)
         {
             int sr = sourceRow + i;
             int dr = startRow + i;
-            if (source.isNull(sr))
+            if (hasNulls
+                    && source.isNull(sr))
             {
                 setNull(dr);
             }
@@ -327,11 +346,13 @@ class MutableObjectVector extends AMutableVector
 
     private void copyObject(int startRow, ValueVector source, int sourceRow, int length)
     {
+        boolean hasNulls = source.hasNulls();
         for (int i = 0; i < length; i++)
         {
             int sr = sourceRow + i;
             int dr = startRow + i;
-            if (source.isNull(sr))
+            if (hasNulls
+                    && source.isNull(sr))
             {
                 setNull(dr);
             }
@@ -361,11 +382,13 @@ class MutableObjectVector extends AMutableVector
 
     private void copyAny(int startRow, ValueVector source, int sourceRow, int length)
     {
+        boolean hasNulls = source.hasNulls();
         for (int i = 0; i < length; i++)
         {
             int sr = sourceRow + i;
             int dr = startRow + i;
-            if (source.isNull(sr))
+            if (hasNulls
+                    && source.isNull(sr))
             {
                 setNull(dr);
             }
