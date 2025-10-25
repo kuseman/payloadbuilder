@@ -48,7 +48,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected =
                 projection(
-                    new TableScan(new TableSchema(expectedSchema), tableSource, Projection.ALL, false, emptyList(), null),
+                    new TableScan(new TableSchema(expectedSchema), tableSource, Projection.ALL, emptyList(), null),
                     List.of(new AsteriskExpression(null)));
         //@formatter:on
 
@@ -73,7 +73,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected =
                 new Limit(
                         projection(
-                            new TableScan(new TableSchema(expectedSchema), tableSource, Projection.ALL, false, emptyList(), null),
+                            new TableScan(new TableSchema(expectedSchema), tableSource, Projection.ALL, emptyList(), null),
                             List.of(new AsteriskExpression(null))),
                         e("10"));
         //@formatter:on
@@ -168,7 +168,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
                                         new OperatorFunctionScan(
                                            Schema.of(Column.of("output", Type.Any)),
                                            projection(
-                                               new TableScan(new TableSchema(expectedSchema), tableSource, Projection.ALL, false, emptyList(), null),
+                                               new TableScan(new TableSchema(expectedSchema), tableSource, Projection.ALL, emptyList(), null),
                                                List.of(new AsteriskExpression(null))),
                                            "",
                                            "object_array",

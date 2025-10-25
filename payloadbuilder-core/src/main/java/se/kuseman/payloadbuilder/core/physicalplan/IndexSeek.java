@@ -26,18 +26,16 @@ public class IndexSeek extends TableScan
 {
     private final ISeekPredicate seekPredicate;
 
-    public IndexSeek(int nodeId, Schema schema, TableSourceReference tableSource, String catalogAlias, boolean tempTable, ISeekPredicate seekPredicate, IDatasource datasource, List<Option> options)
+    public IndexSeek(int nodeId, Schema schema, TableSourceReference tableSource, String catalogAlias, ISeekPredicate seekPredicate, IDatasource datasource, List<Option> options)
     {
-        super(nodeId, schema, tableSource, catalogAlias, tempTable, datasource, options);
+        super(nodeId, schema, tableSource, catalogAlias, datasource, options);
         this.seekPredicate = requireNonNull(seekPredicate, "seekPredicate");
     }
 
     @Override
     public String getName()
     {
-        return "Index Seek: " + (tempTable ? "#"
-                : "")
-               + seekPredicate.getIndex();
+        return "Index Seek: " + seekPredicate.getIndex();
     }
 
     @Override

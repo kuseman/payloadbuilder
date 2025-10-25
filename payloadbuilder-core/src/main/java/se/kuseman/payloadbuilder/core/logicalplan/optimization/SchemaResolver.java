@@ -1,15 +1,12 @@
 package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
-import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
@@ -23,7 +20,6 @@ import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
@@ -139,48 +135,27 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
     @Override
     protected ILogicalPlan create(TableScan plan, Ctx context)
     {
-        String catalogAlias = lowerCase(defaultIfBlank(plan.getCatalogAlias(), context.getSession()
-                .getDefaultCatalogAlias()));
-
+        String catalogAlias = defaultIfBlank(plan.getCatalogAlias(), context.getSession()
+                .getDefaultCatalogAlias());
         Catalog catalog = context.getSession()
                 .getCatalog(catalogAlias);
 
-        Schema schema;
-        List<Index> indices = emptyList();
-        if (plan.isTempTable())
+        TableSchema tableSchema = catalog.getTableSchema(context.getSession(), catalogAlias, plan.getTableSource()
+                .getName(), plan.getOptions());
+
+        Schema schema = tableSchema.getSchema();
+        if (schema.getSize() > 0
+                && schema.getColumns()
+                        .stream()
+                        .anyMatch(c -> SchemaUtils.isAsterisk(c)))
         {
-            QualifiedName table = plan.getTableSource()
-                    .getName()
-                    .toLowerCase();
-
-            if (!context.schemaByTempTable.containsKey(table))
-            {
-                throw new QueryException("No temporary table found with name #" + table);
-            }
-
-            TableSchema tableSchema = context.schemaByTempTable.get(table);
-            schema = tableSchema.getSchema();
-            indices = tableSchema.getIndices();
+            throw new ParseException("Schema for table: " + plan.getTableSource()
+                                     + " is invalid. Schema must be either empty (asterisk) or have only regular columns. Check implementation of Catalog: "
+                                     + catalog.getName(),
+                    plan.getLocation());
         }
-        else
-        {
-            TableSchema tableSchema = catalog.getTableSchema(context.getSession(), catalogAlias, plan.getTableSource()
-                    .getName(), plan.getOptions());
 
-            schema = tableSchema.getSchema();
-            if (schema.getSize() > 0
-                    && schema.getColumns()
-                            .stream()
-                            .anyMatch(c -> SchemaUtils.isAsterisk(c)))
-            {
-                throw new ParseException("Schema for table: " + plan.getTableSource()
-                                         + " is invalid. Schema must be either empty (asterisk) or have only regular columns. Check implementation of Catalog: "
-                                         + catalog.getName(),
-                        plan.getLocation());
-            }
-
-            indices = tableSchema.getIndices();
-        }
+        List<Index> indices = tableSchema.getIndices();
 
         // No schema returned, create an asterisk column with table source ref.
         if (Schema.EMPTY.equals(schema))
@@ -198,9 +173,9 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                 .map(o -> new Option(o.getOption(), ExpressionResolver.INSTANCE.visit(o.getValueExpression(), context)))
                 .collect(toList());
 
-        TableSchema tableSchema = new TableSchema(schema, indices);
+        tableSchema = new TableSchema(schema, indices);
         context.schemaByTableSource.put(plan.getTableSource(), tableSchema);
-        return new TableScan(tableSchema, plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
+        return new TableScan(tableSchema, plan.getTableSource(), plan.getProjection(), options, plan.getLocation());
     }
 
     /**

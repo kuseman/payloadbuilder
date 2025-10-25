@@ -44,7 +44,7 @@ public class IndexSeekTest extends APhysicalPlanTest
         ISeekPredicate predicate = mock(ISeekPredicate.class);
         when(predicate.getSeekKeys(context)).thenReturn(emptyList());
 
-        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", false, predicate, ds, emptyList());
+        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", predicate, ds, emptyList());
         assertFalse(is.execute(context)
                 .hasNext());
     }
@@ -68,7 +68,7 @@ public class IndexSeekTest extends APhysicalPlanTest
         context.getStatementContext()
                 .setIndexSeekKeys(0, List.of(() -> VectorTestUtils.vv(Type.Int, 1, 2, 3)));
 
-        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", false, predicate, ds, emptyList());
+        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", predicate, ds, emptyList());
 
         assertNotNull(context.getStatementContext()
                 .getIndexSeekKeys(0));
@@ -112,7 +112,7 @@ public class IndexSeekTest extends APhysicalPlanTest
         ISeekPredicate predicate = mock(ISeekPredicate.class);
         when(predicate.getSeekKeys(context)).thenReturn(List.of(() -> VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
 
-        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", false, predicate, ds, List.of(new Option(IExecutionContext.BATCH_SIZE, new LiteralIntegerExpression(2))));
+        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", predicate, ds, List.of(new Option(IExecutionContext.BATCH_SIZE, new LiteralIntegerExpression(2))));
 
         TupleIterator it = is.execute(context);
         assertEquals(3, it.estimatedBatchCount());
@@ -179,7 +179,7 @@ public class IndexSeekTest extends APhysicalPlanTest
         ISeekPredicate predicate = mock(ISeekPredicate.class);
         when(predicate.getSeekKeys(context)).thenReturn(List.of(() -> VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
 
-        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", false, predicate, ds, List.of(new Option(IExecutionContext.BATCH_SIZE, new LiteralIntegerExpression(2))));
+        IndexSeek is = new IndexSeek(0, Schema.EMPTY, tsf, "", predicate, ds, List.of(new Option(IExecutionContext.BATCH_SIZE, new LiteralIntegerExpression(2))));
 
         TupleIterator it = is.execute(context);
         assertEquals(3, it.estimatedBatchCount());
@@ -223,7 +223,7 @@ public class IndexSeekTest extends APhysicalPlanTest
         when(predicate.getIndex()).thenReturn(new Index(QualifiedName.of("table"), List.of("col1"), ColumnsType.ALL));
         when(predicate.getSeekKeys(context)).thenReturn(List.of(() -> VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
 
-        IndexSeek is = new IndexSeek(0, schema, tsf, "", false, predicate, ds, List.of(new Option(IExecutionContext.BATCH_SIZE, new LiteralIntegerExpression(2))));
+        IndexSeek is = new IndexSeek(0, schema, tsf, "", predicate, ds, List.of(new Option(IExecutionContext.BATCH_SIZE, new LiteralIntegerExpression(2))));
 
         assertEquals("Index Seek: table [col1] (ALL)", is.getName());
 

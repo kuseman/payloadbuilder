@@ -19,16 +19,14 @@ public class TableScan extends TableSource
     /** List of projected columns */
     private final Projection projection;
     private final TableSchema tableSchema;
-    private final boolean tempTable;
     private final List<Option> options;
     private final Location location;
 
-    public TableScan(TableSchema tableSchema, TableSourceReference tableSource, Projection projection, boolean tempTable, List<Option> options, Location location)
+    public TableScan(TableSchema tableSchema, TableSourceReference tableSource, Projection projection, List<Option> options, Location location)
     {
         super(tableSource);
         this.tableSchema = requireNonNull(tableSchema, "tableSchema");
         this.projection = requireNonNull(projection, "projection");
-        this.tempTable = tempTable;
         this.options = requireNonNull(options, "options");
         this.location = location;
         if (tableSource.getType() != Type.TABLE)
@@ -56,11 +54,6 @@ public class TableScan extends TableSource
     public TableSchema getTableSchema()
     {
         return tableSchema;
-    }
-
-    public boolean isTempTable()
-    {
-        return tempTable;
     }
 
     @Override
@@ -103,7 +96,6 @@ public class TableScan extends TableSource
             return super.equals(that)
                     && tableSchema.equals(that.tableSchema)
                     && projection.equals(that.projection)
-                    && tempTable == that.tempTable
                     && options.equals(that.options);
 
         }
@@ -114,10 +106,6 @@ public class TableScan extends TableSource
     public String toString()
     {
         StringBuilder sb = new StringBuilder("Scan: ");
-        if (tempTable)
-        {
-            sb.append("#");
-        }
         sb.append(tableSource.toString());
         sb.append(", projection: ")
                 .append(projection);

@@ -238,6 +238,6 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
         }
 
         LOGGER.debug("Projected columns for {}: {}", plan.getTableSource(), projection);
-        return new TableScan(plan.getTableSchema(), plan.getTableSource(), projection, plan.isTempTable(), plan.getOptions(), plan.getLocation());
+        return new TableScan(plan.getTableSchema(), plan.getTableSource(), projection, plan.getOptions(), plan.getLocation());
     }
 }

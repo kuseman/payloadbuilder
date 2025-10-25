@@ -108,7 +108,7 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheName
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheRemoveContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CastExpressionContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnAliasListContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnListContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CountExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DateAddExpressionContext;
@@ -136,6 +136,8 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.GenericFu
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.IdentifierContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.IfStatementContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.IndirectionContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.InsertStatementContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.InsertStatementValueContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.JoinPartContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.LambdaExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.LiteralContext;
@@ -147,9 +149,11 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.SelectSta
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.SetStatementContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ShowStatementContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.SortItemContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableNameContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceJoinedContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceOptionContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceOptionsContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TemplateStringAtomContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TemplateStringLiteralContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TopCountContext;
@@ -161,11 +165,11 @@ import se.kuseman.payloadbuilder.core.statement.CacheFlushRemoveStatement;
 import se.kuseman.payloadbuilder.core.statement.DescribeSelectStatement;
 import se.kuseman.payloadbuilder.core.statement.DropTableStatement;
 import se.kuseman.payloadbuilder.core.statement.IfStatement;
-import se.kuseman.payloadbuilder.core.statement.InsertIntoStatement;
+import se.kuseman.payloadbuilder.core.statement.LogicalInsertIntoStatement;
+import se.kuseman.payloadbuilder.core.statement.LogicalSelectIntoStatement;
 import se.kuseman.payloadbuilder.core.statement.LogicalSelectStatement;
 import se.kuseman.payloadbuilder.core.statement.PrintStatement;
 import se.kuseman.payloadbuilder.core.statement.QueryStatement;
-import se.kuseman.payloadbuilder.core.statement.SelectStatement;
 import se.kuseman.payloadbuilder.core.statement.SetStatement;
 import se.kuseman.payloadbuilder.core.statement.ShowStatement;
 import se.kuseman.payloadbuilder.core.statement.Statement;
@@ -356,13 +360,13 @@ public class QueryParser
         @Override
         public Object visitDescribeStatement(DescribeStatementContext ctx)
         {
-            return new DescribeSelectStatement((SelectStatement) visit(ctx.selectStatement()), false, false);
+            return new DescribeSelectStatement((Statement) visit(ctx.dmlStatement()), false, false);
         }
 
         @Override
         public Object visitAnalyzeStatement(AnalyzeStatementContext ctx)
         {
-            return new DescribeSelectStatement((SelectStatement) visit(ctx.selectStatement()), true, false);
+            return new DescribeSelectStatement((Statement) visit(ctx.dmlStatement()), true, false);
         }
 
         @Override
@@ -413,13 +417,80 @@ public class QueryParser
         @Override
         public Object visitDropTableStatement(DropTableStatementContext ctx)
         {
+            boolean tempTable = ctx.tableName().tempHash != null;
             String catalogAlias = ctx.tableName().catalog != null ? ctx.tableName().catalog.getText()
-                    : null;
+                    : "";
+            if (tempTable)
+            {
+                catalogAlias = Catalog.SYSTEM_CATALOG_ALIAS;
+            }
             QualifiedName qname = getQualifiedName(ctx.tableName()
                     .qname());
             boolean lenient = ctx.EXISTS() != null;
-            boolean tempTable = ctx.tableName().tempHash != null;
-            return new DropTableStatement(catalogAlias, qname, lenient, tempTable, Location.from(ctx));
+            return new DropTableStatement(catalogAlias, qname, lenient, Location.from(ctx));
+        }
+
+        @Override
+        public Object visitInsertStatement(InsertStatementContext ctx)
+        {
+            LogicalSelectStatement input = (LogicalSelectStatement) visit(ctx.insertStatementValue());
+
+            if (input.isAssignmentSelect())
+            {
+                throw new ParseException("Insert statements cannot have assignments", Location.from(ctx.insertStatementValue()));
+            }
+
+            List<String> columns = ctx.columnList()
+                    .identifier()
+                    .stream()
+                    .map(this::getIdentifier)
+                    .toList();
+
+            // Wrap the input in a Limit if a TOP count is specified
+            if (ctx.topCount() != null)
+            {
+                IExpression topCount = (IExpression) visit(ctx.topCount());
+
+                ILogicalPlan inputInput = input.getSelect();
+                // Collapse nested limits
+                // Take the smaller of the expressions
+                if (inputInput instanceof Limit limit)
+                {
+                    int insertTopCount = topCount.eval(null)
+                            .getInt(0);
+                    int selectTopCount = limit.getLimitExpression()
+                            .eval(null)
+                            .getInt(0);
+
+                    if (selectTopCount < insertTopCount)
+                    {
+                        topCount = limit.getLimitExpression();
+                    }
+                    inputInput = limit.getInput();
+                }
+
+                input = new LogicalSelectStatement(new Limit(inputInput, topCount), false);
+            }
+            TableName tableName = tableName(ctx.tableName(), ctx.intoOptions);
+            return new LogicalInsertIntoStatement(input, tableName.catalogAlias, tableName.table, columns, tableName.options, Location.from(ctx));
+        }
+
+        @Override
+        public Object visitInsertStatementValue(InsertStatementValueContext ctx)
+        {
+            if (ctx.queryExpression() != null)
+            {
+                return visit(ctx.queryExpression());
+            }
+
+            List<List<IExpression>> expressions = ctx.tableValueConstructor()
+                    .expr_list()
+                    .stream()
+                    .map(this::getExpressionList)
+                    .toList();
+
+            ConstantScan constantScan = ConstantScan.createFromRows(expressions, Location.from(ctx.tableValueConstructor()));
+            return new LogicalSelectStatement(constantScan, false);
         }
 
         @Override
@@ -460,26 +531,17 @@ public class QueryParser
             plan = wrapTop(plan, ctx);
             plan = wrapOperatorFunction(plan, ctx);
 
-            LogicalSelectStatement statement = new LogicalSelectStatement(plan, assignmentSelect);
+            Statement statement = new LogicalSelectStatement(plan, assignmentSelect);
 
             if (ctx.into != null)
             {
-                if (ctx.into.tempHash == null)
-                {
-                    throw new ParseException("Can only insert into temp tables", ctx.into);
-                }
-                else if (insideSubQuery)
+                if (insideSubQuery)
                 {
                     throw new ParseException("SELECT INTO are not allowed in sub query context", ctx.into);
                 }
 
-                List<Option> intoOptions = ctx.intoOptions != null ? ctx.intoOptions.options.stream()
-                        .map(to -> (Option) visit(to))
-                        .collect(toList())
-                        : emptyList();
-
-                QualifiedName tableName = getQualifiedName(ctx.into.qname()).toLowerCase();
-                statement = new InsertIntoStatement(statement, tableName, intoOptions, Location.from(ctx.into));
+                TableName tableName = tableName(ctx.into, ctx.intoOptions);
+                statement = new LogicalSelectIntoStatement((LogicalSelectStatement) statement, tableName.catalogAlias, tableName.table, tableName.options, Location.from(ctx.into));
             }
 
             return statement;
@@ -629,11 +691,17 @@ public class QueryParser
             if (ctx.tableName() != null)
             {
                 String catalogAlias = defaultIfBlank(getIdentifier(ctx.tableName().catalog), "");
-                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.TABLE, catalogAlias, getQualifiedName(ctx.tableName()
-                        .qname()), alias);
-
                 boolean tempTable = ctx.tableName().tempHash != null;
-                return new TableScan(TableSchema.EMPTY, tableSourceRef, se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, tempTable, options, Location.from(ctx.tableName()));
+                QualifiedName qname = getQualifiedName(ctx.tableName()
+                        .qname());
+                if (tempTable)
+                {
+                    catalogAlias = Catalog.SYSTEM_CATALOG_ALIAS;
+                    qname = qname.prepend("#");
+                }
+                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.TABLE, catalogAlias, qname, alias);
+
+                return new TableScan(TableSchema.EMPTY, tableSourceRef, se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, options, Location.from(ctx.tableName()));
             }
             else if (ctx.variable() != null)
             {
@@ -650,7 +718,7 @@ public class QueryParser
             }
             else if (ctx.derivedTable() != null)
             {
-                ColumnAliasListContext columnAliasList = ctx.columnAliasList();
+                ColumnListContext columnList = ctx.columnList();
 
                 // Expression scan
                 if (ctx.derivedTable()
@@ -660,9 +728,9 @@ public class QueryParser
                     {
                         throw new ParseException("Expression scans cannot have options", ctx.tableSourceOptions());
                     }
-                    if (columnAliasList != null)
+                    if (columnList != null)
                     {
-                        throw new ParseException("Columns alias(es) is not supported on expression selects", columnAliasList);
+                        throw new ParseException("Columns alias(es) is not supported on expression selects", columnList);
                     }
 
                     IExpression expression = getExpression(ctx.derivedTable()
@@ -678,9 +746,9 @@ public class QueryParser
                 if (ctx.derivedTable()
                         .selectStatement() != null)
                 {
-                    if (columnAliasList != null)
+                    if (columnList != null)
                     {
-                        throw new ParseException("Columns alias(es) is not supported on sub query statements", columnAliasList);
+                        throw new ParseException("Columns alias(es) is not supported on sub query statements", columnList);
                     }
 
                     boolean prevInsideSubQuery = insideSubQuery;
@@ -709,7 +777,6 @@ public class QueryParser
                 }
                 else
                 {
-                    //
                     boolean prevInsideProjection = insideProjection;
                     insideProjection = true;
                     List<List<IExpression>> expressions = ctx.derivedTable()
@@ -721,9 +788,9 @@ public class QueryParser
                     insideProjection = prevInsideProjection;
 
                     List<String> columns = emptyList();
-                    if (columnAliasList != null)
+                    if (columnList != null)
                     {
-                        columns = columnAliasList.identifier()
+                        columns = columnList.identifier()
                                 .stream()
                                 .map(this::getIdentifier)
                                 .toList();
@@ -1267,6 +1334,31 @@ public class QueryParser
             return new TemplateStringExpression(expressions);
         }
 
+        private TableName tableName(TableNameContext tableNameCtx, TableSourceOptionsContext optionsCtx)
+        {
+            IdentifierContext catalog = tableNameCtx.catalog;
+            boolean tempTable = tableNameCtx.tempHash != null;
+
+            String catalogAlias = catalog != null ? catalog.getText()
+                    : "";
+            QualifiedName tableName = getQualifiedName(tableNameCtx.qname());
+            if (tempTable)
+            {
+                catalogAlias = Catalog.SYSTEM_CATALOG_ALIAS;
+                tableName = tableName.prepend("#");
+            }
+            List<Option> options = optionsCtx != null ? optionsCtx.options.stream()
+                    .map(to -> (Option) visit(to))
+                    .collect(toList())
+                    : emptyList();
+
+            return new TableName(tableName, catalogAlias, options);
+        }
+
+        record TableName(QualifiedName table, String catalogAlias, List<Option> options)
+        {
+        }
+
         private IExpression wrapIndirection(IExpression target, List<IndirectionContext> list)
         {
             IExpression result = null;
@@ -1325,7 +1417,7 @@ public class QueryParser
                     .map(e -> (IExpression) visit(e))
                     .collect(toList());
 
-            // TODO: This could be keep as a list to avoid building a tree
+            // TODO: This could be kept as a list to avoid building a tree
             for (IExpression r : rightList)
             {
                 if (result == null)
@@ -1351,7 +1443,7 @@ public class QueryParser
                 return leftE;
             }
 
-            // TODO: This could be keep as a list to avoid building a tree
+            // TODO: This could be kept as a list to avoid building a tree
             int count = right.size();
             IExpression result = null;
             for (int i = 0; i < count; i++)

@@ -93,7 +93,7 @@ public class TableScanTest extends APhysicalPlanTest
     public void test_validation_asterisk_with_empty_runtime_schema()
     {
         Schema schema = Schema.of(ast("col", table));
-        IPhysicalPlan plan = new TableScan(0, schema, table, "System", false, new IDatasource()
+        IPhysicalPlan plan = new TableScan(0, schema, table, "System", new IDatasource()
         {
             @Override
             public TupleIterator execute(IExecutionContext context)
@@ -119,7 +119,7 @@ public class TableScanTest extends APhysicalPlanTest
     public void test_validation_not_matching_runtime_schema_by_size()
     {
         Schema schema = Schema.of(col("Value", ResolvedType.of(Type.Int), table), col("Value2", ResolvedType.of(Type.Int), table));
-        IPhysicalPlan plan = new TableScan(0, schema, table, "System", false, new IDatasource()
+        IPhysicalPlan plan = new TableScan(0, schema, table, "System", new IDatasource()
         {
             @Override
             public TupleIterator execute(IExecutionContext context)
@@ -144,7 +144,7 @@ public class TableScanTest extends APhysicalPlanTest
     public void test_validation_not_matching_runtime_schema_by_column()
     {
         Schema schema = Schema.of(col("Value", ResolvedType.of(Type.Int), table));
-        IPhysicalPlan plan = new TableScan(0, schema, table, "System", false, new IDatasource()
+        IPhysicalPlan plan = new TableScan(0, schema, table, "System", new IDatasource()
         {
             @Override
             public TupleIterator execute(IExecutionContext context)
@@ -169,7 +169,7 @@ public class TableScanTest extends APhysicalPlanTest
     public void test_validation_not_matching_runtime_schema_by_type()
     {
         Schema schema = Schema.of(col("Value", ResolvedType.of(Type.Int), table));
-        IPhysicalPlan plan = new TableScan(0, schema, table, "System", false, new IDatasource()
+        IPhysicalPlan plan = new TableScan(0, schema, table, "System", new IDatasource()
         {
             @Override
             public TupleIterator execute(IExecutionContext context)

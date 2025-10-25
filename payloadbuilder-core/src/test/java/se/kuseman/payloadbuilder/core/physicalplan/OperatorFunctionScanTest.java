@@ -67,7 +67,7 @@ public class OperatorFunctionScanTest extends APhysicalPlanTest
         MutableBoolean closed = new MutableBoolean();
         IDatasource inner = schemaDS(() -> closed.setTrue(), input);
 
-        IPhysicalPlan plan = new OperatorFunctionScan(1, new TableScan(0, schema, table, "", false, inner, emptyList()), function, "", Schema.of(Column.of("expr1", ResolvedType.table(schema))));
+        IPhysicalPlan plan = new OperatorFunctionScan(1, new TableScan(0, schema, table, "", inner, emptyList()), function, "", Schema.of(Column.of("expr1", ResolvedType.table(schema))));
 
         assertEquals(Schema.of(Column.of("expr1", ResolvedType.table(schema))), plan.getSchema());
 

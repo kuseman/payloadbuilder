@@ -52,10 +52,12 @@ import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
+import se.kuseman.payloadbuilder.core.logicalplan.Limit;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
+import se.kuseman.payloadbuilder.core.statement.LogicalInsertIntoStatement;
 import se.kuseman.payloadbuilder.core.statement.LogicalSelectStatement;
 import se.kuseman.payloadbuilder.core.statement.QueryStatement;
 import se.kuseman.payloadbuilder.core.statement.Statement;
@@ -250,12 +252,6 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_that_we_cannot_insert_into_a_non_temp_table()
-    {
-        assertQueryFail(ParseException.class, "Can only insert into temp tables", "select * into \"table\" from tableA");
-    }
-
-    @Test
     public void test_selectItems_assignment()
     {
         assertSelect("select @var = 10");
@@ -282,7 +278,6 @@ public class QueryParserTest extends Assert
                                 TableSchema.EMPTY,
                                 new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "a"),
                                 se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL,
-                                false,
                                 emptyList(),
                                 null),
                             null,
@@ -349,7 +344,7 @@ public class QueryParserTest extends Assert
 
         // Analyze insert into
         assertQuery("analyze select * into #temp from \"table\"");
-
+        assertQuery("describe select * into #temp from \"table\"");
     }
 
     @Test
@@ -561,8 +556,8 @@ public class QueryParserTest extends Assert
                 .getChildren()
                 .get(0)).getPopulateAlias());
 
+        // CSOFF
         assertSelect(
-                // CSOFF
                 "select a.art_id from article a inner join (select * from articleAttribute aa  left join articlePrice ap with (populate=true) on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
         // CSON
 
@@ -570,6 +565,99 @@ public class QueryParserTest extends Assert
         assertQueryFail(ParseException.class, "Alias is mandatory on joined table sources", "select * from \"table\" t inner join tableA on col = t.col");
 
         // TODO: more parser tests, where, orderby, group by
+    }
+
+    @Test
+    public void test_insert_into()
+    {
+        assertQuery("""
+                DESCRIBE
+                INSERT INTO sys#table1(col1, col2)
+                values (1, 2)
+                ,      (3, 4)
+                """);
+
+        assertQuery("""
+                ANALYZE
+                INSERT INTO sys#table1(col1, col2)
+                values (1, 2)
+                ,      (3, 4)
+                """);
+
+        assertQuery("""
+                INSERT INTO sys#table1(col1, col2)
+                values (1, 2)
+                ,      (3, 4)
+                """);
+
+        assertQuery("""
+                INSERT INTO sys#table1(col1, col2)
+                select 1,2
+                """);
+
+        assertQuery("""
+                INSERT TOP 10 INTO es#table1(col1, col2)
+                select 1,2
+                """);
+
+        assertQuery("""
+                INSERT TOP 10 INTO table1(col1, col2)
+                select *
+                FROM
+                (
+                    VALUES (1,2)
+                    ,      (3,4)
+                ) t (col3, col3)
+                """);
+
+        assertQuery("""
+                INSERT TOP 10 INTO table1(col1, col2) WITH (transactionType='BATCH')
+                select *
+                FROM
+                (
+                    VALUES (1,2)
+                    ,      (3,4)
+                ) t (col3, col3)
+                """);
+
+        assertQueryFail(ParseException.class, "Insert statements cannot have assignments", """
+                INSERT TOP 10 INTO es#table1(col1, col2)
+                select @value = col2
+                from jdbc#table2
+                where col2 > 10
+                """);
+
+        // Verify that nested limits are collapsed
+        Limit plan = (Limit) ((LogicalInsertIntoStatement) assertQuery("""
+                INSERT TOP 1 INTO table1(col1, col2)
+                select TOP 2 col3, col4
+                FROM
+                (
+                VALUES (1,2)
+                , (3,4)
+                ) t (col3, col4)
+                """).getStatements()
+                .get(0)).getInput()
+                .getSelect();
+
+        assertFalse("Nested limits should have been collapsed", plan.getInput() instanceof Limit);
+        assertEquals(LiteralIntegerExpression.createLiteralNumericExpression("1"), plan.getLimitExpression());
+
+        // Verify that we take the smallest TOP
+        plan = (Limit) ((LogicalInsertIntoStatement) assertQuery("""
+                INSERT TOP 2 INTO table1(col1, col2)
+                select TOP 1 col3, col4
+                FROM
+                (
+                VALUES (1,2)
+                , (3,4)
+                ) t (col3, col4)
+                """).getStatements()
+                .get(0)).getInput()
+                .getSelect();
+
+        assertFalse("Nested limits should have been collapsed", plan.getInput() instanceof Limit);
+        assertEquals(LiteralIntegerExpression.createLiteralNumericExpression("1"), plan.getLimitExpression());
     }
 
     @Test

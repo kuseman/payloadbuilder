@@ -3,26 +3,31 @@ package se.kuseman.payloadbuilder.core.planning;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static se.kuseman.payloadbuilder.core.logicalplan.optimization.LogicalPlanOptimizer.resolveExpression;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.IDatasink;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.Index;
-import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
+import se.kuseman.payloadbuilder.api.catalog.InsertIntoData;
 import se.kuseman.payloadbuilder.api.catalog.Option;
-import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.SelectIntoData;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.catalog.system.SelectIntoTempTableSink;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
@@ -44,9 +49,10 @@ import se.kuseman.payloadbuilder.core.statement.CacheFlushRemoveStatement;
 import se.kuseman.payloadbuilder.core.statement.DescribeSelectStatement;
 import se.kuseman.payloadbuilder.core.statement.DropTableStatement;
 import se.kuseman.payloadbuilder.core.statement.IfStatement;
-import se.kuseman.payloadbuilder.core.statement.InsertIntoStatement;
+import se.kuseman.payloadbuilder.core.statement.LogicalInsertIntoStatement;
+import se.kuseman.payloadbuilder.core.statement.LogicalSelectIntoStatement;
 import se.kuseman.payloadbuilder.core.statement.LogicalSelectStatement;
-import se.kuseman.payloadbuilder.core.statement.PhysicalSelectStatement;
+import se.kuseman.payloadbuilder.core.statement.PhysicalStatement;
 import se.kuseman.payloadbuilder.core.statement.PrintStatement;
 import se.kuseman.payloadbuilder.core.statement.SetStatement;
 import se.kuseman.payloadbuilder.core.statement.ShowStatement;
@@ -113,12 +119,10 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
     public Statement visit(DescribeSelectStatement statement, Context context)
     {
         context.analyze = statement.isAnalyze();
-        PhysicalSelectStatement physicalSelectStatement = (PhysicalSelectStatement) statement.getSelectStatement()
+        PhysicalStatement physicalStatement = (PhysicalStatement) statement.getStatement()
                 .accept(this, context);
         context.analyze = false;
-
-        PhysicalSelectStatement physicalDescribeStatement = new PhysicalSelectStatement(new DescribePlan(context.getNextNodeId(), physicalSelectStatement.getSelect(), statement.isAnalyze()));
-        return physicalDescribeStatement;
+        return new PhysicalStatement(new DescribePlan(context.getNextNodeId(), physicalStatement.getPlan(), statement.isAnalyze()));
     }
 
     @Override
@@ -144,9 +148,9 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
 
                     TableScan catalogFunctionsScan = new TableScan(TableSchema.EMPTY,
                             new TableSourceReference(0, TableSourceReference.Type.TABLE, "sys", QualifiedName.of(catalog, "functions"), "fCat"),
-                            se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, false, emptyList(), null);
+                            se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, emptyList(), null);
                     TableScan systemFunctionsScan = new TableScan(TableSchema.EMPTY, new TableSourceReference(1, TableSourceReference.Type.TABLE, "sys", QualifiedName.of("functions"), "fSys"),
-                            se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, false, emptyList(), null);
+                            se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, emptyList(), null);
 
                     // Order by type and name
                     List<SortItem> sortItems = asList(new SortItem(new LiteralIntegerExpression(2), Order.ASC, NullOrder.UNDEFINED, null),
@@ -182,8 +186,8 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
         QualifiedName qname = isBlank(catalog) ? QualifiedName.of(tableName)
                 : QualifiedName.of(catalog, tableName);
         TableSourceReference tableSourceRef = new TableSourceReference(2, TableSourceReference.Type.TABLE, "sys", qname, "t");
-        return new LogicalSelectStatement(new TableScan(TableSchema.EMPTY, tableSourceRef, se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, false, emptyList(), null), false)
-                .accept(this, context);
+        return new LogicalSelectStatement(new TableScan(TableSchema.EMPTY, tableSourceRef, se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, emptyList(), null), false).accept(this,
+                context);
     }
 
     @Override
@@ -208,91 +212,86 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
     }
 
     @Override
-    public Statement visit(PhysicalSelectStatement statement, Context context)
+    public Statement visit(LogicalSelectIntoStatement statement, Context context)
     {
-        throw new IllegalArgumentException("A physical select statement should not be visited");
+        return createInsertStatement(statement, context, null);
     }
 
     @Override
-    public Statement visit(InsertIntoStatement statement, Context context)
+    public Statement visit(LogicalInsertIntoStatement statement, Context context)
     {
-        PhysicalSelectStatement selectStatement = createPhysicalPlan(statement, context);
-
-        List<Option> options = new ArrayList<>(statement.getOptions()
-                .size());
-
-        List<Index> indices = new ArrayList<>();
-
-        for (Option option : statement.getOptions())
-        {
-            IExpression expression = resolveExpression(context.context, option.getValueExpression());
-
-            if (option.getOption()
-                    .equalsIgnoreCase(InsertIntoStatement.INDICES))
-            {
-                if (!expression.isConstant())
-                {
-                    throw new ParseException("Indices option must be constant", statement.getLocation());
-                }
-                else if (!expression.getType()
-                        .equals(ResolvedType.array(ResolvedType.array(Type.String))))
-                {
-                    throw new ParseException("Indices option must be of type Array<Array<String>>", statement.getLocation());
-                }
-
-                ValueVector vector = expression.eval(context.context);
-                ValueVector array = vector.getArray(0);
-                int size = array.size();
-                for (int i = 0; i < size; i++)
-                {
-                    if (array.isNull(i))
-                    {
-                        continue;
-                    }
-                    ValueVector columnsVector = array.getArray(i);
-                    int columnsSize = columnsVector.size();
-                    if (columnsSize <= 0)
-                    {
-                        continue;
-                    }
-                    List<String> columns = new ArrayList<>(columnsSize);
-                    for (int j = 0; j < columnsSize; j++)
-                    {
-                        if (columnsVector.isNull(j))
-                        {
-                            continue;
-                        }
-                        columns.add(columnsVector.getString(j)
-                                .toString());
-                    }
-                    indices.add(new Index(QualifiedName.of(statement.getTable()), columns, ColumnsType.ALL));
-                }
-            }
-            else
-            {
-                options.add(new Option(option.getOption(), expression));
-            }
-        }
-
-        TableSchema tableSchema = new TableSchema(context.currentLogicalPlan.getSchema(), indices);
-
-        // Visit select statement to retrieve the schema for the temp table
-        context.schemaByTempTable.put(statement.getTable(), tableSchema);
-
-        return new PhysicalSelectStatement(QueryPlanner.wrapWithAnalyze(context, new InsertInto(context.getNextNodeId(), selectStatement.getSelect(), statement.getTable(), indices, options)));
+        List<String> columns = statement.getColumns();
+        return createInsertStatement(statement, context, columns);
     }
 
     @Override
     public Statement visit(DropTableStatement statement, Context context)
     {
-        if (!statement.isTempTable())
-        {
-            throw new ParseException("DROP TABLE can only be performed on temporary tables", statement.getLocation());
-        }
         return statement;
     }
 
-    private PhysicalSelectStatement createPhysicalPlan(LogicalSelectStatement statement, Context context)
+    private Statement createInsertStatement(LogicalSelectIntoStatement statement, Context context, List<String> insertColumns)
+    {
+        PhysicalStatement input = createPhysicalPlan(statement.getInput(), context);
+
+        List<Option> options = statement.getOptions()
+                .stream()
+                .map(o -> new Option(o.getOption(), resolveExpression(context.context, o.getValueExpression())))
+                .toList();
+
+        Schema schema = input.getPlan()
+                .getSchema();
+        boolean isAsteriskSchema = SchemaUtils.isAsterisk(schema);
+        List<Column> columns = isAsteriskSchema ? emptyList()
+                : schema.getColumns();
+
+        // Validate the Insert Into
+        if (insertColumns != null
+                && !isAsteriskSchema)
+        {
+            if (insertColumns.size() != columns.size())
+            {
+                throw new ParseException("Insert column count doesn't match input column count. Insert columns: " + insertColumns + ", input columns: " + columns, statement.getLocation());
+            }
+        }
+
+        String catalogAlias = defaultIfBlank(statement.getCatalogAlias(), context.getSession()
+                .getDefaultCatalogAlias());
+        Catalog catalog = context.getSession()
+                .getCatalog(catalogAlias);
+
+        int nodeId = context.getNextNodeId();
+        //@formatter:off
+        IDatasink sink = insertColumns == null
+                ? catalog.getSelectIntoSink(context.getSession(), catalogAlias, statement.getTable(), new SelectIntoData(nodeId, columns, options))
+                : catalog.getInsertIntoSink(context.getSession(), catalogAlias, statement.getTable(), new InsertIntoData(nodeId, columns, options, insertColumns));
+        //@formatter:on
+
+        // If this is a temporary table select into then we need to extract table schema + indices into context to let the rest of the query
+        // know about them
+        if (Catalog.SYSTEM_CATALOG_ALIAS.equalsIgnoreCase(statement.getCatalogAlias())
+                && insertColumns == null // -> SelectInto
+                && "#".equals(statement.getTable()
+                        .getFirst()))
+        {
+            // We need to extract the generated indices from the sink and hence need this ugly cast
+            if (!(sink instanceof SelectIntoTempTableSink))
+            {
+                throw new IllegalArgumentException("Expected temporary table sink to be of type: " + SelectIntoTempTableSink.class.getName());
+            }
+
+            List<Index> indices = ((SelectIntoTempTableSink) sink).getIndices();
+            TableSchema tableSchema = new TableSchema(context.currentLogicalPlan.getSchema(), indices);
+            context.context.getSession()
+                    .setTemporaryTableSchema(statement.getTable()
+                            .extract(1)
+                            .toLowerCase(), tableSchema);
+        }
+
+        return new PhysicalStatement(QueryPlanner.wrapWithAnalyze(context, new InsertInto(nodeId, input.getPlan(), insertColumns, sink)));
+    }
+
+    private PhysicalStatement createPhysicalPlan(LogicalSelectStatement statement, Context context)
     {
         ILogicalPlan plan = statement.getSelect();
         QuerySession s = context.getSession();
@@ -302,7 +301,7 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
                 && printPlanProperty.getBoolean(0);
 
         // Optimize plan
-        plan = LogicalPlanOptimizer.optimize(context.context, plan, context.schemaByTempTable, context.schemaByTableSource);
+        plan = LogicalPlanOptimizer.optimize(context.context, plan, context.schemaByTableSource);
 
         if (printPlan)
         {
@@ -329,6 +328,6 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
         }
 
         // Create a physical plan from the logical
-        return new PhysicalSelectStatement(physicalPlan);
+        return new PhysicalStatement(physicalPlan);
     }
 }

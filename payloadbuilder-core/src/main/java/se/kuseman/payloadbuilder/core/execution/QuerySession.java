@@ -27,6 +27,7 @@ import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
@@ -83,6 +84,9 @@ public class QuerySession implements IQuerySession
     private BooleanSupplier abortSupplier;
     private WeakListenerList abortQueryListeners;
     private Map<QualifiedName, TemporaryTable> temporaryTables;
+    /** Compile time schemas for temporary tables. */
+    private Map<QualifiedName, TableSchema> temporaryTableSchemas;
+
     private TempTableCache tempTableCache = new InMemoryTempTableCache();
     private GenericCache genericCache = new InMemoryGenericCache("QuerySession");
     private long lastQueryExecutionTime;
@@ -354,6 +358,32 @@ public class QuerySession implements IQuerySession
             throw new QueryException("Temporary table #" + name + " already exists in session");
         }
         temporaryTables.put(name, table);
+    }
+
+    /** Get temporary table with provided qualifier */
+    public TableSchema getTemporaryTableSchema(QualifiedName table)
+    {
+        if (temporaryTableSchemas == null)
+        {
+            return null;
+        }
+
+        return temporaryTableSchemas.get(table);
+    }
+
+    /** Set a temporary table schema into context. */
+    public void setTemporaryTableSchema(QualifiedName name, TableSchema tableSchema)
+    {
+        requireNonNull(tableSchema);
+        if (temporaryTableSchemas == null)
+        {
+            temporaryTableSchemas = new HashMap<>();
+        }
+        if (temporaryTableSchemas.containsKey(name))
+        {
+            throw new QueryException("Temporary table #" + name + " already exists in session");
+        }
+        temporaryTableSchemas.put(name, tableSchema);
     }
 
     /** Drop temporary table */

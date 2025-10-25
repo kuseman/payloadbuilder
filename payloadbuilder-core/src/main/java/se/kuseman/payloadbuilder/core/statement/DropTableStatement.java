@@ -11,13 +11,11 @@ public class DropTableStatement extends Statement
     private final String catalogAlias;
     private final QualifiedName qname;
     private final boolean lenient;
-    private final boolean tempTable;
     private final Location location;
 
-    public DropTableStatement(String catalogAlias, QualifiedName qname, boolean lenient, boolean tempTable, Location location)
+    public DropTableStatement(String catalogAlias, QualifiedName qname, boolean lenient, Location location)
     {
         this.catalogAlias = catalogAlias;
-        this.tempTable = tempTable;
         this.location = location;
         this.qname = requireNonNull(qname, "qname");
         this.lenient = lenient;
@@ -31,11 +29,6 @@ public class DropTableStatement extends Statement
     public boolean isLenient()
     {
         return lenient;
-    }
-
-    public boolean isTempTable()
-    {
-        return tempTable;
     }
 
     public String getCatalogAlias()

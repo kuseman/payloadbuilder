@@ -91,13 +91,18 @@ public interface StatementVisitor<TR, TC>
         return visitChildren(statement, context);
     }
 
-    default TR visit(PhysicalSelectStatement statement, TC context)
+    default TR visit(PhysicalStatement statement, TC context)
     {
         return visitChildren(statement, context);
     }
 
     /* DML nodes */
-    default TR visit(InsertIntoStatement statement, TC context)
+    default TR visit(LogicalInsertIntoStatement statement, TC context)
+    {
+        return visitChildren(statement, context);
+    }
+
+    default TR visit(LogicalSelectIntoStatement statement, TC context)
     {
         return visitChildren(statement, context);
     }

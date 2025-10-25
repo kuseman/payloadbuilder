@@ -568,7 +568,7 @@ public class HashAggregateTest extends APhysicalPlanTest
         IExpression tempExp = ce("temp", 1, ResolvedType.FLOAT);
 
         //@formatter:off
-        IPhysicalPlan plan = new HashAggregate(1, new TableScan(0, schema, table, "", false, new IDatasource()
+        IPhysicalPlan plan = new HashAggregate(1, new TableScan(0, schema, table, "", new IDatasource()
         {
 
             @Override

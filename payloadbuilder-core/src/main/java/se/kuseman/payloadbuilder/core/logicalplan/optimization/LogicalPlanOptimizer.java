@@ -5,7 +5,6 @@ import static java.util.Arrays.asList;
 import java.util.List;
 import java.util.Map;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -49,14 +48,13 @@ public class LogicalPlanOptimizer
     }
 
     /** Optimize provided plan */
-    public static ILogicalPlan optimize(IExecutionContext context, ILogicalPlan plan, Map<QualifiedName, TableSchema> schemaByTempTable, Map<TableSourceReference, TableSchema> schemaByTableSource)
+    public static ILogicalPlan optimize(IExecutionContext context, ILogicalPlan plan, Map<TableSourceReference, TableSchema> schemaByTableSource)
     {
-        return optimizeInternal(context, plan, schemaByTempTable, schemaByTableSource, null);
+        return optimizeInternal(context, plan, schemaByTableSource, null);
     }
 
     /** Optimize provided plan but stop before a certain rule class. */
-    static ILogicalPlan optimizeInternal(IExecutionContext context, ILogicalPlan plan, Map<QualifiedName, TableSchema> schemaByTempTable, Map<TableSourceReference, TableSchema> schemaByTableSource,
-            Class<? extends ALogicalPlanOptimizer<?>> stopRule)
+    static ILogicalPlan optimizeInternal(IExecutionContext context, ILogicalPlan plan, Map<TableSourceReference, TableSchema> schemaByTableSource, Class<? extends ALogicalPlanOptimizer<?>> stopRule)
     {
         QuerySession s = (QuerySession) context.getSession();
 
@@ -82,7 +80,6 @@ public class LogicalPlanOptimizer
 
             Context ctx = rule.createContext(context);
             ctx.expressionCounter = expressionCounter;
-            ctx.schemaByTempTable = schemaByTempTable;
             ctx.schemaByTableSource = schemaByTableSource;
 
             result = rule.optimize(ctx, result);

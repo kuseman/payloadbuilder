@@ -7,7 +7,6 @@ import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiFunction;
 
@@ -23,8 +22,6 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
-import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
@@ -36,10 +33,7 @@ import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
-import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
-import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
@@ -234,10 +228,9 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         boolean hasSortItems = !sortItems.isEmpty();
         // CSON
 
-        Catalog catalog = plan.isTempTable() ? SystemCatalog.get()
-                : context.getSession()
-                        .getCatalog(plan.getTableSource()
-                                .getCatalogAlias());
+        Catalog catalog = context.getSession()
+                .getCatalog(plan.getTableSource()
+                        .getCatalogAlias());
 
         SeekPredicate seekPredicate = null;
         IDatasource dataSource;
@@ -258,50 +251,32 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         }
 
         int nodeId = context.getNextNodeId();
+        int sortItemCount = sortItems.size();
+        String catalogAlias = defaultIfBlank(plan.getTableSource()
+                .getCatalogAlias(),
+                context.getSession()
+                        .getDefaultCatalogAlias());
 
-        if (plan.isTempTable())
+        DatasourceData data = new DatasourceData(nodeId, predicatePairs, sortItems, plan.getProjection(), plan.getOptions());
+
+        if (context.seekPredicate != null)
         {
-            QualifiedName tableName = plan.getTableSource()
-                    .getName()
-                    .toLowerCase();
-
-            if (context.seekPredicate != null)
-            {
-                seekPredicate = context.seekPredicate;
-                context.seekPredicate = null;
-            }
-
-            dataSource = new TemporaryTableDataSource(tableName, seekPredicate);
+            seekPredicate = context.seekPredicate;
+            context.seekPredicate = null;
+            dataSource = catalog.getSeekDataSource(context.getSession(), catalogAlias, seekPredicate, data);
         }
         else
         {
-            int sortItemCount = sortItems.size();
-            String catalogAlias = defaultIfBlank(plan.getTableSource()
-                    .getCatalogAlias(),
-                    context.getSession()
-                            .getDefaultCatalogAlias());
+            dataSource = catalog.getScanDataSource(context.getSession(), catalogAlias, plan.getTableSource()
+                    .getName(), data);
+        }
 
-            DatasourceData data = new DatasourceData(nodeId, predicatePairs, sortItems, plan.getProjection(), plan.getOptions());
-
-            if (context.seekPredicate != null)
-            {
-                seekPredicate = context.seekPredicate;
-                context.seekPredicate = null;
-                dataSource = catalog.getSeekDataSource(context.getSession(), catalogAlias, seekPredicate, data);
-            }
-            else
-            {
-                dataSource = catalog.getScanDataSource(context.getSession(), catalogAlias, plan.getTableSource()
-                        .getName(), data);
-            }
-
-            // Validate sort items
-            if (sortItemCount > 0
-                    && sortItems.size() != sortItemCount
-                    && !sortItems.isEmpty())
-            {
-                throw new CompileException("Sort items must be totally consumed or left as is.");
-            }
+        // Validate sort items
+        if (sortItemCount > 0
+                && sortItems.size() != sortItemCount
+                && !sortItems.isEmpty())
+        {
+            throw new CompileException("Sort items must be totally consumed or left as is.");
         }
 
         // Set the left overs to context to be consumed when coming back to filter above
@@ -321,10 +296,10 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         context.topTableScanVisited = true;
 
-        return wrapWithAnalyze(context, seekPredicate != null
-                ? new se.kuseman.payloadbuilder.core.physicalplan.IndexSeek(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), plan.isTempTable(), seekPredicate, dataSource,
-                        plan.getOptions())
-                : new se.kuseman.payloadbuilder.core.physicalplan.TableScan(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), plan.isTempTable(), dataSource, plan.getOptions()));
+        return wrapWithAnalyze(context,
+                seekPredicate != null
+                        ? new se.kuseman.payloadbuilder.core.physicalplan.IndexSeek(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), seekPredicate, dataSource, plan.getOptions())
+                        : new se.kuseman.payloadbuilder.core.physicalplan.TableScan(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), dataSource, plan.getOptions()));
     }
 
     @Override
@@ -721,59 +696,6 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                 context.add(tableRef);
             }
             return null;
-        }
-    }
-
-    /** Datasource used for temporary tables */
-    static class TemporaryTableDataSource implements IDatasource
-    {
-        private final QualifiedName name;
-        private final ISeekPredicate seekPredicate;
-
-        TemporaryTableDataSource(QualifiedName name, ISeekPredicate seekPredicate)
-        {
-            this.name = name;
-            this.seekPredicate = seekPredicate;
-        }
-
-        @Override
-        public TupleIterator execute(IExecutionContext context)
-        {
-            TemporaryTable temporaryTable = ((ExecutionContext) context).getSession()
-                    .getTemporaryTable(name);
-            TupleVector vector = temporaryTable.getTupleVector();
-            if (seekPredicate != null)
-            {
-                return temporaryTable.getIndexIterator(context, seekPredicate);
-            }
-
-            // Return the tuple vector from context with the planned schema
-            return TupleIterator.singleton(vector);
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return name.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object obj)
-        {
-            if (obj == this)
-            {
-                return true;
-            }
-            else if (obj == null)
-            {
-                return false;
-            }
-            else if (obj instanceof TemporaryTableDataSource that)
-            {
-                return name.equals(that.name)
-                        && Objects.equals(seekPredicate, that.seekPredicate);
-            }
-            return false;
         }
     }
 

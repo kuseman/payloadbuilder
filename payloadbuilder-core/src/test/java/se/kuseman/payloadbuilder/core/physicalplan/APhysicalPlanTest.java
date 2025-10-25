@@ -163,13 +163,13 @@ public abstract class APhysicalPlanTest extends AExpressionTest
 
     protected IPhysicalPlan scan(IDatasource ds, TableSourceReference tableSource, Schema schema)
     {
-        return new TableScan(0, schema, tableSource, "", false, ds, emptyList());
+        return new TableScan(0, schema, tableSource, "", ds, emptyList());
     }
 
     protected TableScan scan(IDatasource ds, TableSourceReference tableSource, Schema schema, int batchSize)
     {
         List<Option> options = asList(new Option(QualifiedName.of(IExecutionContext.BATCH_SIZE), intLit(batchSize)));
-        return new TableScan(0, schema, tableSource, "", false, ds, options);
+        return new TableScan(0, schema, tableSource, "", ds, options);
     }
 
     /** Create a schema less datasource with provided vectors. */
