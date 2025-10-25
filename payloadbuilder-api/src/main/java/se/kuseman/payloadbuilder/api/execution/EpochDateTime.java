@@ -63,6 +63,12 @@ public class EpochDateTime implements Comparable<EpochDateTime>, ValueVector
     }
 
     @Override
+    public boolean hasNulls()
+    {
+        return false;
+    }
+
+    @Override
     public boolean isNull(int row)
     {
         return false;

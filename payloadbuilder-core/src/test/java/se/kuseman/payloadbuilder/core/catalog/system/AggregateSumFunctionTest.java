@@ -20,6 +20,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
+import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link AggregateSumFunction} */
 public class AggregateSumFunctionTest extends APhysicalPlanTest
@@ -45,7 +46,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     public void test_object()
     {
         //@formatter:off
-        ValueVector one = ValueVector.literalAny(
+        ValueVector one = VectorTestUtils.vv(Type.Any,
                 10, 10, 10, 10,
                 10_000_000,10_000_000,10_000_000,10_000_000,
                 null,null,null,null
@@ -72,7 +73,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     public void test_object_multi_vector()
     {
         //@formatter:off
-        ValueVector one = ValueVector.literalAny(
+        ValueVector one = VectorTestUtils.vv(Type.Any,
                 10, 10, 10, 10,
                 10_000_000,10_000_000,10_000_000,10_000_000,
                 null,null,null,null
@@ -105,7 +106,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     public void test_decimal()
     {
         //@formatter:off
-        ValueVector one = ValueVector.literalDecimal(
+        ValueVector one = vv(ResolvedType.DECIMAL,
                 Decimal.from(10),Decimal.from(10),Decimal.from(10),Decimal.from(10),
                 Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),
                 null,null,null,null
@@ -131,7 +132,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     public void test_decimal_multi_vectors()
     {
         //@formatter:off
-        ValueVector one = ValueVector.literalDecimal(
+        ValueVector one = vv(ResolvedType.DECIMAL,
                 Decimal.from(10),Decimal.from(10),Decimal.from(10),Decimal.from(10),
                 Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),
                 null,null,null,null

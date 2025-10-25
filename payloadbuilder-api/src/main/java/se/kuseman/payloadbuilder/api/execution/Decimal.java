@@ -38,6 +38,12 @@ public class Decimal extends Number implements Comparable<Decimal>, ValueVector
     }
 
     @Override
+    public boolean hasNulls()
+    {
+        return false;
+    }
+
+    @Override
     public boolean isNull(int row)
     {
         return false;

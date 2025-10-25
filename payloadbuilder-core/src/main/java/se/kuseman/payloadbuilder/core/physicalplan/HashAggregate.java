@@ -164,7 +164,7 @@ public class HashAggregate implements IPhysicalPlan
             @Override
             public int hashCode(GroupKey o)
             {
-                return VectorUtils.hash(o.rowValues, o.row);
+                return o.hashCode();
             }
 
             @Override
@@ -175,7 +175,8 @@ public class HashAggregate implements IPhysicalPlan
                 {
                     return a == b;
                 }
-                return VectorUtils.equals(a.rowValues, b.rowValues, a.row, b.row);
+
+                return a.equals(b);
             }
         });
 
@@ -219,6 +220,8 @@ public class HashAggregate implements IPhysicalPlan
                 }
 
                 int vectorSize;
+                Type[] types;
+                boolean[] hasNulls;
                 // Aggregate whole input
                 if (distinct)
                 {
@@ -232,24 +235,33 @@ public class HashAggregate implements IPhysicalPlan
                     vectorSize = vector.getSchema()
                             .getSize();
                     aggregateVectors = new ValueVector[vectorSize];
-
+                    types = new Type[vectorSize];
+                    hasNulls = new boolean[vectorSize];
                     for (int i = 0; i < vectorSize; i++)
                     {
                         aggregateVectors[i] = vector.getColumn(i);
+                        types[i] = aggregateVectors[i].type()
+                                .getType();
+                        hasNulls[i] = aggregateVectors[i].hasNulls();
                     }
                 }
                 else
                 {
                     vectorSize = aggregationSize;
+                    types = new Type[vectorSize];
+                    hasNulls = new boolean[vectorSize];
                     // Evaluate aggregations for current vector
                     for (int i = 0; i < vectorSize; i++)
                     {
                         aggregateVectors[i] = aggregateExpressions.get(i)
                                 .eval(vector, context);
+                        types[i] = aggregateVectors[i].type()
+                                .getType();
+                        hasNulls[i] = aggregateVectors[i].hasNulls();
                     }
                 }
 
-                GroupKey key = new GroupKey(-1, aggregateVectors);
+                GroupKey key = new GroupKey(-1, aggregateVectors, types, hasNulls);
 
                 // Group all input rows
                 int count = vector.getRowCount();
@@ -272,7 +284,8 @@ public class HashAggregate implements IPhysicalPlan
 
                         // TODO: find a good estimate of avg group row count
                         intList = new IntArrayList();
-                        GroupKey groupKey = new GroupKey(groupCounter++, rowValues);
+                        GroupKey groupKey = new GroupKey(groupCounter++, rowValues, types, hasNulls);
+                        groupKey.row = 0;
                         table.put(groupKey, intList);
                     }
                     intList.add(i);
@@ -450,19 +463,64 @@ public class HashAggregate implements IPhysicalPlan
         long aggregateTime;
     }
 
-    private static class GroupKey
+    static class GroupKey
     {
         /** Unique group id */
         final int groupId;
         /** The groups unique values. Ie. the aggregate expressions value */
         final ValueVector[] rowValues;
+        final Type[] types;
+        final boolean[] hasNulls;
         /** The row number used to identify which row to use in {@link #rowValues} */
         int row;
 
-        GroupKey(int groupId, ValueVector[] rowValues)
+        GroupKey(int groupId, ValueVector[] rowValues, Type[] types, boolean[] hasNulls)
         {
             this.groupId = groupId;
             this.rowValues = rowValues;
+            this.types = types;
+            this.hasNulls = hasNulls;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return VectorUtils.hash(rowValues, types, hasNulls, row);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (obj == null)
+            {
+                return false;
+            }
+            else if (obj == this)
+            {
+                return true;
+            }
+            else if (obj instanceof GroupKey that)
+            {
+                // NOTE! Some speed ups was noticed when measuring this to skip the loop
+                // when only having one aggregate expression
+                int size = rowValues.length;
+                if (size == 1)
+                {
+                    return VectorUtils.equals(rowValues[0], that.rowValues[0], types[0], row, that.row, hasNulls[0]
+                            || that.hasNulls[0]);
+                }
+
+                for (int i = 0; i < size; i++)
+                {
+                    if (!VectorUtils.equals(rowValues[i], that.rowValues[i], types[i], row, that.row, hasNulls[i]
+                            || that.hasNulls[i]))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
         }
     }
 }

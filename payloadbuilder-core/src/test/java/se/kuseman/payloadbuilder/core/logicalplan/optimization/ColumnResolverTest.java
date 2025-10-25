@@ -276,7 +276,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 ), List.of(
                 ValueVector.empty(ResolvedType.of(Type.Int)),
                 ValueVector.empty(ResolvedType.of(Type.Boolean))
-                ))));
+                )), 1));
         //@formatter:on
 
         ILogicalPlan plan = getSchemaResolvedPlan(query);

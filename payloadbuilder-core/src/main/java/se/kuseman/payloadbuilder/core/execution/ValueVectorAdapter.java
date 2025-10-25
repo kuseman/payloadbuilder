@@ -46,6 +46,12 @@ public class ValueVectorAdapter implements ValueVector
     }
 
     @Override
+    public boolean hasNulls()
+    {
+        return wrapped.hasNulls();
+    }
+
+    @Override
     public boolean isNull(int row)
     {
         return wrapped.isNull(getRow(row));

@@ -24,6 +24,7 @@ public class EpochDateTimeOffsetTest extends Assert
     public void test()
     {
         EpochDateTimeOffset d = EpochDateTimeOffset.now();
+        assertFalse(d.hasNulls());
         assertFalse(d.equals(null));
         assertTrue(d.equals(d));
         assertFalse(d.equals(EpochDateTimeOffset.from("2010-10-10T00:10:00.00Z")));

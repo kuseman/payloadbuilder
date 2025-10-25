@@ -36,8 +36,12 @@ public class MutableFloatVectorTest extends Assert
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Float), 2);
 
+        assertFalse(b.hasNulls());
+
         b.setNull(0);
         b.setNull(1);
+
+        assertTrue(b.hasNulls());
 
         VectorTestUtils.assertVectorsEquals(vv(Type.Float, null, null), b);
     }

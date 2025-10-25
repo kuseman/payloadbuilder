@@ -21,6 +21,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
+import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link AggregateAvgFunction} */
 public class AggregateAvgFunctionTest extends APhysicalPlanTest
@@ -33,7 +34,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     public void test_object()
     {
         //@formatter:off
-        ValueVector one = ValueVector.literalAny(
+        ValueVector one = VectorTestUtils.vv(Type.Any,
                 10, 20, -20F, -200D,
                 10_000_000,10_000_000,10_000_000,10_000_000,
                 null,null,null,null,
@@ -61,7 +62,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     public void test_object_multi_vector()
     {
         //@formatter:off
-        ValueVector one = ValueVector.literalAny(
+        ValueVector one = VectorTestUtils.vv(Type.Any,
                 10, 20, -20F, -200D,
                 10_000_000,10_000_000,10_000_000,10_000_000,
                 null,null,null,null,
@@ -96,7 +97,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     public void test_decimal()
     {
         //@formatter:off
-        ValueVector one = ValueVector.literalDecimal(
+        ValueVector one = vv(ResolvedType.DECIMAL,
                 Decimal.from("10.00"), Decimal.from(20), Decimal.from(-20F), Decimal.from(-200D),
                 Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),
                 null,null,null,null,
@@ -123,7 +124,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     public void test_decimal_multi_vector()
     {
         //@formatter:off
-        ValueVector one = ValueVector.literalDecimal(
+        ValueVector one = vv(ResolvedType.DECIMAL,
                 Decimal.from("10.00"), Decimal.from(20), Decimal.from(-20F), Decimal.from(-200D),
                 Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),
                 null,null,null,null,

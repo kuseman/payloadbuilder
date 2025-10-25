@@ -15,6 +15,7 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
@@ -24,6 +25,7 @@ import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.catalog.es.ESQueryUtils.SortItemMeta;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMetaUtils.MappedProperty;
 import se.kuseman.payloadbuilder.test.IPredicateMock;
+import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link ESQueryUtils} */
 public class ESQueryUtilsTest extends Assert
@@ -136,7 +138,7 @@ public class ESQueryUtilsTest extends Assert
                                 .toString(), p, false))
                         .collect(toList()), null, "index.keyword", true, context));
 
-        ValueVector indexSeekValues = ValueVector.literalAny((Object) 1, (Object) 2);
+        ValueVector indexSeekValues = VectorTestUtils.vv(Type.Any, 1, 2);
 
         // Non quote
         assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"terms\":{\"index.keyword\":[1,2]}}],\"must_not\":[{\"term\":{\"field1\":20}}]}}}",
@@ -232,7 +234,7 @@ public class ESQueryUtilsTest extends Assert
     @Test
     public void test_search_body_with_index()
     {
-        ValueVector indexSeekValues = ValueVector.literalAny(1, 2, null);
+        ValueVector indexSeekValues = VectorTestUtils.vv(Type.Any, 1, 2, null);
 
         // field1 != 20
         List<IPredicate> pairs = asList(IPredicateMock.neq("field1", 20));

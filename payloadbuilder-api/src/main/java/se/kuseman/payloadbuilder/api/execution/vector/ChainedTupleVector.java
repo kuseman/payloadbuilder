@@ -87,6 +87,13 @@ public class ChainedTupleVector implements TupleVector
         }
 
         @Override
+        public boolean hasNulls()
+        {
+            // TODO: Implement
+            return true;
+        }
+
+        @Override
         public boolean isNull(int row)
         {
             setCurrentVector(row);
@@ -216,20 +223,20 @@ public class ChainedTupleVector implements TupleVector
         {
             /*
              * @formatter:off
-             * 
+             *
              * 3 vectors with their row indices
              * [0-4] (0-4)
              * [0-4] (5-9)
              * [0-4] (10-14)
-             * 
+             *
              * Ordinals array: [5,10,15]
-             * 
+             *
              * Total index:            0,  1,  2,  3,  4   5,  6,  7,  8,  9   10, 11, 12, 13, 14
              * Index in vector:      [[0,  1,  2,  3,  4],[0,  1,  2,  3,  4],[ 0,  1,  2,  3,  4]]
              * Binary search result:  -1, -1, -1, -1, -1   0, -2, -2, -2, -2    1, -3, -3, -3, -3
              * @formatt:on
              */
-            
+
             // Ordinals are row count + 1 in the source vectors
             int index = Arrays.binarySearch(ordinals, row);
             // Result is either the index or (-(insertion point) - 1)
@@ -248,7 +255,7 @@ public class ChainedTupleVector implements TupleVector
     public static TupleVector chain(List<TupleVector> vectors)
     {
         int size = vectors.size();
-        
+
         if (size == 0)
         {
             return TupleVector.EMPTY;
@@ -257,7 +264,7 @@ public class ChainedTupleVector implements TupleVector
         {
             return vectors.get(0);
         }
-        
+
         // Validate schema. All schemas must share the same columns or have less/more columns
         // ie.
         // Schema1
@@ -273,17 +280,17 @@ public class ChainedTupleVector implements TupleVector
         // col3 string
         //
         // The vector with the largest schema will be the resulting schema
-        
+
         Schema schema = vectors.get(0).getSchema();
         int[] ordinals = new int[size];
         int rowCount = vectors.get(0).getRowCount();
         ordinals[0] = rowCount;
-        
+
         for (int i=1;i<size;i++)
         {
             rowCount += vectors.get(i).getRowCount();
             ordinals[i] = rowCount;
-            
+
             Schema current = vectors.get(i).getSchema();
             // Optimize for chaining a lot of the same type of vectors, then we avoid a lot
             // of column comparisons
@@ -291,7 +298,7 @@ public class ChainedTupleVector implements TupleVector
             {
                 continue;
             }
-            
+
             int colCount = Math.min(schema.getSize(), current.getSize());
             for (int j=0;j<colCount;j++)
             {
@@ -300,7 +307,7 @@ public class ChainedTupleVector implements TupleVector
                     throw new IllegalArgumentException("Schema of chained tuple vectors must share a common sub set of columns.");
                 }
             }
-            
+
             // Switch to the largest schema
             if (current.getSize() > schema.getSize())
             {

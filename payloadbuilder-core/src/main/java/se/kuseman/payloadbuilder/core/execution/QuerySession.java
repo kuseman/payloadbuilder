@@ -100,7 +100,7 @@ public class QuerySession implements IQuerySession
         this.variables = requireNonNull(variables, "variables").entrySet()
                 .stream()
                 .collect(toMap(e -> e.getKey()
-                        .toLowerCase(), v -> ValueVector.literalAny(v.getValue())));
+                        .toLowerCase(), v -> ValueVector.literalAny(1, v.getValue())));
     }
 
     @Override

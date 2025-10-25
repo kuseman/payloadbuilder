@@ -47,7 +47,6 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
-import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralStringExpression;
 import se.kuseman.payloadbuilder.catalog.TestUtils;
@@ -865,7 +864,7 @@ public class HttpCatalogTest
         {
             ISeekPredicate.ISeekKey seekKey = mock(ISeekPredicate.ISeekKey.class);
             seekKeys.add(seekKey);
-            when(seekKey.getValue()).thenReturn(ValueVector.literalAny(values.get(i)));
+            when(seekKey.getValue()).thenReturn(VectorTestUtils.vv(Type.Any, values.get(i)));
         }
         when(seekPredicate.getSeekKeys(any(IExecutionContext.class))).thenReturn(seekKeys);
         return seekPredicate;

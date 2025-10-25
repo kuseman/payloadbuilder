@@ -19,6 +19,7 @@ public class UTF8StringTest extends Assert
     {
         byte[] bytes = "hello world".getBytes(StandardCharsets.UTF_8);
         UTF8String str = UTF8String.utf8(bytes, 0, 5);
+        assertFalse(str.hasNulls());
         assertEquals(UTF8String.from("hello"), str);
 
         byte[] slice = str.getBytes();

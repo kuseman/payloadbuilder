@@ -31,6 +31,7 @@ public class ResolvedType
     public static final ResolvedType DOUBLE = ResolvedType.of(Type.Double);
     public static final ResolvedType LONG = ResolvedType.of(Type.Long);
     public static final ResolvedType FLOAT = ResolvedType.of(Type.Float);
+    public static final ResolvedType DECIMAL = ResolvedType.of(Type.Decimal);
 
     private final Type type;
     /** Type used do specify the contained type if {@link #type} is {@link Type#Array} */
