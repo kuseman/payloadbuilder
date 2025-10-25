@@ -300,6 +300,10 @@
       <property name="tokens" value="SINGLE_LINE_COMMENT, BLOCK_COMMENT_BEGIN"/>
       <metadata name="net.sf.eclipsecs.core.lastEnabledSeverity" value="inherit"/>
     </module>
+    <module name="SuppressionCommentFilter">
+      <property name="offCommentFormat" value="CSOFF"/>
+      <property name="onCommentFormat" value="CSON"/>
+    </module>
   </module>
   <module name="SuppressWithPlainTextCommentFilter">
     <property name="offCommentFormat" value="CSOFF"/>

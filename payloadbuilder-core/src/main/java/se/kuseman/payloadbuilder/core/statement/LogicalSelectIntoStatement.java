@@ -8,21 +8,32 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
-/** Logical insert into statement. Note! only insert into in memory temp table are supported for now. */
-public class InsertIntoStatement extends LogicalSelectStatement
+/** Logical insert into statement. */
+public class LogicalSelectIntoStatement extends Statement
 {
-    public static final QualifiedName INDICES = QualifiedName.of("indices");
-
+    private final LogicalSelectStatement input;
+    private final String catalogAlias;
     private final QualifiedName table;
     private final List<Option> options;
     private final Location location;
 
-    public InsertIntoStatement(LogicalSelectStatement selectStatement, QualifiedName table, List<Option> options, Location location)
+    public LogicalSelectIntoStatement(LogicalSelectStatement input, String catalogAlias, QualifiedName table, List<Option> options, Location location)
     {
-        super(selectStatement.getSelect(), false);
+        this.input = requireNonNull(input, "input");
+        this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.table = requireNonNull(table, "table");
         this.options = requireNonNull(options, "options");
         this.location = location;
+    }
+
+    public LogicalSelectStatement getInput()
+    {
+        return input;
+    }
+
+    public String getCatalogAlias()
+    {
+        return catalogAlias;
     }
 
     public QualifiedName getTable()
@@ -38,6 +49,12 @@ public class InsertIntoStatement extends LogicalSelectStatement
     public Location getLocation()
     {
         return location;
+    }
+
+    @Override
+    public List<Statement> getChildren()
+    {
+        return List.of(input);
     }
 
     @Override

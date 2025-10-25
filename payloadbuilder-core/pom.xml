@@ -14,7 +14,6 @@
 
     <properties>
         <main.basedir>${project.parent.basedir}</main.basedir>
-        
         <!-- Versions -->
         <antlr4.version>4.13.0</antlr4.version>
         <fastutil.version>8.5.12</fastutil.version>
@@ -105,7 +104,6 @@
             <version>${jmh.version}</version>
             <optional>true</optional>
         </dependency>
-
     </dependencies>
 
     <build>

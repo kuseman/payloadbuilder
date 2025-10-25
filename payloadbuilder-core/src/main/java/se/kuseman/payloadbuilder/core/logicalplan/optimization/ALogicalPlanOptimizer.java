@@ -1,6 +1,5 @@
 package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
-import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
@@ -10,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -60,7 +58,6 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     static class Context
     {
         final IExecutionContext context;
-        Map<QualifiedName, TableSchema> schemaByTempTable = emptyMap();
         Map<TableSourceReference, TableSchema> schemaByTableSource = new HashMap<>();
         // Counter used to generate unique expression column names for each pushed down sub expression
         int expressionCounter;
@@ -323,7 +320,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
                     .collect(toList());
         }
 
-        return new TableScan(plan.getTableSchema(), plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
+        return new TableScan(plan.getTableSchema(), plan.getTableSource(), plan.getProjection(), options, plan.getLocation());
     }
 
     protected ILogicalPlan create(TableFunctionScan plan, C context)

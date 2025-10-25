@@ -2284,6 +2284,78 @@
           [{ "key": "key", "value": null}]
         ]
       ]
+    },
+    {
+      "name": "Select Into",
+      "query": [
+        "select * into new_source from source ",
+        "select * from new_source ",
+        "insert into new_source (col1, col2) ",
+        "values (1337, 666), ",
+        "       (100, 200)  ",
+        "",
+        "select * from new_source ",
+        "select name from sys#c.tables order by name ",
+        "drop table new_source ",
+        "select name from sys#c.tables order by name "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1}, { "key": "col2", "value": 2}],
+          [{ "key": "col1", "value": 3}, { "key": "col2", "value": 4}],
+          [{ "key": "col1", "value": 5}, { "key": "col2", "value": 6}]
+        ],
+        [
+          [{ "key": "col1", "value": 1},    { "key": "col2", "value": 2}],
+          [{ "key": "col1", "value": 3},    { "key": "col2", "value": 4}],
+          [{ "key": "col1", "value": 5},    { "key": "col2", "value": 6}],
+          [{ "key": "col1", "value": 1337}, { "key": "col2", "value": 666}],
+          [{ "key": "col1", "value": 100},  { "key": "col2", "value": 200}]
+        ],
+        [
+          [{ "key": "name", "value": "agg_data"   }],
+          [{ "key": "name", "value": "data"       }],
+          [{ "key": "name", "value": "data2"      }],
+          [{ "key": "name", "value": "map_values" }],
+          [{ "key": "name", "value": "new_source" }],
+          [{ "key": "name", "value": "source"     }],
+          [{ "key": "name", "value": "source2"    }],
+          [{ "key": "name", "value": "strings"    }]
+        ],
+        [
+          [{ "key": "name", "value": "agg_data"   }],
+          [{ "key": "name", "value": "data"       }],
+          [{ "key": "name", "value": "data2"      }],
+          [{ "key": "name", "value": "map_values" }],
+          [{ "key": "name", "value": "source"     }],
+          [{ "key": "name", "value": "source2"    }],
+          [{ "key": "name", "value": "strings"    }]
+        ]
+      ]
+    },
+    {
+      "name": "Select Into, mismatch insert column and input columns (runtime)",
+      "schemaLess": true,
+      "query": [
+        "select * into new_source from source ",
+        "select * from new_source ",
+        "insert into new_source (col1) ",
+        "select * from new_source "
+      ],
+      "expectedException": "se.kuseman.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "Insert column count doesn't match input column count"
+    },
+    {
+      "name": "Select Into, mismatch insert column and input columns",
+      "schemaLess": false,
+      "query": [
+        "select * into new_source from source ",
+        "select * from new_source ",
+        "insert into new_source (col1) ",
+        "select * from new_source "
+      ],
+      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "Insert column count doesn't match input column count"
     }
   ]
 }

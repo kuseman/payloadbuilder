@@ -60,6 +60,23 @@
       ]
     },
     {
+      "name": "Select into with asterisk select",
+      "query": [
+        "select * ",
+        "into #temp ",
+        "from source",
+        "",
+        "select * from #temp"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 } ],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 } ],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 } ]
+        ]
+      ]
+    },
+    {
       "name": "Select into with index",
       "onlyAssertExpectedColumns": true,
       "query": [
@@ -93,9 +110,9 @@
           [{ "key": "newCol1", "value": 10 }, { "key": "newCol2", "value": 60 } ]
         ],
         [
-          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Hash Match" }                           ],
-          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
-          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Hash Match" }                                ],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Scan: data" }                             ],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Index Seek: \"#\".temp [newCol1] (ALL)" } ]
         ],
         [
           [{ "key": "id", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "2_1" }, { "key": "newCol1", "value": 2 }, { "key": "newCol2", "value": 20 } ]
@@ -127,9 +144,9 @@
       "expectedResultSets": [
         [],
         [
-          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Hash Match" }                           ],
-          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
-          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Hash Match" }                                ],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Scan: data" }                             ],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Index Seek: \"#\".temp [newCol1] (ALL)" } ]
         ],
         []
       ]
@@ -333,20 +350,20 @@
     {
       "name": "join 2 temporary asterisk select",
       "query": [
-		"select Value + 1 newCol_temp, Value ",
-		"into #temp ",
-		"from range(1,3) ",
-		"",
-		"select Value + 2 newCol_temp_1, Value ",
-		"into #temp1 ",
-		"from range(1,3) ",
-		"",
-		"select * ",
-		"from #temp t ",
-		"inner join #temp1 t1 ",
-		"  on t1.Value = t.Value ",
-		"order by t1.newCol_temp_1 desc"
-	  ],
+        "select Value + 1 newCol_temp, Value ",
+        "into #temp ",
+        "from range(1,3) ",
+        "",
+        "select Value + 2 newCol_temp_1, Value ",
+        "into #temp1 ",
+        "from range(1,3) ",
+        "",
+        "select * ",
+        "from #temp t ",
+        "inner join #temp1 t1 ",
+        "  on t1.Value = t.Value ",
+        "order by t1.newCol_temp_1 desc"
+      ],
       "expectedResultSets": [
         [
           [{ "key": "newCol_temp", "value": 3 },{ "key": "Value", "value": 2 },{ "key": "newCol_temp_1", "value": 4 },{ "key": "Value", "value": 2 }],
@@ -382,8 +399,8 @@
         " ",
         "select calc, t.col1, t.data ",
         "from #temp t "
-	  ],
-	  "expectedResultSets": [
+      ],
+      "expectedResultSets": [
         [
           [{ "key": "calc", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "data", "value": "1_1" }],
           [{ "key": "calc", "value": 4 }, { "key": "col1", "value": 1 }, { "key": "data", "value": "1_2" }],
@@ -391,7 +408,7 @@
           [{ "key": "calc", "value": 8 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_2" }],
           [{ "key": "calc", "value": 12 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_3" }]
         ]
-	  ]    
+      ]
     },
     {
       "name": "Complex value in temp table",
@@ -424,10 +441,10 @@
         " ",
         "select col ",
         "from #temp t "
-	  ],
-	  "expectedResultSets": [
+      ],
+      "expectedResultSets": [
         []
-	  ]    
+      ]
     }
   ]
 }

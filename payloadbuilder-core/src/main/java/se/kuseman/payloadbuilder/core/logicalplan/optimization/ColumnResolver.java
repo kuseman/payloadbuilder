@@ -567,7 +567,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         context.tableSourceSchemaById.put(plan.getTableSource()
                 .getId(), plan.getSchema());
 
-        return new TableScan(plan.getTableSchema(), plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
+        return new TableScan(plan.getTableSchema(), plan.getTableSource(), plan.getProjection(), options, plan.getLocation());
     }
 
     @Override

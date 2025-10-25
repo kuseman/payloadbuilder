@@ -10,7 +10,7 @@ import se.kuseman.payloadbuilder.api.execution.vector.ChainedTupleVector;
 import se.kuseman.payloadbuilder.api.execution.vector.ITupleVectorBuilder;
 
 /** Utils for plans */
-class PlanUtils
+public class PlanUtils
 {
     private static final int DEFAULT_SIZE = 500;
 
@@ -37,7 +37,7 @@ class PlanUtils
     }
 
     /** Concats provided iterator into a single tuple vector. NOTE! Closes the iterator */
-    static TupleVector concat(IExecutionContext context, TupleIterator iterator)
+    public static TupleVector concat(IExecutionContext context, TupleIterator iterator)
     {
         try
         {

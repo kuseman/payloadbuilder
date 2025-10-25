@@ -8,20 +8,20 @@ import java.util.List;
 /** Statement used for DESCRIBE/ANALZYE operations */
 public class DescribeSelectStatement extends Statement
 {
-    private final SelectStatement selectStatement;
+    private final Statement statement;
     private final boolean includeLogicalPlan;
     private final boolean analyze;
 
-    public DescribeSelectStatement(SelectStatement selectStatement, boolean analyze, boolean includeLogicalPlan)
+    public DescribeSelectStatement(Statement statement, boolean analyze, boolean includeLogicalPlan)
     {
-        this.selectStatement = requireNonNull(selectStatement, "selectStatement");
+        this.statement = requireNonNull(statement, "statement");
         this.analyze = analyze;
         this.includeLogicalPlan = includeLogicalPlan;
     }
 
-    public SelectStatement getSelectStatement()
+    public Statement getStatement()
     {
-        return selectStatement;
+        return statement;
     }
 
     public boolean isIncludeLogicalPlan()
@@ -43,6 +43,6 @@ public class DescribeSelectStatement extends Statement
     @Override
     public List<Statement> getChildren()
     {
-        return singletonList(selectStatement);
+        return singletonList(statement);
     }
 }

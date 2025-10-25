@@ -2,12 +2,10 @@ package se.kuseman.payloadbuilder.core.statement;
 
 import static java.util.Objects.requireNonNull;
 
-import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 
-/** Logical select statement. Statement in the planning phase. Will be transformed in to a {@link PhysicalSelectStatement} further down the lane */
-public class LogicalSelectStatement extends SelectStatement
+/** Logical select statement. Statement in the planning phase. Will be transformed in to a {@link PhysicalStatement} further down the line */
+public class LogicalSelectStatement extends Statement
 {
     private final ILogicalPlan select;
     private final boolean assignmentSelect;
@@ -26,12 +24,6 @@ public class LogicalSelectStatement extends SelectStatement
     public boolean isAssignmentSelect()
     {
         return assignmentSelect;
-    }
-
-    @Override
-    public TupleIterator execute(IExecutionContext context)
-    {
-        throw new IllegalArgumentException("A logical select cannot be executed");
     }
 
     @Override
@@ -57,9 +49,8 @@ public class LogicalSelectStatement extends SelectStatement
         {
             return true;
         }
-        else if (obj instanceof LogicalSelectStatement)
+        else if (obj instanceof LogicalSelectStatement that)
         {
-            LogicalSelectStatement that = (LogicalSelectStatement) obj;
             return select.equals(that.select)
                     && assignmentSelect == that.assignmentSelect;
 

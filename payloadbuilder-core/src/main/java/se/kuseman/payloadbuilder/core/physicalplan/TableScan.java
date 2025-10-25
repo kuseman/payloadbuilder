@@ -31,18 +31,16 @@ public class TableScan implements IPhysicalPlan
     private final String catalogName;
     protected final IDatasource datasource;
     protected final Schema schema;
-    protected final boolean tempTable;
     protected final List<Option> options;
     protected final boolean asteriskSchema;
 
-    public TableScan(int nodeId, Schema schema, TableSourceReference tableSource, String catalogName, boolean tempTable, IDatasource datasource, List<Option> options)
+    public TableScan(int nodeId, Schema schema, TableSourceReference tableSource, String catalogName, IDatasource datasource, List<Option> options)
     {
         this.nodeId = nodeId;
         this.schema = requireNonNull(schema, "schema");
         this.tableSource = requireNonNull(tableSource, "tableSource");
         this.catalogName = requireNonNull(catalogName, "catalogName");
         this.datasource = requireNonNull(datasource, "datasource");
-        this.tempTable = tempTable;
         this.options = requireNonNull(options, "options");
         this.asteriskSchema = SchemaUtils.isAsterisk(schema);
     }
@@ -56,9 +54,7 @@ public class TableScan implements IPhysicalPlan
     @Override
     public String getName()
     {
-        return "Scan: " + (tempTable ? "#"
-                : "")
-               + tableSource.getName();
+        return "Scan: " + tableSource.getName();
     }
 
     @Override
@@ -259,8 +255,7 @@ public class TableScan implements IPhysicalPlan
                     && schema.equals(that.schema)
                     && tableSource.equals(that.tableSource)
                     && catalogName.equals(that.catalogName)
-                    && datasource.equals(that.datasource)
-                    && tempTable == that.tempTable;
+                    && datasource.equals(that.datasource);
         }
         return false;
     }
@@ -270,10 +265,6 @@ public class TableScan implements IPhysicalPlan
     {
         StringBuilder sb = new StringBuilder("Scan (").append(nodeId)
                 .append("): ");
-        if (tempTable)
-        {
-            sb.append("#");
-        }
         sb.append(tableSource.toString());
         return sb.toString();
     }

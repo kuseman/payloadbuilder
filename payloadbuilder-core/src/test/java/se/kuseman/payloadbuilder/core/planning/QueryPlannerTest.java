@@ -28,6 +28,7 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.CompileException;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.IDatasink;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
@@ -43,6 +44,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
@@ -68,6 +70,7 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeInterceptor;
 import se.kuseman.payloadbuilder.core.physicalplan.Assert;
 import se.kuseman.payloadbuilder.core.physicalplan.CachePlan;
+import se.kuseman.payloadbuilder.core.physicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.physicalplan.DescribePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionPredicate;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionScan;
@@ -76,6 +79,7 @@ import se.kuseman.payloadbuilder.core.physicalplan.HashAggregate;
 import se.kuseman.payloadbuilder.core.physicalplan.HashMatch;
 import se.kuseman.payloadbuilder.core.physicalplan.IPhysicalPlan;
 import se.kuseman.payloadbuilder.core.physicalplan.IndexSeek;
+import se.kuseman.payloadbuilder.core.physicalplan.InsertInto;
 import se.kuseman.payloadbuilder.core.physicalplan.Limit;
 import se.kuseman.payloadbuilder.core.physicalplan.NestedLoop;
 import se.kuseman.payloadbuilder.core.physicalplan.OperatorFunctionScan;
@@ -83,8 +87,7 @@ import se.kuseman.payloadbuilder.core.physicalplan.Projection;
 import se.kuseman.payloadbuilder.core.physicalplan.Sort;
 import se.kuseman.payloadbuilder.core.physicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.physicalplan.TableScan;
-import se.kuseman.payloadbuilder.core.planning.QueryPlanner.TemporaryTableDataSource;
-import se.kuseman.payloadbuilder.core.statement.PhysicalSelectStatement;
+import se.kuseman.payloadbuilder.core.statement.PhysicalStatement;
 import se.kuseman.payloadbuilder.core.statement.QueryStatement;
 import se.kuseman.payloadbuilder.core.utils.CollectionUtils;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
@@ -121,8 +124,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
 
@@ -131,7 +134,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new Filter(
                 1,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new ExpressionPredicate(and(gt(cre("col1", tableA), intLit(10)), gt(cre("col", tableA), intLit(20))))
                 );
         //@formatter:on
@@ -170,8 +173,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
 
@@ -185,7 +188,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                             2,
                             new AnalyzeInterceptor(
                                 1,
-                                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList())
+                                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList())
                             ),
                             new ExpressionPredicate(and(gt(cre("col1", tableA), intLit(10)), gt(cre("col", tableA), intLit(20))))
                         )),
@@ -231,8 +234,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(3, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
 
@@ -241,7 +244,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new Projection(
                 1,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 List.of(cre("col1", tableA), cre("col2", tableA)),
                 null
                 );
@@ -278,8 +281,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
         Schema expectedSchemaA = Schema.of(ast("", ResolvedType.of(Type.Any), tableA));
@@ -287,7 +290,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new Projection(
                 2,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 List.of(cre("col1", tableA), cre("col2", tableA), add(cre("col3", tableA), cre("col2", tableA))),
                 null
                 );
@@ -325,8 +328,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
         Schema expectedSchemaA = Schema.of(ast("", ResolvedType.of(Type.Any), tableA));
@@ -341,7 +344,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                             4,
                             new AnalyzeInterceptor(
                                 1,
-                                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList())
+                                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList())
                             ),
                             List.of(cre("col1", tableA), cre("col2", tableA), add(cre("col3", tableA), cre("col2", tableA))),
                             null
@@ -384,8 +387,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
@@ -393,7 +396,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new Projection(
                 2,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 List.of(new AliasExpression(add(cre("col1", tableA), cre("col2", tableA)), "col")),
                 null
                 );
@@ -437,8 +440,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
         TableSourceReference tableA1 = new TableSourceReference(3, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
@@ -448,8 +451,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new HashMatch(
                 2,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
-                new TableScan(1, expectedSchemaA1, tableA1, "test", false, t.scanDataSources.get(1), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
+                new TableScan(1, expectedSchemaA1, tableA1, "test", t.scanDataSources.get(1), emptyList()),
                 List.of(cre("value", tableA, ResolvedType.of(Type.Any))),
                 List.of(cre("value", tableA1, ResolvedType.of(Type.Any))),
                 new ExpressionPredicate(eq(cre("value", tableA1, ResolvedType.of(Type.Any)), cre("value", tableA, ResolvedType.of(Type.Any)))),
@@ -493,8 +496,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
         TableSourceReference tableA1 = new TableSourceReference(3, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
@@ -506,10 +509,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new HashMatch(
                 3,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new Projection(
                   2,
-                  new TableScan(1, expectedSchemaA1, tableA1, "test", false, t.scanDataSources.get(1), emptyList()),
+                  new TableScan(1, expectedSchemaA1, tableA1, "test", t.scanDataSources.get(1), emptyList()),
                   List.of(new AliasExpression(add(cre("col1", tableA1), cre("col2", tableA1)), "value")),
                   subQueryT),
                 List.of(cre("value", tableA, ResolvedType.of(Type.Any))),
@@ -555,8 +558,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
         TableSourceReference tableA1 = new TableSourceReference(3, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
@@ -571,12 +574,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 4,
                 new Projection(
                     1,
-                    new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                    new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                     List.of(new AliasExpression(add(cre("col3", tableA), cre("col4", tableA)), "value")),
                     subQueryF),
                 new Projection(
                     3,
-                    new TableScan(2, expectedSchemaA1, tableA1, "test", false, t.scanDataSources.get(1), emptyList()),
+                    new TableScan(2, expectedSchemaA1, tableA1, "test", t.scanDataSources.get(1), emptyList()),
                     List.of(new AliasExpression(add(cre("col1", tableA1), cre("col2", tableA1)), "value")),
                     subQueryT),
                 List.of(cre("value", subQueryF, 0)),
@@ -622,8 +625,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
         TableSourceReference tableA1 = new TableSourceReference(3, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
@@ -634,10 +637,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.innerJoin(
                 3,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new CachePlan(
                     2,
-                    new TableScan(1, expectedSchemaA1, tableA1, "test", false, t.scanDataSources.get(1), emptyList())
+                    new TableScan(1, expectedSchemaA1, tableA1, "test", t.scanDataSources.get(1), emptyList())
                 ),
                 new ExpressionPredicate(gt(cre("value", tableA1, ResolvedType.of(Type.Any)), cre("value", tableA, ResolvedType.of(Type.Any)))),
                 null,
@@ -673,8 +676,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -684,10 +687,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.leftJoin(
                 3,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new CachePlan(
                     2,
-                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList())
+                    new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList())
                 ),
                 null,
                 false);
@@ -723,8 +726,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -734,10 +737,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.leftJoin(
                 3,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new Filter(
                     2,
-                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                    new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                     new ExpressionPredicate(eq(cre("id", tableB), ocre("id", tableA)))),
                 asSet(col("id", ResolvedType.of(Type.Any), tableA)),
                 null,
@@ -774,8 +777,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -785,10 +788,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.innerJoin(
                 3,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new Filter(
                     2,
-                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                    new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                     new ExpressionPredicate(eq(cre("id", tableB), ocre("id", tableA)))),
                 asSet(col("id", ResolvedType.of(Type.Any), tableA)),
                 null,
@@ -834,8 +837,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -846,12 +849,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.innerJoin(
                 4,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new CachePlan(
                     3,
                     new Filter(
                         2,
-                        new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                        new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                         new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE)))
                 ),
                 null,
@@ -899,8 +902,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -911,10 +914,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         
         IPhysicalPlan expected = NestedLoop.innerJoin(
                 3,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new Filter(
                     2,
-                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                    new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                     new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
                 null,
                 false);
@@ -945,8 +948,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
@@ -954,7 +957,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new Limit(
                 1,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 intLit(100));
         //@formatter:on
 
@@ -969,11 +972,11 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_top_temp_table()
+    public void test_temp_table()
     {
         //@formatter:off
         String query = "select 1 col1 into #tableA "
-                + "select top 100 * "
+                + "select * "
                 + "from #tableA a ";
         //@formatter:on
 
@@ -983,18 +986,42 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(1)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
-        TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
+        //@formatter:off
+        IPhysicalPlan expected = new InsertInto(1, new ConstantScan(0, TupleVector.of(
+                Schema.of(CoreColumn.of("col1", ResolvedType.INT)), List.of(ValueVector.literalInt(1, 1)))), null, new IDatasink()
+        {
+            @Override
+            public void execute(IExecutionContext context, TupleIterator input)
+            {
+            }
+        });
+        //@formatter:on
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                // Ignore the sink for now since it's hard to extract
+                .ignoringFields("datasink")
+                .isEqualTo(expected);
+
+        actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(1)).getPlan();
+
+        TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "sys", QualifiedName.of("#", "tableA"), "a");
 
         Schema schema = Schema.of(col("col1", ResolvedType.of(Type.Int), tableA));
         //@formatter:off
-        IPhysicalPlan expected = new Limit(
-                1,
-                new TableScan(0, schema, tableA, "System", true, new TemporaryTableDataSource(QualifiedName.of("tablea"), null),
-                emptyList()),
-                intLit(100));
+        expected = new TableScan(0, schema, tableA, "System", new IDatasource()
+                {
+                    @Override
+                    public TupleIterator execute(IExecutionContext context)
+                    {
+                        return null;
+                    }
+                },
+                emptyList());
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -1002,9 +1029,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                // Ignore datasource since that is from a class not reachable from here
+                .ignoringFields("datasource")
                 .isEqualTo(expected);
-
-        assertEquals(expected, actual);
     }
 
     @Test
@@ -1022,8 +1049,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference range = new TableSourceReference(0, TableSourceReference.Type.FUNCTION, "", QualifiedName.of("range"), "a");
 
@@ -1057,8 +1084,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
@@ -1067,7 +1094,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan expected = 
                 new Sort(
                     1,
-                    new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                    new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                     asList(sortItem(cre("col", tableA), Order.DESC, NullOrder.UNDEFINED)));
         //@formatter:on
 
@@ -1114,8 +1141,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -1128,10 +1155,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     4,
                     NestedLoop.innerJoin(
                         3,
-                        new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                        new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                         new CachePlan(
                             2,
-                            new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList())
+                            new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList())
                         ),
                         null,
                         false),
@@ -1181,8 +1208,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -1195,10 +1222,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     4,
                     NestedLoop.innerJoin(
                         3,
-                        new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                        new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                         new CachePlan(
                             2,
-                            new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList())
+                            new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList())
                         ),
                         null,
                         false),
@@ -1245,14 +1272,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
 
         //@formatter:off
-        IPhysicalPlan expected = new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList());
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -1323,8 +1350,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -1336,14 +1363,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 6,
                 NestedLoop.leftJoin(
                     5,
-                    new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                    new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                     new CachePlan(
                         4,
                         Assert.maxRowCount(
                                 3,
                                 new Projection(
                                     2,
-                                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                                    new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                                     asList(new AliasExpression(cre("col1", tableB), "__expr0", true)),
                                     null),
                                 1)
@@ -1386,8 +1413,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -1409,8 +1436,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     6,
                     new HashMatch(
                         2,
-                        new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
-                        new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                        new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
+                        new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                         List.of(cre("col", tableA)),
                         List.of(cre("col", tableB)),
                         new ExpressionPredicate(eq(cre("col", tableB), cre("col", tableA))),
@@ -1482,8 +1509,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -1498,10 +1525,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         IPhysicalPlan expected = new HashMatch(
                 3,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new Filter(
                     2,
-                    new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
+                    new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
                     new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
                 List.of(cre("col", tableA)),
                 List.of(cre("col", tableB)),
@@ -1554,8 +1581,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -1566,10 +1593,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         
         IPhysicalPlan expected = new HashMatch(
                 3,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new Filter(
                     2,
-                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), List.of(new Option(QueryPlanner.FORCE_NO_INDEX, LiteralBooleanExpression.TRUE))),
+                    new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), List.of(new Option(QueryPlanner.FORCE_NO_INDEX, LiteralBooleanExpression.TRUE))),
                     new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
                 List.of(cre("col", tableA)),
                 List.of(cre("col", tableB)),
@@ -1619,8 +1646,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
 
@@ -1630,7 +1657,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan expected =
                 new Filter(
                     1,
-                    new TableScan(0, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(0), emptyList()),
+                    new TableScan(0, expectedSchemaB, tableB, "test", t.scanDataSources.get(0), emptyList()),
                     new ExpressionPredicate(in(cre("col", tableB), asList(intLit(1), intLit(2), intLit(3)), true)));
         //@formatter:on
 
@@ -1672,8 +1699,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
 
@@ -1683,7 +1710,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan expected =
                 new Filter(
                     1,
-                    new TableScan(0, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(0), emptyList()),
+                    new TableScan(0, expectedSchemaB, tableB, "test", t.scanDataSources.get(0), emptyList()),
                     new ExpressionPredicate(neq(cre("col", tableB), intLit(3))));
         //@formatter:on
 
@@ -1725,8 +1752,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
 
@@ -1737,7 +1764,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
 
-        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
         //@formatter:on
 
         //@formatter:off
@@ -1782,8 +1809,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
 
@@ -1794,7 +1821,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Index(QualifiedName.of("tableB"), emptyList(), ColumnsType.WILDCARD), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
 
-        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
         //@formatter:on
 
         //@formatter:off
@@ -1839,8 +1866,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
 
@@ -1851,7 +1878,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Index(QualifiedName.of("tableB"),  List.of("COL"), ColumnsType.ALL), List.of(
                 new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
 
-        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
         //@formatter:on
 
         //@formatter:off
@@ -1898,8 +1925,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
 
@@ -1911,7 +1938,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(3)))
                         ), true);
 
-        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
         //@formatter:on
 
         //@formatter:off
@@ -1963,8 +1990,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
 
@@ -1976,7 +2003,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new SeekPredicate.SeekPredicateItem("col2", cre("col2", tableB), List.of(intLit(10)))
                 ), true);
 
-        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
         //@formatter:on
 
         //@formatter:off
@@ -2026,8 +2053,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -2042,10 +2069,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         
         IPhysicalPlan expected = NestedLoop.leftJoin(
                 3,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new Filter(
                     2,
-                    new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
+                    new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
                     new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
                 new ExpressionPredicate(
                     and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("active", tableA), LiteralBooleanExpression.TRUE))
@@ -2099,8 +2126,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -2116,8 +2143,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         IPhysicalPlan expected = new HashMatch(
                 2,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
-                new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
+                new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
                 List.of(cre("col", tableA), cre("active", tableA)),
                 List.of(cre("col", tableB), cre("active", tableB)),
                 new ExpressionPredicate(
@@ -2171,8 +2198,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -2190,8 +2217,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new HashMatch(
                 2,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
-                new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
+                new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
                 List.of(cre("active", tableA), cre("col", tableA)),
                 List.of(cre("active", tableB), cre("col", tableB)),
                 new ExpressionPredicate(
@@ -2243,8 +2270,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -2255,10 +2282,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new HashMatch(
                 3,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new Filter(
                     2,
-                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                    new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                     new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
                 List.of(cre("col", tableA)),
                 List.of(cre("col", tableB)),
@@ -2321,8 +2348,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -2344,13 +2371,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //CSOFF
         IPhysicalPlan expected = new HashMatch(
                 5,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new HashAggregate(
                     4,
                     new HashMatch(
                        3,
-                       new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicateB, t.seekDataSources.get(0), emptyList()),
-                       new IndexSeek(2, expectedSchemaC, tableC, "test", false, expectedSeekPredicateC, t.seekDataSources.get(1), emptyList()),
+                       new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicateB, t.seekDataSources.get(0), emptyList()),
+                       new IndexSeek(2, expectedSchemaC, tableC, "test", expectedSeekPredicateC, t.seekDataSources.get(1), emptyList()),
                        List.of(cre("col", tableB)),
                        List.of(cre("col", tableC)),
                        new ExpressionPredicate(
@@ -2432,8 +2459,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -2449,8 +2476,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         IPhysicalPlan expected = new HashMatch(
                 2,
-                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
-                new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
+                new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
                 List.of(cre("col", tableA), cre("col2", tableA)),
                 List.of(cre("col", tableB), cre("col2", tableB)),
                 new ExpressionPredicate(
@@ -2503,8 +2530,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
 
@@ -2513,7 +2540,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         
         IPhysicalPlan expected = new Filter(
                 1,
-                new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList()),
+                new TableScan(0, expectedSchema, table, "test", catalog.scanDataSources.get(0), emptyList()),
                 new ExpressionPredicate(
                     and(
                         and(
@@ -2557,13 +2584,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
 
         Schema expectedSchema = Schema.of(ast("", ResolvedType.of(Type.Any), table));
-        IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", catalog.scanDataSources.get(0), emptyList());
 
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
@@ -2597,13 +2624,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
 
         Schema expectedSchema = Schema.of(ast("", ResolvedType.of(Type.Any), table));
-        IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", catalog.scanDataSources.get(0), emptyList());
 
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
@@ -2637,13 +2664,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
 
         Schema expectedSchema = Schema.of(ast("", ResolvedType.of(Type.Any), table));
-        IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", catalog.scanDataSources.get(0), emptyList());
 
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
@@ -2695,13 +2722,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t");
 
         Schema expectedSchema = Schema.of(ast("t", ResolvedType.of(Type.Any), table));
-        IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", catalog.scanDataSources.get(0), emptyList());
 
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
@@ -2756,8 +2783,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
 
@@ -2772,7 +2799,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         2,
                         new AnalyzeInterceptor(
                             1,
-                            new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList())
+                            new TableScan(0, expectedSchema, table, "test", catalog.scanDataSources.get(0), emptyList())
                         ),
                         new ExpressionPredicate(
                             and(
@@ -2831,15 +2858,15 @@ public class QueryPlannerTest extends APhysicalPlanTest
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
 
-        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
-                .get(0)).getSelect();
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
 
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
 
         //@formatter:off
         Schema expectedSchema = Schema.of(ast("", ResolvedType.of(Type.Any), table));
         
-        IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList());
+        IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", catalog.scanDataSources.get(0), emptyList());
         //@formatter:on
 
         //@formatter:off

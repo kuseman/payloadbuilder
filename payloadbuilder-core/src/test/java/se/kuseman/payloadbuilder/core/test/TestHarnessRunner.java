@@ -5,7 +5,9 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.commons.lang3.Strings.CI;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
@@ -13,10 +15,12 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TimeZone;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -37,11 +41,14 @@ import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData.ProjectionType;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.FunctionType;
+import se.kuseman.payloadbuilder.api.catalog.IDatasink;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
+import se.kuseman.payloadbuilder.api.catalog.InsertIntoData;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.SelectIntoData;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -53,6 +60,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.CompiledQuery;
 import se.kuseman.payloadbuilder.core.Payloadbuilder;
+import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.QueryResult;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
@@ -61,6 +69,7 @@ import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
 import se.kuseman.payloadbuilder.core.execution.vector.VectorFactory;
+import se.kuseman.payloadbuilder.core.physicalplan.PlanUtils;
 import se.kuseman.payloadbuilder.core.test.AObjectOutputWriter.ColumnValue;
 
 /** Harness runner test */
@@ -362,6 +371,9 @@ public class TestHarnessRunner
         private final boolean schemaLess;
         private final boolean typedVectors;
 
+        /** Tables created via Select Into */
+        private Map<String, TestTable> createdTables = new HashMap<>();
+
         TCatalog(TestCatalog catalog, boolean schemaLess, boolean typedVectors)
         {
             super("Test#" + catalog.getAlias());
@@ -421,7 +433,7 @@ public class TestHarnessRunner
             });
         }
 
-        private TestTable getTestTable(QualifiedName table)
+        private TestTable getTestTable(QualifiedName table, boolean searchInCreatedTables)
         {
             String tableName = table.getLast();
             for (TestTable testTable : catalog.getTables())
@@ -432,7 +444,20 @@ public class TestHarnessRunner
                 }
             }
 
-            throw new IllegalArgumentException("No test table setup with name: " + table.toString());
+            if (searchInCreatedTables)
+            {
+                TestTable testTable = createdTables.get(tableName);
+                if (testTable != null)
+                {
+                    return testTable;
+                }
+            }
+
+            if (searchInCreatedTables)
+            {
+                throw new IllegalArgumentException("No test table setup with name: " + table.toString());
+            }
+            return null;
         }
 
         private Schema getSchema(TestTable table)
@@ -460,22 +485,136 @@ public class TestHarnessRunner
         @Override
         public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
         {
+            // Verify that catalogAlias is provided and is not empty in case of session default catalog
+            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+
             if (schemaLess)
             {
                 return TableSchema.EMPTY;
             }
 
-            TestTable testTable = getTestTable(table);
+            TestTable testTable = getTestTable(table, true);
             return new TableSchema(getSchema(testTable));
+        }
+
+        @Override
+        public IDatasink getInsertIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, InsertIntoData data)
+        {
+            // Verify that catalogAlias is provided and is not empty in case of session default catalog
+            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+
+            TestTable testTable = createdTables.get(table.getLast());
+            if (testTable == null)
+            {
+                throw new QueryException("Table " + table + " does not exist");
+            }
+
+            return new IDatasink()
+            {
+                @Override
+                public void execute(IExecutionContext context, TupleIterator input)
+                {
+                    TupleVector vector = PlanUtils.concat(context, input);
+                    int rowCount = vector.getRowCount();
+                    int colCount = vector.getSchema()
+                            .getSize();
+                    for (int i = 0; i < rowCount; i++)
+                    {
+                        Object[] row = new Object[colCount];
+                        testTable.getRows()
+                                .add(row);
+                        for (int j = 0; j < colCount; j++)
+                        {
+                            row[j] = vector.getColumn(j)
+                                    .valueAsObject(i);
+                        }
+                    }
+                }
+            };
+        }
+
+        @Override
+        public IDatasink getSelectIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, SelectIntoData data)
+        {
+            // Verify that catalogAlias is provided and is not empty in case of session default catalog
+            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+
+            TestTable existingTestTable = getTestTable(table, false);
+            if (existingTestTable != null)
+            {
+                throw new QueryException("Table " + table + " already exists");
+            }
+
+            // Insert a shell of the new table that will be accessible during planning before execution
+            TestTable testTable = new TestTable();
+            testTable.setName(table.getLast());
+            testTable.setColumns(data.getInputColumns()
+                    .stream()
+                    .map(c -> c.getName())
+                    .toList());
+            testTable.setTypes(data.getInputColumns()
+                    .stream()
+                    .map(c -> c.getType())
+                    .toList());
+            testTable.setRows(new ArrayList<>());
+            createdTables.put(table.getLast(), testTable);
+
+            return new IDatasink()
+            {
+                @Override
+                public void execute(IExecutionContext context, TupleIterator input)
+                {
+                    TupleVector vector = PlanUtils.concat(context, input);
+                    Schema schema = vector.getSchema();
+
+                    // Set the runtime data of the test table
+                    testTable.setColumns(schema.getColumns()
+                            .stream()
+                            .map(c -> c.getName())
+                            .toList());
+                    testTable.setTypes(schema.getColumns()
+                            .stream()
+                            .map(c -> c.getType())
+                            .toList());
+
+                    int rowCount = vector.getRowCount();
+                    int colCount = schema.getSize();
+                    for (int i = 0; i < rowCount; i++)
+                    {
+                        Object[] row = new Object[colCount];
+                        testTable.getRows()
+                                .add(row);
+                        for (int j = 0; j < colCount; j++)
+                        {
+                            row[j] = vector.getColumn(j)
+                                    .valueAsObject(i);
+                        }
+                    }
+                }
+            };
+        }
+
+        @Override
+        public void dropTable(IQuerySession session, String catalogAlias, QualifiedName table, boolean lenient)
+        {
+            // Verify that catalogAlias is provided and is not empty in case of session default catalog
+            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+
+            if (createdTables.remove(table.getLast()) == null
+                    && !lenient)
+            {
+                throw new QueryException("Table " + table + " does not exists or cannot be removed.");
+            }
         }
 
         @Override
         public IDatasource getScanDataSource(IQuerySession session, String catalogAlias, QualifiedName table, DatasourceData data)
         {
-            final TestTable testTable = getTestTable(table);
-            final Schema schema = getSchema(testTable);
+            // Verify that catalogAlias is provided and is not empty in case of session default catalog
+            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+
+            final TestTable testTable = getTestTable(table, true);
             final List<Object[]> rows = testTable.getRows();
-            final int rowCount = rows.size();
             final Projection projection = data.getProjection();
 
             return new IDatasource()
@@ -490,7 +629,8 @@ public class TestHarnessRunner
                         ((ExecutionContext) context).setVariable(optionName.getFirst(), option);
                     }
 
-                    ObjectTupleVector tupleVector = new ObjectTupleVector(schema, rowCount, (row, col) ->
+                    Schema schema = getSchema(testTable);
+                    ObjectTupleVector tupleVector = new ObjectTupleVector(schema, rows.size(), (row, col) ->
                     {
                         Column column = schema.getColumns()
                                 .get(col);
@@ -544,6 +684,9 @@ public class TestHarnessRunner
         @Override
         public TableSchema getSystemTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
         {
+            // Verify that catalogAlias is provided and is not empty in case of session default catalog
+            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+
             String type = table.getLast();
             if (SYS_TABLES.equalsIgnoreCase(type))
             {
@@ -568,80 +711,91 @@ public class TestHarnessRunner
         @Override
         public IDatasource getSystemTableDataSource(IQuerySession session, String catalogAlias, QualifiedName table, DatasourceData data)
         {
-            TupleVector vector = null;
+            // Verify that catalogAlias is provided and is not empty in case of session default catalog
+            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+
+            Supplier<TupleVector> vector = null;
             String type = table.getLast();
             if (SYS_TABLES.equalsIgnoreCase(type))
             {
-                List<TestTable> tables = catalog.getTables();
-                vector = new ObjectTupleVector(SYS_TABLES_SCHEMA, tables.size(), (row, col) ->
+                vector = () ->
                 {
-                    TestTable t = tables.get(row);
-                    if (col == 0)
+                    List<TestTable> tables = new ArrayList<>(catalog.getTables());
+                    tables.addAll(createdTables.values());
+                    return new ObjectTupleVector(SYS_TABLES_SCHEMA, tables.size(), (row, col) ->
                     {
-                        return t.getName();
-                    }
-                    return new ValueVector()
-                    {
-                        @Override
-                        public ResolvedType type()
+                        TestTable t = tables.get(row);
+                        if (col == 0)
                         {
-                            return ResolvedType.of(Type.String);
+                            return t.getName();
                         }
+                        return new ValueVector()
+                        {
+                            @Override
+                            public ResolvedType type()
+                            {
+                                return ResolvedType.of(Type.String);
+                            }
 
-                        @Override
-                        public int size()
-                        {
-                            return t.getColumns()
-                                    .size();
-                        }
+                            @Override
+                            public int size()
+                            {
+                                return t.getColumns()
+                                        .size();
+                            }
 
-                        @Override
-                        public boolean isNull(int row)
-                        {
-                            return t.getColumns()
-                                    .get(row) == null;
-                        }
+                            @Override
+                            public boolean isNull(int row)
+                            {
+                                return t.getColumns()
+                                        .get(row) == null;
+                            }
 
-                        @Override
-                        public Object getAny(int row)
-                        {
-                            return t.getColumns()
-                                    .get(row);
-                        }
-                    };
-                });
+                            @Override
+                            public Object getAny(int row)
+                            {
+                                return t.getColumns()
+                                        .get(row);
+                            }
+                        };
+                    });
+                };
             }
             else if (SYS_COLUMNS.equalsIgnoreCase(type))
             {
-                List<Pair<TestTable, String>> columns = catalog.getTables()
-                        .stream()
-                        .flatMap(t -> t.getColumns()
-                                .stream()
-                                .map(c -> Pair.of(t, c)))
-                        .collect(toList());
-                vector = new ObjectTupleVector(SYS_COLUMNS_SCHEMA, columns.size(), (row, col) ->
+                vector = () ->
                 {
-                    Pair<TestTable, String> p = columns.get(row);
-                    if (col == 0)
+                    List<Pair<TestTable, String>> columns = catalog.getTables()
+                            .stream()
+                            .flatMap(t -> t.getColumns()
+                                    .stream()
+                                    .map(c -> Pair.of(t, c)))
+                            .collect(toList());
+
+                    return new ObjectTupleVector(SYS_COLUMNS_SCHEMA, columns.size(), (row, col) ->
                     {
-                        return p.getKey()
-                                .getName();
-                    }
-                    else if (col == 1)
-                    {
-                        return p.getValue();
-                    }
-                    return p.getValue()
-                            .length();
-                });
+                        Pair<TestTable, String> p = columns.get(row);
+                        if (col == 0)
+                        {
+                            return p.getKey()
+                                    .getName();
+                        }
+                        else if (col == 1)
+                        {
+                            return p.getValue();
+                        }
+                        return p.getValue()
+                                .length();
+                    });
+                };
             }
             else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
             {
-                vector = getFunctionsTupleVector(SYS_FUNCTIONS_SCHEMA);
+                vector = () -> getFunctionsTupleVector(SYS_FUNCTIONS_SCHEMA);
             }
             else if (SYS_INDICES.equalsIgnoreCase(type))
             {
-                vector = TupleVector.EMPTY;
+                vector = () -> TupleVector.EMPTY;
             }
 
             if (vector == null)
@@ -649,13 +803,13 @@ public class TestHarnessRunner
                 return super.getSystemTableDataSource(session, catalogAlias, table, data);
             }
 
-            final TupleVector tupleVector = vector;
+            final Supplier<TupleVector> sup = vector;
             return new IDatasource()
             {
                 @Override
                 public TupleIterator execute(IExecutionContext context)
                 {
-                    return TupleIterator.singleton(tupleVector);
+                    return TupleIterator.singleton(sup.get());
                 }
             };
         }

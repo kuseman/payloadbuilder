@@ -185,6 +185,17 @@ public class ConstantScan implements ILogicalPlan
         return new ConstantScan(schema, List.of(rowExpressions), location);
     }
 
+    /** Constructs a constant scan with provided rows expressions. */
+    public static ConstantScan createFromRows(List<List<IExpression>> rowsExpressions, Location location)
+    {
+        // Extract the schema from the first row
+        List<ResolvedType> columnTypes = getTypesFromRows(rowsExpressions, location);
+        Schema schema = new Schema(IntStream.range(0, columnTypes.size())
+                .mapToObj(i -> (Column) CoreColumn.of("column" + i, columnTypes.get(i)))
+                .toList());
+        return new ConstantScan(schema, rowsExpressions, location);
+    }
+
     private static List<ResolvedType> getTypesFromRows(List<List<IExpression>> rowsExpressions, Location location)
     {
         if (rowsExpressions.isEmpty())

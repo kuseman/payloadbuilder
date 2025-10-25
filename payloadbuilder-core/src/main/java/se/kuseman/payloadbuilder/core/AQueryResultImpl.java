@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,6 +12,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.time.StopWatch;
 
 import se.kuseman.payloadbuilder.api.OutputWriter;
+import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -28,9 +30,8 @@ import se.kuseman.payloadbuilder.core.statement.CacheFlushRemoveStatement;
 import se.kuseman.payloadbuilder.core.statement.DescribeSelectStatement;
 import se.kuseman.payloadbuilder.core.statement.DropTableStatement;
 import se.kuseman.payloadbuilder.core.statement.IfStatement;
-import se.kuseman.payloadbuilder.core.statement.InsertIntoStatement;
 import se.kuseman.payloadbuilder.core.statement.LogicalSelectStatement;
-import se.kuseman.payloadbuilder.core.statement.PhysicalSelectStatement;
+import se.kuseman.payloadbuilder.core.statement.PhysicalStatement;
 import se.kuseman.payloadbuilder.core.statement.PrintStatement;
 import se.kuseman.payloadbuilder.core.statement.QueryStatement;
 import se.kuseman.payloadbuilder.core.statement.SetStatement;
@@ -162,16 +163,20 @@ abstract class AQueryResultImpl implements BaseQueryResult, StatementVisitor<Voi
     }
 
     @Override
-    public Void visit(PhysicalSelectStatement statement, Void ctx)
+    public Void visit(PhysicalStatement statement, Void ctx)
     {
-        currentPlan = statement.getSelect();
+        currentPlan = statement.getPlan();
         return null;
     }
 
     @Override
     public Void visit(DropTableStatement statement, Void ctx)
     {
-        session.dropTemporaryTable(statement.getQname(), statement.isLenient());
+        String catalogAlias = defaultIfBlank(statement.getCatalogAlias(), context.getSession()
+                .getDefaultCatalogAlias());
+        Catalog catalog = context.getSession()
+                .getCatalog(catalogAlias);
+        catalog.dropTable(context.getSession(), catalogAlias, statement.getQname(), statement.isLenient());
         return null;
     }
 
@@ -323,12 +328,6 @@ abstract class AQueryResultImpl implements BaseQueryResult, StatementVisitor<Voi
     public Void visit(LogicalSelectStatement statement, Void ctx)
     {
         throw new IllegalArgumentException("LogicalSelectStatement cannot be executed");
-    }
-
-    @Override
-    public Void visit(InsertIntoStatement statement, Void context)
-    {
-        throw new IllegalArgumentException("InsertIntoStatement cannot be executed");
     }
 
     @Override

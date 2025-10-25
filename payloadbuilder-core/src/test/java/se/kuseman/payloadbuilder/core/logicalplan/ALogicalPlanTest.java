@@ -19,17 +19,17 @@ public abstract class ALogicalPlanTest extends AExpressionTest
 {
     protected TableScan tableScan(Schema schema, TableSourceReference tableSource)
     {
-        return new TableScan(new TableSchema(schema), tableSource, Projection.ALL, false, emptyList(), null);
+        return new TableScan(new TableSchema(schema), tableSource, Projection.ALL, emptyList(), null);
     }
 
     protected TableScan tableScan(Schema schema, TableSourceReference tableSource, List<String> projection)
     {
-        return new TableScan(new TableSchema(schema), tableSource, Projection.columns(projection), false, emptyList(), null);
+        return new TableScan(new TableSchema(schema), tableSource, Projection.columns(projection), emptyList(), null);
     }
 
     protected TableScan tableScanNoProjection(Schema schema, TableSourceReference tableSource)
     {
-        return new TableScan(new TableSchema(schema), tableSource, Projection.NONE, false, emptyList(), null);
+        return new TableScan(new TableSchema(schema), tableSource, Projection.NONE, emptyList(), null);
     }
 
     protected SubQuery subQuery(ILogicalPlan input, TableSourceReference tableSource)

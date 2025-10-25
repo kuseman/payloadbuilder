@@ -95,6 +95,31 @@ public abstract class Catalog
         throw new IllegalArgumentException("Catalog " + catalogAlias + " (" + name + ") doesn't support seek operators.");
     }
 
+    /** Return an insert into sink for provided table. */
+    public IDatasink getInsertIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, InsertIntoData data)
+    {
+        throw new IllegalArgumentException("Catalog " + catalogAlias + " (" + name + ") doesn't support insert into operator.");
+    }
+
+    /**
+     * Return a select into sink for provided table. This operator assumes that the table does not already exists and should throw error if exists.
+     */
+    public IDatasink getSelectIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, SelectIntoData data)
+    {
+        throw new IllegalArgumentException("Catalog " + catalogAlias + " (" + name + ") doesn't support select into operator.");
+    }
+
+    /**
+     * Drop provided table.
+     *
+     * @param qname Name of table
+     * @param lenient False if this operation should fail if table does not exist otherwise false.
+     */
+    public void dropTable(IQuerySession session, String catalogAlias, QualifiedName qname, boolean lenient)
+    {
+        throw new IllegalArgumentException("Catalog " + catalogAlias + " (" + name + ") doesn't support drop table operator.");
+    }
+
     /**
      * <pre>
      * Get system datasource for provided table.

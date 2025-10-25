@@ -15,23 +15,29 @@ import org.apache.commons.lang3.tuple.Triple;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.CompileException;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
+import se.kuseman.payloadbuilder.api.catalog.IDatasink;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.SelectIntoData;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
+import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.cache.Cache;
 import se.kuseman.payloadbuilder.core.cache.CacheProvider;
 import se.kuseman.payloadbuilder.core.cache.CacheType;
 import se.kuseman.payloadbuilder.core.catalog.system.AMatchFunction.MatchType;
 import se.kuseman.payloadbuilder.core.catalog.system.TrimFunction.Type;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
@@ -421,8 +427,32 @@ public class SystemCatalog extends Catalog
     }
 
     @Override
+    public IDatasink getSelectIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, SelectIntoData data)
+    {
+        if (!"#".equalsIgnoreCase(table.getFirst()))
+        {
+            throw new CompileException("Can only insert into temp tables (prefixed with '#'). Table: " + table);
+        }
+
+        return new SelectIntoTempTableSink(table, data.getOptions(), true);
+    }
+
+    @Override
+    public void dropTable(IQuerySession session, String catalogAlias, QualifiedName qname, boolean lenient)
+    {
+        ((QuerySession) session).dropTemporaryTable(qname, lenient);
+    }
+
+    @Override
     public IDatasource getScanDataSource(IQuerySession session, String catalogAlias, QualifiedName table, DatasourceData data)
     {
+        if ("#".equals(table.getFirst()))
+        {
+            table = table.extract(1)
+                    .toLowerCase();
+            return new TemporaryTableDataSource(table, null);
+        }
+
         int size = table.size();
         QuerySession querySession = (QuerySession) session;
         String targetCatalogAlias;
@@ -458,8 +488,43 @@ public class SystemCatalog extends Catalog
     }
 
     @Override
+    public IDatasource getSeekDataSource(IQuerySession session, String catalogAlias, ISeekPredicate seekPredicate, DatasourceData data)
+    {
+        if ("#".equals(seekPredicate.getIndex()
+                .getTable()
+                .getFirst()))
+        {
+            QualifiedName table = seekPredicate.getIndex()
+                    .getTable()
+                    .extract(1)
+                    .toLowerCase();
+            return new TemporaryTableDataSource(table, seekPredicate);
+        }
+        throw new CompileException("Index: " + seekPredicate.getIndex() + " is not supported");
+    }
+
+    @Override
     public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
     {
+        // Temporary table
+        if ("#".equals(table.getFirst()))
+        {
+            table = table.extract(1)
+                    .toLowerCase();
+            TableSchema tableSchema = ((QuerySession) session).getTemporaryTableSchema(table);
+            if (tableSchema == null)
+            {
+                throw new QueryException("No temporary table found with name #" + table);
+            }
+
+            if (SchemaUtils.isAsterisk(tableSchema.getSchema()))
+            {
+                return new TableSchema(Schema.EMPTY, tableSchema.getIndices());
+            }
+
+            return tableSchema;
+        }
+
         int size = table.size();
         QuerySession querySession = (QuerySession) session;
         String targetCatalogAlias;

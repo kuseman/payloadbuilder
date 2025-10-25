@@ -43,11 +43,11 @@ useStatement
  ;
 
 analyzeStatement
- : ANALYZE selectStatement
+ : ANALYZE dmlStatement
  ;
 
 describeStatement
- : DESCRIBE  selectStatement
+ : DESCRIBE dmlStatement
  ;
 
 showStatement
@@ -93,6 +93,7 @@ printStatement
 
 dmlStatement
  : selectStatement
+ | insertStatement
  ;
 
 ddlStatement
@@ -101,6 +102,41 @@ ddlStatement
 
 topSelect
  : selectStatement EOF
+ ;
+
+queryExpression
+ : selectStatement //unions+=sqlUnion*
+ ;
+
+/*
+sqlUnion
+ : (UNION ALL? | EXCEPT | INTERSECT)
+   (
+      spec=selectStatement
+      | (PARENO op=queryExpression PARENC)
+   )
+ ;
+*/
+
+/*
+  INSERT TOP 100 INTO <tableName> (column1, column2) WITH (transactionType=NONE/PER_BATCH/FULL)
+  VALUES (1, 2)
+
+  INSERT INTO <tableName> (column1, column2)
+  SELECT customerNumber, orderNumber
+  FROM jdbc#table
+*/
+insertStatement
+ : INSERT (TOP topCount)?
+   INTO into=tableName
+   columnList
+   intoOptions=tableSourceOptions?
+   insertStatementValue
+ ;
+
+insertStatementValue
+ : tableValueConstructor
+ | queryExpression
  ;
 
 selectStatement
@@ -144,7 +180,7 @@ tableSource
  : tableName                                    identifier? tableSourceOptions?
  | functionCall                                 identifier? tableSourceOptions?
  | variable                                     identifier?
- | PARENO derivedTable PARENC                   identifier columnAliasList? tableSourceOptions?
+ | PARENO derivedTable PARENC                   identifier columnList? tableSourceOptions?
  ;
 
 derivedTable
@@ -181,7 +217,7 @@ tableValueConstructor
     : VALUES PARENO expr_list PARENC (COMMA PARENO expr_list PARENC)*
     ;
 
-columnAliasList
+columnList
     : PARENO identifier (COMMA identifier)* PARENC
     ;
 
