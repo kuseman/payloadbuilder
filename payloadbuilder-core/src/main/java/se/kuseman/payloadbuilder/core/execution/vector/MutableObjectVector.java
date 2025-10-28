@@ -58,7 +58,8 @@ class MutableObjectVector extends AMutableVector
             value = UTF8String.from(value);
         }
         buffer[row] = value;
-        hasNulls = value == null;
+        hasNulls = hasNulls
+                || value == null;
     }
 
     @Override

@@ -6,7 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.StringWriter;
+import java.io.PrintWriter;
 import java.io.Writer;
 import java.time.Duration;
 import java.util.Map;
@@ -61,7 +61,7 @@ public final class TestUtils
     /** Mock {@link IExecutionContext} with provided data */
     public static IExecutionContext mockExecutionContext(String catalogAlias, Map<String, Object> properties, int nodeId, NodeData data)
     {
-        return mockExecutionContext(catalogAlias, properties, nodeId, data, new StringWriter());
+        return mockExecutionContext(catalogAlias, properties, nodeId, data, new PrintWriter(System.out));
     }
 
     /** Mock {@link IExecutionContext} with provided data */
@@ -101,10 +101,26 @@ public final class TestUtils
         });
 
         when(session.getPrintWriter()).thenReturn(writer);
-        Mockito.doCallRealMethod()
-                .when(session)
-                .handleKnownException(any(Exception.class));
 
+        if (writer == null)
+        {
+            Mockito.doAnswer(new Answer<Void>()
+            {
+                @Override
+                public Void answer(InvocationOnMock invocation) throws Throwable
+                {
+                    throw (Exception) invocation.getArgument(0);
+                }
+            })
+                    .when(session)
+                    .handleKnownException(any(Exception.class));
+        }
+        else
+        {
+            Mockito.doCallRealMethod()
+                    .when(session)
+                    .handleKnownException(any(Exception.class));
+        }
         return context;
     }
 }

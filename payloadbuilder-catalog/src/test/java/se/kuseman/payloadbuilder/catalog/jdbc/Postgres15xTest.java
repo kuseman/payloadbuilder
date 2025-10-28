@@ -60,25 +60,12 @@ public class Postgres15xTest extends BaseJDBCTest
             precision = 29;
             scale = 6;
         }
-        return super.getColumn(type, name.toLowerCase(), precision, scale);
-    }
-
-    @Override
-    protected String getBooleanValue(boolean value)
-    {
-        return Boolean.toString(value);
-    }
-
-    @Override
-    protected String getColumnDeclaration(Column column)
-    {
-        Type type = column.getType()
-                .getType();
-        if (type == Type.Boolean)
+        else if (type == Type.DateTimeOffset)
         {
-            return "BOOLEAN";
+            precision = 35;
+            scale = 6;
         }
-        return super.getColumnDeclaration(column);
+        return super.getColumn(type, name.toLowerCase(), precision, scale);
     }
 
     @Test
@@ -109,10 +96,9 @@ public class Postgres15xTest extends BaseJDBCTest
         IExecutionContext context = mockExecutionContext();
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("json_test"), new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, emptyList()));
         TupleIterator it = ds.execute(context);
-
-        Column jsonColumn = getStringColumn("myjson", 2147483647);
-        Column xmlColumn = getStringColumn("myxml", 2147483647);
-        Column uuidColumn = getStringColumn("myuuid", 2147483647);
+        Column jsonColumn = getStringColumn("myjson", -1);
+        Column xmlColumn = getStringColumn("myxml", -1);
+        Column uuidColumn = getStringColumn("myuuid", -1);
 
         while (it.hasNext())
         {

@@ -12,7 +12,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
-/** Function listOf. Creates a list of provided arguments */
+/** Function contains. Creates a list of provided arguments */
 class ContainsFunction extends ScalarFunctionInfo
 {
     ContainsFunction()

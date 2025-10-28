@@ -1,16 +1,23 @@
 package se.kuseman.payloadbuilder.catalog.jdbc.dialect;
 
+import static java.util.Objects.requireNonNull;
+
 import java.io.IOException;
 import java.io.Reader;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.execution.Decimal;
@@ -84,9 +91,20 @@ public interface SqlDialect
             MapUtils.entry(java.sql.Types.NCLOB, Column.Type.String),
             // DateTime
             MapUtils.entry(java.sql.Types.TIMESTAMP, Column.Type.DateTime),
-            MapUtils.entry(java.sql.Types.DATE, Column.Type.DateTime)
+            MapUtils.entry(java.sql.Types.DATE, Column.Type.DateTime),
+            // DateTimeOffset
+            MapUtils.entry(java.sql.Types.TIMESTAMP_WITH_TIMEZONE, Column.Type.DateTimeOffset)
             );
     //@formatter:on
+
+    /**
+     * Create connection with provided url and credentials. This connected is intended to be used when inserting data via {@link InsertSink} and if dialect supports special connections for fast
+     * inserts it can be applied.
+     */
+    default Connection createInsertConnection(String url, String username, String password) throws SQLException
+    {
+        return DriverManager.getConnection(url, username, password);
+    }
 
     /** Returns true if this dialect uses JDBC schemas as database */
     default boolean usesSchemaAsDatabase()
@@ -94,26 +112,35 @@ public interface SqlDialect
         return false;
     }
 
+    /** Returns the identifier quote string for this dialect. */
+    default String getIdentifierQuoteString(Connection connection) throws SQLException
+    {
+        return connection.getMetaData()
+                .getIdentifierQuoteString();
+    }
+
+    /** Jdbc meta for a column. */
+    record ColumnMeta(Column.Type type, int precision, int scale)
+    {
+        public ColumnMeta
+        {
+            requireNonNull(type);
+        }
+    }
+
     /**
      * Retuns PLB column type from provided JDBC meta data.
      */
-    default Column.Type getColumnType(ResultSetMetaData rsmd, int jdbcType, int ordinal) throws SQLException
+    default ColumnMeta getColumnMeta(ResultSetMetaData rsmd, int jdbcType, int ordinal) throws SQLException
     {
+        int scale = rsmd.getScale(ordinal);
+        int precision = rsmd.getPrecision(ordinal);
         Column.Type type = JDBC_TO_PLB_MAP.get(jdbcType);
         if (type == null)
         {
-            // See if the type name can be of use to determine type
-            String typeName = rsmd.getColumnTypeName(ordinal);
-            // A json/xml type from eg. postgres => String
-            if ("json".equalsIgnoreCase(typeName)
-                    || "xml".equalsIgnoreCase(typeName)
-                    || "uuid".equalsIgnoreCase(typeName))
-            {
-                return Column.Type.String;
-            }
             type = Column.Type.Any;
         }
-        return type;
+        return new ColumnMeta(type, precision, scale);
     }
 
     /** Set result set value to provided value vector. */
@@ -163,15 +190,15 @@ public interface SqlDialect
         }
         else if (type == Type.DateTime)
         {
-            Timestamp obj = rs.getTimestamp(ordinal);
+            LocalDateTime obj = rs.getObject(ordinal, LocalDateTime.class);
             if (obj != null)
             {
-                vector.setDateTime(row, EpochDateTime.from(obj.toLocalDateTime()));
+                vector.setDateTime(row, EpochDateTime.from(obj));
             }
         }
         else if (type == Type.DateTimeOffset)
         {
-            Object obj = rs.getObject(ordinal);
+            OffsetDateTime obj = rs.getObject(ordinal, OffsetDateTime.class);
             if (obj != null)
             {
                 vector.setDateTimeOffset(row, EpochDateTimeOffset.from(obj));
@@ -190,6 +217,86 @@ public interface SqlDialect
         {
             vector.setNull(row);
         }
+    }
+
+    /**
+     * Set value into {@link PreparedStatement} object.
+     */
+    default void setStatementValue(Column.Type type, PreparedStatement stm, int ordinal, int row, ValueVector vector) throws SQLException
+    {
+        if (vector.hasNulls()
+                && vector.isNull(row))
+        {
+            stm.setObject(ordinal, null);
+            return;
+        }
+
+        switch (type)
+        {
+            case String:
+            case Any:
+                stm.setString(ordinal, vector.valueAsString(row));
+                break;
+            case Boolean:
+                stm.setBoolean(ordinal, vector.getBoolean(row));
+                break;
+            case DateTime:
+                stm.setObject(ordinal, vector.getDateTime(row)
+                        .getLocalDateTime());
+                break;
+            case DateTimeOffset:
+                stm.setObject(ordinal, vector.getDateTimeOffset(row)
+                        .getZonedDateTime()
+                        .toOffsetDateTime());
+                break;
+            case Decimal:
+                stm.setBigDecimal(ordinal, vector.getDecimal(row)
+                        .asBigDecimal());
+                break;
+            case Double:
+                stm.setDouble(ordinal, vector.getDouble(row));
+                break;
+            case Float:
+                stm.setFloat(ordinal, vector.getFloat(row));
+                break;
+            case Int:
+                stm.setInt(ordinal, vector.getInt(row));
+                break;
+            case Long:
+                stm.setLong(ordinal, vector.getLong(row));
+                break;
+            default:
+                throw new IllegalArgumentException("Type: " + type + " is not supported.");
+        }
+    }
+
+    /** Return column definition for provided column. */
+    default String getColumnDeclaration(Type type, int scale, int precision)
+    {
+        return switch (type)
+        {
+            case Boolean -> "BIT";
+            case Int -> "INT";
+            case Long -> "BIGINT";
+            case Float -> "REAL";
+            case Double -> "FLOAT";
+            case Decimal -> "NUMERIC(%s, %s)".formatted(precision < 0 ? 19
+                    : precision,
+                    scale < 0 ? 4
+                            : scale);
+            case DateTime -> "TIMESTAMP";
+            case DateTimeOffset -> "TIMESTAMP WITH TIME ZONE";
+            case String -> "VARCHAR(%s)".formatted(precision < 0 ? "MAX"
+                    : precision);
+            default -> throw new IllegalArgumentException("Type: " + type + " is not supported.");
+        };
+    }
+
+    /** Return drop table statement for provided table. */
+    default String getDropTableStatement(QualifiedName qname, boolean lenient)
+    {
+        return (lenient ? "DROP TABLE IF EXISTS %"
+                : "DROP TABLE %s").formatted(qname.toDotDelimited());
     }
 
     /**

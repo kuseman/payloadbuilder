@@ -309,10 +309,7 @@ class JdbcDatasource implements IDatasource
             Map<String, ColumnOption> columnOptions)
     //@formatter:on
     {
-        final String database = context.getSession()
-                .getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
-                .valueAsString(0);
-
+        final String database = catalog.getDatabase(context.getSession(), catalogAlias);
         // CSOFF
         return new TupleIterator()
         // CSON
@@ -478,7 +475,7 @@ class JdbcDatasource implements IDatasource
                 // First result set, open connection an create statement
                 if (statement == null)
                 {
-                    connection = catalog.getConnection(context.getSession(), catalogAlias);
+                    connection = catalog.getPooledConnection(context.getSession(), catalogAlias);
                     JdbcUtils.printWarnings(connection, context.getSession()
                             .getPrintWriter());
 

@@ -1,6 +1,8 @@
 package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import java.sql.SQLException;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 
 import javax.sql.DataSource;
 
@@ -25,26 +27,6 @@ public class MariaDb10xTest extends BaseJDBCTest
     public static void tearDownClass()
     {
         MariaDb.stop();
-    }
-
-    @Override
-    protected String getColumnDeclaration(Column column)
-    {
-        Type type = column.getType()
-                .getType();
-        if (type == Type.Float)
-        {
-            return "FLOAT";
-        }
-        else if (type == Type.Double)
-        {
-            return "DOUBLE";
-        }
-        else if (type == Type.DateTime)
-        {
-            return "DATETIME";
-        }
-        return super.getColumnDeclaration(column);
     }
 
     @Override
@@ -73,7 +55,22 @@ public class MariaDb10xTest extends BaseJDBCTest
             precision = 19;
             scale = 0;
         }
+        else if (type == Type.DateTimeOffset)
+        {
+            type = Type.DateTime;
+            precision = 19;
+            scale = 0;
+        }
         return super.getColumn(type, name, precision, scale);
+    }
+
+    /** Return the UTC in LocaleDateTime since this dialect don't support offsets. */
+    @Override
+    protected Object zdt(String value)
+    {
+        ZonedDateTime zdt = (ZonedDateTime) super.zdt(value);
+        return zdt.withZoneSameInstant(ZoneId.of("UTC"))
+                .toLocalDateTime();
     }
 
     static class MariaDb

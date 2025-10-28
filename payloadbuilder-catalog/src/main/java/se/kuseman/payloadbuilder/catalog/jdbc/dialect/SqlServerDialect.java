@@ -1,19 +1,23 @@
 package se.kuseman.payloadbuilder.catalog.jdbc.dialect;
 
-import java.io.IOException;
-import java.sql.ResultSet;
+import java.sql.Connection;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.time.OffsetDateTime;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
-import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 
 /** Dialect for SQL server */
 class SqlServerDialect implements SqlDialect
 {
+    @Override
+    public Connection createInsertConnection(String url, String username, String password) throws SQLException
+    {
+        // Enable bulk copy for insert connections
+        url += ";useBulkCopyForBatchInsert=true";
+        return SqlDialect.super.createInsertConnection(url, username, password);
+    }
 
     /**
      * @formatter:off
@@ -26,34 +30,54 @@ class SqlServerDialect implements SqlDialect
     static final int DATETIMEOFFSET = -155;
 
     @Override
-    public Type getColumnType(ResultSetMetaData rsmd, int jdbcType, int ordinal) throws SQLException
+    public ColumnMeta getColumnMeta(ResultSetMetaData rsmd, int jdbcType, int ordinal) throws SQLException
     {
+        ColumnMeta meta = SqlDialect.super.getColumnMeta(rsmd, jdbcType, ordinal);
         if (DATETIMEOFFSET == jdbcType)
         {
-            return Column.Type.DateTimeOffset;
+            return new ColumnMeta(Column.Type.DateTimeOffset, meta.precision(), meta.scale());
         }
-        return SqlDialect.super.getColumnType(rsmd, jdbcType, ordinal);
+        else if (meta.type() == Type.String
+                && meta.precision() > 1_000_000_000)
+        {
+            return new ColumnMeta(meta.type(), -1, meta.scale());
+        }
+        return meta;
     }
 
     @Override
-    public void setResultSetValue(Column.Type type, ResultSet rs, int ordinal, int row, int jdbcType, MutableValueVector vector) throws SQLException, IOException
+    public String getColumnDeclaration(Type type, int scale, int precision)
     {
-        // Special handling of SQLServer's own DateTimeOffset type
-        if (type == Column.Type.DateTimeOffset)
+        if (type == Type.DateTime)
         {
-            OffsetDateTime odt = rs.getObject(ordinal, OffsetDateTime.class);
-            if (odt != null)
-            {
-                vector.setDateTimeOffset(row, EpochDateTimeOffset.from(odt));
-            }
-            if (rs.wasNull())
-            {
-                vector.setNull(row);
-            }
+            return "DATETIME2";
         }
-        else
+        else if (type == Type.DateTimeOffset)
         {
-            SqlDialect.super.setResultSetValue(type, rs, ordinal, row, jdbcType, vector);
+            return "DATETIMEOFFSET";
         }
+        else if (type == Type.String)
+        {
+            return "NVARCHAR(" + (precision < 0 ? "MAX"
+                    : precision)
+                   + ")";
+        }
+        return SqlDialect.super.getColumnDeclaration(type, scale, precision);
+    }
+
+    @Override
+    public String getDropTableStatement(QualifiedName qname, boolean lenient)
+    {
+        if (!lenient)
+        {
+            return SqlDialect.super.getDropTableStatement(qname, lenient);
+        }
+        // Use of format with OBJECT_ID for lenient mode to cover for old sqlserver versions
+        return """
+                IF OBJECT_ID(N'%1$s') IS NOT NULL
+                BEGIN
+                    DROP TABLE %1$s
+                END
+                """.formatted(qname.toDotDelimited());
     }
 }

@@ -3,9 +3,9 @@ package se.kuseman.payloadbuilder.catalog.jdbc;
 import static java.util.Collections.emptyList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
 
 import javax.sql.DataSource;
 
@@ -17,14 +17,17 @@ import org.testcontainers.utility.DockerImageName;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.MetaData;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 import oracle.jdbc.datasource.impl.OracleDataSource;
@@ -35,34 +38,6 @@ public class Oracle21xTest extends BaseJDBCTest
     public Oracle21xTest()
     {
         super(Oracle.getDatasource(), Oracle.getUrl(), "oracle.jdbc.OracleDriver", TEST_DB, Oracle.PASSWORD);
-    }
-
-    @Override
-    protected String getTimestampValue(String timestamp)
-    {
-        return "TO_DATE(%s,'YYYY-MM-DD HH24:MI:SS')".formatted(timestamp);
-    }
-
-    @Override
-    protected String getColumnDeclaration(Column column)
-    {
-        Type type = column.getType()
-                .getType();
-        if (type == Type.Int)
-        {
-            return "NUMBER(" + column.getMetaData()
-                    .getPrecision()
-                   + ")";
-        }
-        else if (type == Type.Long)
-        {
-            return "NUMBER(19)";
-        }
-        else if (type == Type.Boolean)
-        {
-            return "NUMBER(1)";
-        }
-        return super.getColumnDeclaration(column);
     }
 
     @Override
@@ -89,32 +64,25 @@ public class Oracle21xTest extends BaseJDBCTest
     @Test
     public void test_clob() throws SQLException
     {
-        try (Connection con = datasource.getConnection())
-        {
-            try (PreparedStatement stm = con.prepareStatement("""
-                    CREATE TABLE clob_test
-                    (
-                        MYCLOB  CLOB
-                    ,   MYNCLOB NCLOB
-                    )
-                    """))
-            {
-                stm.execute();
-            }
+        QualifiedName table = QualifiedName.of("clob_test");
+        InsertSink sink = new InsertSink(catalog, table, CATALOG_ALIAS,
+                List.of(new Option(QualifiedName.of(JdbcCatalog.COLUMN, "myclob", JdbcCatalog.DECLARATION), new LiteralStringExpression("CLOB")),
+                        new Option(QualifiedName.of(JdbcCatalog.COLUMN, "mynclob", JdbcCatalog.DECLARATION), new LiteralStringExpression("NCLOB"))));
 
-            try (PreparedStatement stm = con.prepareStatement("""
-                    INSERT INTO clob_test (myclob, mynclob) VALUES ('clob', 'nclob')
-                    """))
-            {
-                stm.execute();
-            }
-        }
+        //@formatter:off
+        sink.execute(mockExecutionContext(), TupleIterator.singleton(TupleVector.of(Schema.of(
+                Column.of("myclob", Type.String, new Column.MetaData(Map.of(MetaData.NULLABLE, false))),
+                Column.of("mynclob", Type.String)),
+                List.of(
+                    VectorTestUtils.vv(Type.String, "clob åäö"),
+                    VectorTestUtils.vv(Type.String, "nclob åäö")))));
+        //@formatter:on
 
         IExecutionContext context = mockExecutionContext();
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("clob_test"), new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, emptyList()));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, table, new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, emptyList()));
         TupleIterator it = ds.execute(context);
 
-        Column clobColumn = getStringColumn("myclob", -1);
+        Column clobColumn = Column.of("MYCLOB", Type.String, new Column.MetaData(Map.of(MetaData.PRECISION, -1, MetaData.SCALE, 0, MetaData.NULLABLE, false)));
         Column nclobColumn = getStringColumn("mynclob", -1);
 
         while (it.hasNext())
@@ -122,8 +90,8 @@ public class Oracle21xTest extends BaseJDBCTest
             TupleVector v = it.next();
             assertEquals(Schema.of(clobColumn, nclobColumn), v.getSchema());
             //@formatter:off
-            assertVectorsEquals(VectorTestUtils.vv(clobColumn.getType().getType(), "clob"), v.getColumn(0));
-            assertVectorsEquals(VectorTestUtils.vv(clobColumn.getType().getType(), "nclob"), v.getColumn(1));
+            assertVectorsEquals(VectorTestUtils.vv(clobColumn.getType().getType(), "clob åäö"), v.getColumn(0));
+            assertVectorsEquals(VectorTestUtils.vv(clobColumn.getType().getType(), "nclob åäö"), v.getColumn(1));
             //@formatter:on
         }
         it.close();

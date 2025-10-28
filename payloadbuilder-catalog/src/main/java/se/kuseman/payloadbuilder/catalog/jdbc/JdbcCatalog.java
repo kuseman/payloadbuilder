@@ -10,6 +10,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -42,14 +43,17 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData.ProjectionType;
+import se.kuseman.payloadbuilder.api.catalog.IDatasink;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.Index;
+import se.kuseman.payloadbuilder.api.catalog.InsertIntoData;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.SelectIntoData;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
@@ -77,6 +81,8 @@ public class JdbcCatalog extends Catalog
     static final String COLUMN = "column";
     /** Suffix value for plbtype. When overriding PLB's choice. */
     static final String PLBTYPE = "plbtype";
+    /** Suffix value for column declaration. When overriding PLB's choice. */
+    static final String DECLARATION = "declaration";
 
     private final Map<String, DatasourceHolder> dataSourceByURL = new ConcurrentHashMap<>();
     private final ScheduledFuture<?> houseKeepingFuture;
@@ -158,6 +164,18 @@ public class JdbcCatalog extends Catalog
     }
 
     @Override
+    public IDatasink getSelectIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, SelectIntoData data)
+    {
+        return new InsertSink(this, table, catalogAlias, data.getOptions());
+    }
+
+    @Override
+    public IDatasink getInsertIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, InsertIntoData data)
+    {
+        return new InsertSink(this, table, catalogAlias, data.getInsertColumns(), data.getOptions());
+    }
+
+    @Override
     public IDatasource getScanDataSource(IQuerySession session, String catalogAlias, QualifiedName table, DatasourceData data)
     {
         return getDataSource(session, catalogAlias, table, null, data);
@@ -168,6 +186,34 @@ public class JdbcCatalog extends Catalog
     {
         return getDataSource(session, catalogAlias, seekPredicate.getIndex()
                 .getTable(), seekPredicate, data);
+    }
+
+    @Override
+    public void dropTable(IQuerySession session, String catalogAlias, QualifiedName qname, boolean lenient)
+    {
+        String database = getDatabase(session, catalogAlias);
+        SqlDialect dialect = DialectProvider.getDialect(session, catalogAlias);
+        String dropTableStatement = dialect.getDropTableStatement(qname, lenient);
+        try (Connection con = getPooledConnection(session, catalogAlias))
+        {
+            if (dialect.usesSchemaAsDatabase())
+            {
+                con.setSchema(database);
+            }
+            else
+            {
+                con.setCatalog(database);
+            }
+
+            try (PreparedStatement stm = con.prepareStatement(dropTableStatement))
+            {
+                stm.execute();
+            }
+        }
+        catch (SQLException e)
+        {
+            throw new RuntimeException("Error droping table", e);
+        }
     }
 
     private IDatasource getDataSource(IQuerySession session, String catalogAlias, QualifiedName table, ISeekPredicate seekPredicate, DatasourceData data)
@@ -282,8 +328,30 @@ public class JdbcCatalog extends Catalog
                 .size() == 1;
     }
 
+    String getDatabase(IQuerySession session, String catalogAlias)
+    {
+        String database = session.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
+                .valueAsString(0);
+
+        if (isBlank(database))
+        {
+            throw new IllegalArgumentException("Missing database in catalog properties. Catalog alias: " + catalogAlias);
+        }
+        return database;
+    }
+
+    Connection getPooledConnection(IQuerySession session, String catalogAlias) throws SQLException
+    {
+        return getConnection(session, catalogAlias, true);
+    }
+
+    Connection getInsertConnection(IQuerySession session, String catalogAlias) throws SQLException
+    {
+        return getConnection(session, catalogAlias, false);
+    }
+
     /** Get connection for provided session/catalog alias */
-    Connection getConnection(IQuerySession session, String catalogAlias)
+    private Connection getConnection(IQuerySession session, String catalogAlias, boolean pooled) throws SQLException
     {
         final String driverClassName = session.getCatalogProperty(catalogAlias, JdbcCatalog.DRIVER_CLASSNAME)
                 .valueAsString(0);
@@ -303,11 +371,18 @@ public class JdbcCatalog extends Catalog
             throw new CredentialsException(catalogAlias, "Missing username/password in catalog properties for " + catalogAlias);
         }
 
-        return getConnection(driverClassName, url, username, password, catalogAlias);
+        if (!pooled)
+        {
+            SqlDialect dialect = DialectProvider.getDialect(url, driverClassName);
+            return dialect.createInsertConnection(url, username, password);
+        }
+        return getPooledConnection(driverClassName, url, username, password, catalogAlias);
     }
 
     /** Get connection for provided url and user/pass */
-    Connection getConnection(String driverClassName, String url, String username, String password, String catalogAlias)
+    // CSOFF
+    private Connection getPooledConnection(String driverClassName, String url, String username, String password, String catalogAlias)
+    // CSON
     {
         try
         {
@@ -418,16 +493,14 @@ public class JdbcCatalog extends Catalog
 
     private TupleIterator getSystemIterator(IQuerySession session, String catalogAlias, String tableFilter, boolean tables)
     {
-        String database = session.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
-                .valueAsString(0);
-
+        String database = getDatabase(session, catalogAlias);
         SqlDialect dialect = DialectProvider.getDialect(session, catalogAlias);
 
         Connection connection = null;
         ResultSet rs = null;
         try
         {
-            connection = getConnection(session, catalogAlias);
+            connection = getPooledConnection(session, catalogAlias);
             if (tables)
             {
                 rs = connection.getMetaData()

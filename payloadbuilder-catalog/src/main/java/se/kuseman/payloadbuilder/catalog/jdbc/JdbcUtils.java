@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -19,6 +20,7 @@ import java.util.function.Consumer;
 
 import org.apache.commons.lang3.Strings;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -26,10 +28,15 @@ import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.catalog.jdbc.JdbcCatalog.ColumnOption;
 import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
+import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect.ColumnMeta;
 
 /** Jdbc utils. Managing resources etc. */
-class JdbcUtils
+final class JdbcUtils
 {
+    private JdbcUtils()
+    {
+    }
+
     static final String JAVA_SQL_TYPE = "java.sql.Type";
 
     record SchemaResult(Schema schema, int[] jdbcTypes)
@@ -39,6 +46,56 @@ class JdbcUtils
             requireNonNull(schema);
             requireNonNull(jdbcTypes);
         }
+    }
+
+    /** Return a create table statement for provided schema. */
+    static String getCreateTableStatement(SqlDialect dialect, QualifiedName table, Schema schema, String identifierQuoteString, Map<String, ColumnOption> columnOptions)
+    {
+        StringBuilder sb = new StringBuilder("CREATE TABLE ").append(table.getParts()
+                .stream()
+                .map(p -> "%1$s%2$s%1$s".formatted(identifierQuoteString, p))
+                .collect(joining(".")))
+                .append("\n(\n");
+        sb.append(schema.getColumns()
+                .stream()
+                .map(c ->
+                {
+                    Column.Type type = c.getType()
+                            .getType();
+                    String name = c.getName();
+
+                    int precision = c.getMetaData()
+                            .getPrecision();
+                    int scale = c.getMetaData()
+                            .getScale();
+                    boolean nullable = c.getMetaData()
+                            .isNullable();
+
+                    String columnDeclaration;
+                    ColumnOption option = columnOptions.get(name.toLowerCase());
+                    IExpression valueExp;
+                    if (option != null
+                            && (valueExp = (option.values()
+                                    .get(JdbcCatalog.DECLARATION))) != null)
+                    {
+                        columnDeclaration = valueExp.eval(null)
+                                .valueAsString(0);
+                    }
+                    else
+                    {
+                        columnDeclaration = dialect.getColumnDeclaration(type, scale, precision);
+                    }
+
+                    if (!nullable)
+                    {
+                        columnDeclaration += " NOT NULL";
+                    }
+
+                    return "%1$s%2$s%1$s\t%3$s".formatted(identifierQuoteString, name, columnDeclaration);
+                })
+                .collect(joining(",\n")));
+        sb.append("\n)\n");
+        return sb.toString();
     }
 
     static SchemaResult getSchemaFromResultSet(SqlDialect dialect, ResultSetMetaData rsmd, Map<String, ColumnOption> columnOptions) throws SQLException
@@ -75,14 +132,15 @@ class JdbcUtils
 
             if (type == null)
             {
-                type = dialect.getColumnType(rsmd, jdbcTypes[i], ordinal);
-                precision = rsmd.getPrecision(ordinal);
-                scale = rsmd.getScale(ordinal);
+                ColumnMeta meta = dialect.getColumnMeta(rsmd, jdbcTypes[i], ordinal);
+                type = meta.type();
+                precision = meta.precision();
+                scale = meta.scale();
             }
 
             //@formatter:off
             Column.MetaData metaData = new Column.MetaData(Map.of(
-                    Column.MetaData.NULLABLE, ResultSetMetaData.columnNullable == rsmd.isNullable(ordinal),
+                    Column.MetaData.NULLABLE, rsmd.isNullable(ordinal) == ResultSetMetaData.columnNullable,
                     Column.MetaData.SCALE, scale,
                     Column.MetaData.PRECISION, precision
                     //JAVA_SQL_TYPE, rsmd.getColumnType(ordinal)
