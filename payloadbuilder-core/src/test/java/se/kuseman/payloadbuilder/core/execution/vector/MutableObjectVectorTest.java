@@ -24,6 +24,7 @@ public class MutableObjectVectorTest extends Assert
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.String), 2);
 
         assertFalse(b.hasNulls());
+        assertTrue(b.isNull(0));
 
         try
         {
