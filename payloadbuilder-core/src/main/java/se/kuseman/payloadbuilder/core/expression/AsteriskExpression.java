@@ -14,7 +14,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
@@ -31,7 +30,7 @@ import se.kuseman.payloadbuilder.core.parser.Location;
  *  - SELECT a.map.* FROM table                   &lt;-- qualified in select that expands a nested typ (Not implementd yet)
  * </pre>
  */
-public class AsteriskExpression implements IExpression, HasColumnReference
+public class AsteriskExpression implements IExpression
 {
     /** Qualifier before the asterisk */
     private final QualifiedName qname;
@@ -71,17 +70,6 @@ public class AsteriskExpression implements IExpression, HasColumnReference
     public Set<TableSourceReference> getTableSourceReferences()
     {
         return tableSourceReferences;
-    }
-
-    @Override
-    public ColumnReference getColumnReference()
-    {
-        if (tableSourceReferences.size() == 1)
-        {
-            return new ColumnReference(tableSourceReferences.iterator()
-                    .next(), CoreColumn.Type.ASTERISK);
-        }
-        return null;
     }
 
     @Override

@@ -19,6 +19,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
@@ -27,7 +28,7 @@ import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
 
 /** Dereference expression. expression.column reference */
-public class DereferenceExpression implements IDereferenceExpression, HasAlias, HasColumnReference
+public class DereferenceExpression implements IDereferenceExpression, HasAlias
 {
     private final IExpression left;
     private final String right;
@@ -96,23 +97,12 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
         return List.of(left);
     }
 
-    /** Returns true if this deref. has an explicitly set {@link ColumnReference}. */
-    public boolean hasColumnReferenceSet()
-    {
-        return columnReference != null;
-    }
-
-    @Override
+    /** Get column reference from this dereference. */
     public ColumnReference getColumnReference()
     {
         if (columnReference != null)
         {
             return columnReference;
-        }
-
-        if (left instanceof HasColumnReference htsr)
-        {
-            return htsr.getColumnReference();
         }
         return null;
     }
@@ -337,9 +327,10 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
             ColumnReference cf = ce.getColumnReference();
             // If the dereferenced expression is of populated type then we need to change the column type
             // of the dereference to a regular type since it's not going to be populated any more
+            // Also pick the first part of the qname since that is the actual column name
             if (cf.columnType() == CoreColumn.Type.POPULATED)
             {
-                inputColRef = new ColumnReference(cf.tableSourceReference(), CoreColumn.Type.REGULAR, cf.tableTypeTableSource());
+                inputColRef = new ColumnReference(qname.getFirst(), cf.tableSourceReference(), CoreColumn.Type.REGULAR);
             }
             columnReferenceSet = true;
         }
@@ -388,6 +379,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
             ordinal = pair.getValue();
             if (pair.getKey() != null)
             {
+                Column column = pair.getKey();
                 // If table then wrap type in an array
                 resolvedType = type.getType() == Type.Table ? ResolvedType.array(pair.getKey()
                         .getType())
@@ -397,7 +389,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                 TableSourceReference tableSource = SchemaUtils.getTableSource(pair.getKey());
                 if (tableSource != null)
                 {
-                    colRef = new ColumnReference(tableSource, SchemaUtils.getColumnType(pair.getKey()));
+                    colRef = new ColumnReference(column.getName(), tableSource, SchemaUtils.getColumnType(column));
                 }
             }
             else
@@ -416,7 +408,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                     TableSourceReference tableSource = SchemaUtils.getTableSource(column);
                     if (tableSource != null)
                     {
-                        colRef = new ColumnReference(tableSource, SchemaUtils.getColumnType(column));
+                        colRef = new ColumnReference(column.getName(), tableSource, SchemaUtils.getColumnType(column));
                     }
                 }
             }

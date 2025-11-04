@@ -22,8 +22,9 @@ import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzeResult;
@@ -196,21 +197,17 @@ class ConditionAnalyzer
         {
             Pair<IExpression, IExpression> expressionPair = pair.getExpressionPair(tableSource);
             IExpression innerExpression = expressionPair.getLeft();
-
-            if (innerExpression instanceof HasColumnReference tsr)
+            ColumnReference cr = SchemaUtils.getColumnReference(innerExpression);
+            if (cr != null)
             {
-                TableSourceReference tableRef = tsr.getColumnReference()
-                        .tableSourceReference();
-                if (tableRef != null)
+                TableSourceReference tableRef = cr.tableSourceReference();
+                // Pick the first table schema we find, later on we might want
+                // to optimize and try to find the best candidate
+                TableSchema tableSchema = schemaByTableSource.get(tableRef);
+                if (tableSchema != null)
                 {
-                    // Pick the first table schema we find, later on we might want
-                    // to optimize and try to find the best candidate
-                    TableSchema tableSchema = schemaByTableSource.get(tableRef);
-                    if (tableSchema != null)
-                    {
-                        indices = tableSchema.getIndices();
-                        break;
-                    }
+                    indices = tableSchema.getIndices();
+                    break;
                 }
             }
         }

@@ -20,6 +20,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.SelectedValueVector;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.core.QueryException;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
@@ -39,7 +40,7 @@ import se.kuseman.payloadbuilder.core.execution.StatementContext;
  * outerReference:        Is set if this column is resolved to the outer schema and then the outer tuple vector is used in context instead of input
  * </pre>
  */
-public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnReference
+public class ColumnExpression implements IColumnExpression, HasAlias
 {
     /** Alias for this expression. This is the column name (only used for presentation) */
     private final String alias;
@@ -117,7 +118,6 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
         return outerReference;
     }
 
-    @Override
     public ColumnReference getColumnReference()
     {
         return columnReference;
@@ -319,11 +319,6 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
                     .append(columnReference.tableSourceReference())
                     .append(", columnType=")
                     .append(columnReference.columnType());
-            if (columnReference.tableTypeTableSource() != null)
-            {
-                sb.append(", tableType table=")
-                        .append(columnReference.tableTypeTableSource());
-            }
         }
 
         if (hasOptions)

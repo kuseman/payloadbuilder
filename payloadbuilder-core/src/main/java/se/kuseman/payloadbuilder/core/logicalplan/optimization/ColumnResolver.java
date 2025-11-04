@@ -18,7 +18,6 @@ import java.util.Set;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.Strings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +37,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
@@ -50,7 +50,6 @@ import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
@@ -171,42 +170,6 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             }
 
             return new ResolveSchema(plan.getSchema());
-        }
-
-        /** Find {@link TableSourceReference} of type {@link TableSourceReference.Type#TABLE} from provided table source and column. */
-        TableSourceReference getTableTypeTableSource(TableSourceReference tableSource, String column)
-        {
-            // Provided table source is of Type = TABLE already => return
-            if (tableSource.getType() == TableSourceReference.Type.TABLE)
-            {
-                return tableSource;
-            }
-
-            Schema schema = tableSourceSchemaById.get(tableSource.getId());
-            if (schema == null)
-            {
-                return null;
-            }
-
-            // Asterisk column on schema => bind
-            if (schema.getSize() == 1
-                    && SchemaUtils.isAsterisk(schema.getColumns()
-                            .get(0)))
-            {
-                return SchemaUtils.getTableSource(schema.getColumns()
-                        .get(0));
-            }
-
-            // Else search for column match
-            for (Column col : schema.getColumns())
-            {
-                if (Strings.CI.equals(column, col.getName()))
-                {
-                    return SchemaUtils.getTableSource(col);
-                }
-            }
-
-            return null;
         }
     }
 
@@ -1502,16 +1465,17 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             int ordinal = canUseOrdinal ? index
                     : -1;
 
+            String resolvedColumnName = populatedAliasMatch ? alias
+                    : column;
+
             // Set the alias of the ColumnExpression to the alias and not the column
             // in case we matched the alias and not the column
-            ColumnExpression.Builder builder = ColumnExpression.Builder.of(populatedAliasMatch ? alias
-                    : column, match.getType())
+            ColumnExpression.Builder builder = ColumnExpression.Builder.of(resolvedColumnName, match.getType())
                     .withOrdinal(ordinal);
 
             if (ordinal < 0)
             {
-                builder.withColumn(populatedAliasMatch ? alias
-                        : column);
+                builder.withColumn(resolvedColumnName);
             }
 
             // If column did not have a table source use the one from schema (sub query)
@@ -1523,27 +1487,15 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             if (tableRef != null)
             {
                 CoreColumn.Type columnType = SchemaUtils.getColumnType(match);
+
                 // Switch asterisk to regular upon match
                 if (columnType == CoreColumn.Type.ASTERISK)
                 {
                     columnType = CoreColumn.Type.REGULAR;
                 }
-                match = new CoreColumn(column, match.getType(), "", false, tableRef, columnType);
 
-                TableSourceReference tableTypeTableSource = null;
-                // Only lookup real columns
-                if (columnType != CoreColumn.Type.POPULATED)
-                {
-                    tableTypeTableSource = context.getTableTypeTableSource(tableRef, column);
-                    // Clear the found table source if it's not of desired type or the same as the original
-                    if (tableTypeTableSource != null
-                            && (tableTypeTableSource.getType() != TableSourceReference.Type.TABLE
-                                    || tableTypeTableSource.getId() == tableRef.getId()))
-                    {
-                        tableTypeTableSource = null;
-                    }
-                }
-                builder.withColumnReference(new ColumnReference(tableRef, columnType, tableTypeTableSource));
+                match = new CoreColumn(resolvedColumnName, match.getType(), "", false, tableRef, columnType);
+                builder.withColumnReference(new ColumnReference(resolvedColumnName, tableRef, columnType));
             }
 
             // Add column to outer references and set outer reference to column builder

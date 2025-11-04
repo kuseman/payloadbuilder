@@ -153,8 +153,8 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
         {
             for (ColumnReferenceExtractorResult ce : e.getValue())
             {
-                TableSourceReference tableSource = ce.columnReference()
-                        .tableTypeTableSource();
+                TableSourceReference tableSource = getRoot(ce.columnReference()
+                        .tableSourceReference());
                 if (tableSource == null)
                 {
                     tableSource = ce.columnReference()
@@ -196,12 +196,25 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
                     continue;
                 }
 
-                String column = ce.column();
+                String column = ce.columnReference()
+                        .name();
                 appendColumn(tableSource, column, context);
             }
         }
 
         return expressions;
+    }
+
+    /** Get concrete table source (table or function) from provided table source. */
+    private TableSourceReference getRoot(TableSourceReference tableSource)
+    {
+        while (tableSource != null
+                && tableSource.getType() != TableSourceReference.Type.TABLE
+                && tableSource.getType() != TableSourceReference.Type.FUNCTION)
+        {
+            tableSource = tableSource.getParent();
+        }
+        return tableSource;
     }
 
     private void appendColumn(TableSourceReference tableSource, String column, Ctx context)

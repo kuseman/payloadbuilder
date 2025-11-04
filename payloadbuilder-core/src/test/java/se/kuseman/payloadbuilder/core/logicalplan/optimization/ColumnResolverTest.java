@@ -22,6 +22,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
@@ -31,7 +32,6 @@ import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
@@ -370,7 +370,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         Assertions.assertThat(actual.getSchema())
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
-                .isEqualTo(Schema.of(col("qualifier", ResolvedType.of(Type.Any), tableA)));
+                .isEqualTo(Schema.of(col("qualifier", ResolvedType.of(Type.Any), null)));
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
@@ -415,7 +415,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         Assertions.assertThat(actual.getSchema())
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
-                .isEqualTo(Schema.of(col("val", ResolvedType.of(Type.Any), tableA)));
+                .isEqualTo(Schema.of(col("val", ResolvedType.of(Type.Any), null)));
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
@@ -497,7 +497,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         Assertions.assertThat(actual.getSchema())
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
-                .isEqualTo(Schema.of(col("level", Type.Any, tableA)));
+                .isEqualTo(Schema.of(col("level", Type.Any)));
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
@@ -613,7 +613,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
                 col("col", ResolvedType.of(Type.Any), tableA),
-                new CoreColumn("", ResolvedType.of(Type.Int), "count(a.col2)", false, tableA, CoreColumn.Type.REGULAR),
+                new CoreColumn("", ResolvedType.of(Type.Int), "count(a.col2)", false, null, CoreColumn.Type.REGULAR),
                 col("col3", ResolvedType.array(Type.Any), tableA)
                 ));
         //@formatter:on
@@ -714,11 +714,11 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         .usingRecursiveComparison()
         .ignoringFieldsOfTypes(Location.class, Random.class)
         .isEqualTo(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Any), "map(a.d, x -> x)", false, CoreColumn.Type.REGULAR),
-                new CoreColumn("", ResolvedType.of(Type.Any), "map(a.d, x -> x.value)", false, CoreColumn.Type.REGULAR),
-                new CoreColumn("", ResolvedType.of(Type.Any), "map(a.a, y -> y)", false, CoreColumn.Type.REGULAR),
-                new CoreColumn("", ResolvedType.of(Type.Any), "map(a.a, z -> z.column)", false, CoreColumn.Type.REGULAR),
-                new CoreColumn("", ResolvedType.of(Type.Any), "map(a.col, zz -> zz.column + a.value)", false, CoreColumn.Type.REGULAR)
+                new CoreColumn("", ResolvedType.of(Type.Any), "map(a.d, x -> x)", false),
+                new CoreColumn("", ResolvedType.of(Type.Any), "map(a.d, x -> x.value)", false),
+                new CoreColumn("", ResolvedType.of(Type.Any), "map(a.a, y -> y)", false),
+                new CoreColumn("", ResolvedType.of(Type.Any), "map(a.a, z -> z.column)", false),
+                new CoreColumn("", ResolvedType.of(Type.Any), "map(a.col, zz -> zz.column + a.value)", false)
                 ));
         //@formatter:on
 
@@ -816,10 +816,10 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         Assertions.assertThat(actual.getSchema())
             .usingRecursiveComparison()
             .isEqualTo(Schema.of(
-                    new CoreColumn("", ResolvedType.array(ResolvedType.object(schemaB)), "map(b.b, x -> x)", false, CoreColumn.Type.REGULAR),       // ValueVector of ObjectVectors
-                    new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Any)), "map(b.b, x -> x.col)", false, CoreColumn.Type.REGULAR),
-                    new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Any)), "map(b.b, z -> z.column)", false, CoreColumn.Type.REGULAR),
-                    new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Any)), "map(b.b, zz -> zz.col2 + a.value)", false, CoreColumn.Type.REGULAR)
+                    new CoreColumn("", ResolvedType.array(ResolvedType.object(schemaB)), "map(b.b, x -> x)", false),       // ValueVector of ObjectVectors
+                    new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Any)), "map(b.b, x -> x.col)", false),
+                    new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Any)), "map(b.b, z -> z.column)", false),
+                    new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Any)), "map(b.b, zz -> zz.col2 + a.value)", false)
                     ));
         //@formatter:on
 
@@ -1021,11 +1021,11 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                         ocre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED),
                                         null),
                                     asList(
-                                        cre("col2", e_b.withParent(tableB), tableB),
+                                        cre("col2", e_b.withParent(tableB)),
                                         new DereferenceExpression(ocre("c", tableC, "c", ResolvedType.table(schemaC), CoreColumn.Type.POPULATED),
                                                 "col3", -1, ResolvedType.array(Type.Any),
-                                                new ColumnReference(tableC, CoreColumn.Type.REGULAR)),
-                                        cre("col4", e_b.withParent(tableB), tableB),
+                                                new ColumnReference("col3", tableC, CoreColumn.Type.REGULAR)),
+                                        cre("col4", e_b.withParent(tableB)),
                                         ocre("col3", tableA),
                                         ocre("col6", sTableD, "col6", ResolvedType.of(Type.String), CoreColumn.Type.REGULAR),
                                         ocre("c", tableC, "c", ResolvedType.table(schemaC), CoreColumn.Type.POPULATED)
@@ -1038,7 +1038,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                         null,
                         asSet(
                             pop("b", ResolvedType.table(schemaB), tableB),
-                            pop("col3", ResolvedType.table(schemaC), tableC),
+                            pop("c", ResolvedType.table(schemaC), tableC),
                             col("col3", ResolvedType.of(Type.Any), tableA),
                             col("col6", ResolvedType.of(Type.String), sTableD),     // static schema col6 was chosen instead of asterisk
                             pop("c", ResolvedType.table(schemaC), tableC)
@@ -1352,12 +1352,12 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     intLit(1),
                                     new DereferenceExpression(ocre("r1", rangeR1, 1, ResolvedType.table(schemaRangeR1), CoreColumn.Type.POPULATED),
                                             "Value", 0, ResolvedType.array(ResolvedType.of(Type.Int)),
-                                            new ColumnReference(rangeR1, CoreColumn.Type.REGULAR))),
+                                            new ColumnReference("Value", rangeR1, CoreColumn.Type.REGULAR))),
                                     emptyList(), null),
                         Join.Type.INNER,
                         null,
                         (IExpression) null,
-                        asSet(pop("Value", ResolvedType.table(schemaRangeR1), rangeR1)),
+                        asSet(pop("r1", ResolvedType.table(schemaRangeR1), rangeR1)),
                         false,
                         SchemaUtils.joinSchema(schemaRangeA, schemaRangeR1, "r1")),
                     asList(new DereferenceExpression(
@@ -1365,7 +1365,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                 "Value",
                                 0,
                                 ResolvedType.array(ResolvedType.of(Type.Int)),
-                            new ColumnReference(rangeR1, CoreColumn.Type.REGULAR))
+                            new ColumnReference("Value", rangeR1, CoreColumn.Type.REGULAR))
                     ));
 
         assertEquals(
@@ -1424,12 +1424,12 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     intLit(1),
                                     new DereferenceExpression(ocre("r1", rangeR1, 1, ResolvedType.table(schemaRangeR1), CoreColumn.Type.POPULATED),
                                             "Value", 0, ResolvedType.array(ResolvedType.of(Type.Int)),
-                                            new ColumnReference(rangeR1, CoreColumn.Type.REGULAR))),
+                                            new ColumnReference("Value", rangeR1, CoreColumn.Type.REGULAR))),
                                     emptyList(), null),
                         Join.Type.INNER,
                         null,
                         (IExpression) null,
-                        asSet(pop("Value", ResolvedType.table(schemaRangeR1), rangeR1)),
+                        asSet(pop("r1", ResolvedType.table(schemaRangeR1), rangeR1)),
                         false,
                         SchemaUtils.joinSchema(schemaRangeA, schemaRangeR1, "r1")),
                     List.of(
@@ -1503,12 +1503,12 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     intLit(1),
                                     new DereferenceExpression(ocre("r1", rangeR1, 1, ResolvedType.table(schemaRangeR1), CoreColumn.Type.POPULATED),
                                             "Value", 0, ResolvedType.array(ResolvedType.of(Type.Int)),
-                                            new ColumnReference(rangeR1, CoreColumn.Type.REGULAR))),
+                                            new ColumnReference("Value", rangeR1, CoreColumn.Type.REGULAR))),
                                     emptyList(), null),
                         Join.Type.INNER,
                         "r2",
                         (IExpression) null,
-                        asSet(pop("Value", ResolvedType.table(schemaRangeR1), rangeR1)),
+                        asSet(pop("r1", ResolvedType.table(schemaRangeR1), rangeR1)),
                         false,
                         SchemaUtils.joinSchema(schemaRangeA, schemaRangeR1, "r1")),
                     List.of(
@@ -1519,14 +1519,16 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         //@formatter:on
 
         //@formatter:off
-        assertEquals(Schema.of(
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .isEqualTo(Schema.of(
                 // All a
                 schemaRangeA.getColumns().get(0),
                 // Populate r1
                 new CoreColumn("r1", ResolvedType.table(schemaRangeR1), "", false, rangeR1, CoreColumn.Type.POPULATED),
                 // Populate r2
                 new CoreColumn("r2", ResolvedType.table(schemaRangeR2), "", false, rangeR2, CoreColumn.Type.POPULATED)
-                ), actual.getSchema());
+                ));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1574,7 +1576,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     Schema.EMPTY),
                 asList(cre("col", tableA), new DereferenceExpression(cre("b", tableB, "b",
                         ResolvedType.table(schemaB), CoreColumn.Type.POPULATED), "col", -1, ResolvedType.array(Type.Any),
-                        new ColumnReference(tableB, CoreColumn.Type.REGULAR)))
+                        new ColumnReference("col", tableB, CoreColumn.Type.REGULAR)))
                 );
         //@formatter:on
 
@@ -1765,8 +1767,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                 ocre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED),
                                 null),
                             List.of(
-                                cre("col", e_b.withParent(tableB), tableB),
-                                cre("col2", e_b.withParent(tableB), tableB),
+                                cre("col", e_b.withParent(tableB)),
+                                cre("col2", e_b.withParent(tableB)),
                                 ocre("col3", tableA))
                         ),
                         "",
@@ -1786,7 +1788,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     )),
                 asList(cre("col", tableA), new AliasExpression(
                         new DereferenceExpression(cre("b", tableB, "b", ResolvedType.table(schemaB), CoreColumn.Type.POPULATED), "col", -1, ResolvedType.array(Type.Any),
-                                new ColumnReference(tableB, CoreColumn.Type.REGULAR)), "bOuterCol"),
+                                new ColumnReference("col", tableB, CoreColumn.Type.REGULAR)), "bOuterCol"),
                         ce("__expr0", ResolvedType.table(subQuerySchema))
                 ));
         //@formatter:on
@@ -1850,8 +1852,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     ocre("b", sTableB, 3, ResolvedType.table(schemaSTableB), CoreColumn.Type.POPULATED),
                                     null),
                                 asList(
-                                    cre("col3", e_b.withParent(sTableB), sTableB, 2, ResolvedType.of(Type.Float)),
-                                    cre("col2", e_b.withParent(sTableB), sTableB, 1, ResolvedType.of(Type.String)),
+                                    cre("col3", e_b.withParent(sTableB), 2, ResolvedType.of(Type.Float)),
+                                    cre("col2", e_b.withParent(sTableB), 1, ResolvedType.of(Type.String)),
                                     ocre("col3", sTableA, 2, ResolvedType.of(Type.Float))
                                 )),
                             "",
@@ -1874,7 +1876,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 asList(cre("col1", sTableA, 0, ResolvedType.of(Type.Int)),
                        new AliasExpression(new DereferenceExpression(cre("b", sTableB, 3, ResolvedType.table(schemaSTableB), CoreColumn.Type.POPULATED),
                                "col2", 1, ResolvedType.array(ResolvedType.of(Type.String)),
-                               new ColumnReference(sTableB, CoreColumn.Type.REGULAR)),
+                               new ColumnReference("col2", sTableB, CoreColumn.Type.REGULAR)),
                             "bOuterCol"),
                        ce("__expr0", 4, ResolvedType.table(objectArraySchema))));
         //@formatter:on
@@ -1928,7 +1930,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 asList(
                         cre("col", tableA, 0, ResolvedType.of(Type.Int)),
                         new DereferenceExpression(cre("b", tableB, 2, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED), "col", 0, ResolvedType.array(ResolvedType.of(Type.String)),
-                                new ColumnReference(tableB, CoreColumn.Type.REGULAR)))
+                                new ColumnReference("col", tableB, CoreColumn.Type.REGULAR)))
                 );
         //@formatter:on
 

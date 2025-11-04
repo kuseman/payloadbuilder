@@ -32,12 +32,12 @@ import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.LogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
@@ -90,11 +90,13 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             return input;
         }
 
+        TableSourceReference parentTableSource = plan.getParentTableSource();
         List<IExpression> expressions = plan.getExpressions();
         if (input instanceof se.kuseman.payloadbuilder.core.physicalplan.Projection p)
         {
             expressions = ProjectionMerger.replace(plan.getExpressions(), p.getExpressions());
             input = p.getInput();
+            parentTableSource = p.getParentTableSource();
         }
         else if (input instanceof AnalyzeInterceptor ai
                 && ai.getInput() instanceof se.kuseman.payloadbuilder.core.physicalplan.Projection p)
@@ -103,7 +105,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             input = p.getInput();
         }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, expressions, plan.getParentTableSource()));
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, expressions, parentTableSource));
     }
 
     @Override

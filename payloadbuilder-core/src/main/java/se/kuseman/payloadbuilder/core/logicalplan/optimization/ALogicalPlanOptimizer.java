@@ -15,6 +15,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
@@ -22,8 +23,6 @@ import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ALogicalPlanVisitor;
@@ -544,7 +543,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         return columns;
     }
 
-    protected record ColumnReferenceExtractorResult(IExpression expression, ColumnReference columnReference, String column)
+    protected record ColumnReferenceExtractorResult(IExpression expression, ColumnReference columnReference)
     {
     }
 
@@ -563,31 +562,26 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         public Void visit(IColumnExpression expression, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
         {
             ColumnExpression ce = (ColumnExpression) expression;
-            add(ce, ce.getAlias()
-                    .getAlias(), context);
+            add(ce, ce.getColumnReference(), context);
             return null;
         }
 
         @Override
         public Void visit(IDereferenceExpression expression, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
         {
-            // The dereference doesn't have a column reference, that means that this is a nested property on some target
-            // which means that the the right side of the deref IS NOT a column but rather a nested property/field.
-            if (expression instanceof DereferenceExpression de
-                    && !de.hasColumnReferenceSet())
+            // If there is a column reference of the dereference then use that one else
+            // traverse
+            ColumnReference cr = ((DereferenceExpression) expression).getColumnReference();
+            if (cr != null)
             {
-                super.visit(expression, context);
+                add(expression, cr, context);
+                return null;
             }
-            else
-            {
-                add((HasColumnReference) expression, expression.getRight(), context);
-            }
-            return null;
+            return super.visit(expression, context);
         }
 
-        private void add(HasColumnReference hcr, String column, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
+        private void add(IExpression expression, ColumnReference colRef, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
         {
-            ColumnReference colRef = hcr.getColumnReference();
             TableSourceReference tableRef = null;
             if (colRef != null)
             {
@@ -596,7 +590,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
             if (tableRef != null)
             {
                 context.computeIfAbsent(tableRef, k -> new HashSet<>())
-                        .add(new ColumnReferenceExtractorResult((IExpression) hcr, colRef, column));
+                        .add(new ColumnReferenceExtractorResult(expression, colRef));
             }
         }
     }

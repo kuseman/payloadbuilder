@@ -285,6 +285,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
+        TableSourceReference subQueryX = new TableSourceReference(0, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
         Schema expectedSchemaA = Schema.of(ast("", ResolvedType.of(Type.Any), tableA));
 
         //@formatter:off
@@ -292,7 +293,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 2,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 List.of(cre("col1", tableA), cre("col2", tableA), add(cre("col3", tableA), cre("col2", tableA))),
-                null
+                subQueryX
                 );
         //@formatter:on
 
@@ -374,8 +375,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 select x.col
                 from
                 (
-                  select a.col1 + a.col2 col,
-                  a.col3
+                  select a.col1 + a.col2 col, a.col3
                   from tableA a
                 ) x
                 """;
@@ -391,6 +391,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getPlan();
 
         TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference subQueryX = new TableSourceReference(0, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
 
         //@formatter:off
@@ -398,7 +399,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 2,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 List.of(new AliasExpression(add(cre("col1", tableA), cre("col2", tableA)), "col")),
-                null
+                subQueryX
                 );
         //@formatter:on
 
@@ -1453,7 +1454,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                                 e_b.withParent(tableB),
                                 e_bExpectedSchema,
                                 ocre("b", tableB, ResolvedType.table(expectedSchemaB), CoreColumn.Type.POPULATED)),
-                            asList(cre("col1", e_b.withParent(tableB), tableB), cre("col2", e_b.withParent(tableB), tableB)),
+                            asList(cre("col1", e_b.withParent(tableB)), cre("col2", e_b.withParent(tableB))),
                             null),
                         SystemCatalog.get().getOperatorFunction("object_array"),
                         "sys",

@@ -17,6 +17,7 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
@@ -25,7 +26,6 @@ import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
@@ -75,9 +75,9 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                         false,
                         Schema.EMPTY),
                     List.of(new DereferenceExpression(cre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED), "col2", -1, ResolvedType.array(Type.Any),
-                                new ColumnReference(tableB, CoreColumn.Type.REGULAR)),
+                                new ColumnReference("col2", tableB, CoreColumn.Type.REGULAR)),
                             new DereferenceExpression(cre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED), "col3", -1, ResolvedType.array(Type.Any),
-                                new ColumnReference(tableB, CoreColumn.Type.REGULAR)))
+                                new ColumnReference("col3", tableB, CoreColumn.Type.REGULAR)))
                 );
         //@formatter:on
         Assertions.assertThat(actual)
