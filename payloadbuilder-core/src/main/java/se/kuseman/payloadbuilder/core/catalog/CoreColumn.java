@@ -46,17 +46,6 @@ public class CoreColumn extends Column
         this(name, type, outputName, internal, null, Type.REGULAR);
     }
 
-    public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, Type columnType)
-    {
-        this(name, type, outputName, internal, null, columnType);
-    }
-
-    /** Copy ctor. New name of column */
-    public CoreColumn(CoreColumn source, String newName)
-    {
-        this(newName, source.getType(), source.outputName, source.internal, source.tableSourceReference, source.columnType);
-    }
-
     /** Copy ctor. New type of column */
     public CoreColumn(CoreColumn source, ResolvedType type, TableSourceReference tableSource)
     {
@@ -138,21 +127,10 @@ public class CoreColumn extends Column
         return new CoreColumn(name, type, "", false, null, Type.REGULAR);
     }
 
-    public static CoreColumn of(String name, Column.Type type)
-    {
-        return new CoreColumn(name, ResolvedType.of(type), "", false, null, Type.REGULAR);
-    }
-
     /** Return a {@link CoreColumn} with provided name and type and reference */
     public static CoreColumn of(String name, ResolvedType type, TableSourceReference tableSource)
     {
         return new CoreColumn(name, type, "", false, tableSource, Type.REGULAR);
-    }
-
-    /** Return a {@link CoreColumn} with provided name and type and reference */
-    public static CoreColumn of(String name, TableSourceReference tableSource)
-    {
-        return of(name, ResolvedType.of(Column.Type.Any), tableSource);
     }
 
     /** Reference column type */

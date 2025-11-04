@@ -13,11 +13,10 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
 
@@ -258,21 +257,18 @@ public class ConstantScan implements ILogicalPlan
                 }
 
                 IExpression expression = rowExpressions.get(i);
-                if (expression instanceof HasColumnReference hcr)
+                ColumnReference cr = SchemaUtils.getColumnReference(expression);
+                if (cr != null)
                 {
-                    ColumnReference cr = hcr.getColumnReference();
-                    if (cr != null)
+                    if (rowTableSource == null)
                     {
-                        if (rowTableSource == null)
-                        {
-                            rowTableSource = cr.tableSourceReference();
-                        }
-                        // We have different sources, null out the reference
-                        else if (!rowTableSource.equals(cr.tableSourceReference()))
-                        {
-                            rowTableSource = null;
-                            break;
-                        }
+                        rowTableSource = cr.tableSourceReference();
+                    }
+                    // We have different sources, null out the reference
+                    else if (!rowTableSource.equals(cr.tableSourceReference()))
+                    {
+                        rowTableSource = null;
+                        break;
                     }
                 }
             }

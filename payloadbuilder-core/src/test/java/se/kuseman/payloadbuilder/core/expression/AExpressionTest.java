@@ -23,11 +23,11 @@ import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.logicalplan.optimization.LogicalPlanOptimizer;
 import se.kuseman.payloadbuilder.core.parser.QueryParser;
 
@@ -103,19 +103,7 @@ public abstract class AExpressionTest extends Assert
     }
 
     /** Create an {@link ColumnExpression} */
-    protected ColumnExpression cre(String alias, TableSourceReference tr, TableSourceReference ttr, int ordinal, ResolvedType type)
-    {
-        return cre(alias, tr, ttr, ordinal, type, CoreColumn.Type.REGULAR);
-    }
-
-    /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String alias, TableSourceReference tr, int ordinal, ResolvedType type, CoreColumn.Type columnType)
-    {
-        return cre(alias, tr, null, ordinal, type, columnType);
-    }
-
-    /** Create an {@link ColumnExpression} */
-    protected ColumnExpression cre(String alias, TableSourceReference tr, TableSourceReference ttr, int ordinal, ResolvedType type, CoreColumn.Type columnType)
     {
         if (ordinal < 0)
         {
@@ -123,7 +111,7 @@ public abstract class AExpressionTest extends Assert
         }
         return ColumnExpression.Builder.of(alias, type)
                 .withOrdinal(ordinal)
-                .withColumnReference(new ColumnReference(tr, columnType, ttr))
+                .withColumnReference(new ColumnReference(alias, tr, columnType))
                 .build();
     }
 
@@ -138,20 +126,14 @@ public abstract class AExpressionTest extends Assert
     {
         return ColumnExpression.Builder.of(alias, type)
                 .withColumn(column)
-                .withColumnReference(new ColumnReference(tr, columnType))
+                .withColumnReference(new ColumnReference(alias, tr, columnType))
                 .build();
     }
 
     /** Create an {@link ColumnExpression} with no ordinal */
     protected ColumnExpression cre(String column, TableSourceReference tr)
     {
-        return cre(column, tr, (TableSourceReference) null, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR);
-    }
-
-    /** Create an {@link ColumnExpression} with no ordinal */
-    protected ColumnExpression cre(String column, TableSourceReference tr, TableSourceReference ttr)
-    {
-        return cre(column, tr, ttr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR);
+        return cre(column, tr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR);
     }
 
     /** Create an {@link ColumnExpression} with no ordinal */
@@ -169,15 +151,9 @@ public abstract class AExpressionTest extends Assert
     /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String column, TableSourceReference tr, ResolvedType type, CoreColumn.Type columnType)
     {
-        return cre(column, tr, (TableSourceReference) null, type, columnType);
-    }
-
-    /** Create an {@link ColumnExpression} */
-    protected ColumnExpression cre(String column, TableSourceReference tr, TableSourceReference ttr, ResolvedType type, CoreColumn.Type columnType)
-    {
         return ColumnExpression.Builder.of(column, type)
                 .withColumn(column)
-                .withColumnReference(new ColumnReference(tr, columnType, ttr))
+                .withColumnReference(new ColumnReference(column, tr, columnType))
                 .build();
     }
 
@@ -223,7 +199,7 @@ public abstract class AExpressionTest extends Assert
     protected ColumnExpression ocre(String column, TableSourceReference tr, ResolvedType type, CoreColumn.Type columnType)
     {
         return ColumnExpression.Builder.of(column, type)
-                .withColumnReference(new ColumnReference(tr, columnType))
+                .withColumnReference(new ColumnReference(column, tr, columnType))
                 .withColumn(column)
                 .withOuterReference(true)
                 .build();
@@ -244,7 +220,7 @@ public abstract class AExpressionTest extends Assert
         }
         return ColumnExpression.Builder.of(alias, type)
                 .withOuterReference(true)
-                .withColumnReference(new ColumnReference(tr, columnType))
+                .withColumnReference(new ColumnReference(alias, tr, columnType))
                 .withOrdinal(ordinal)
                 .build();
     }
@@ -254,7 +230,7 @@ public abstract class AExpressionTest extends Assert
     {
         return ColumnExpression.Builder.of(alias, type)
                 .withOuterReference(true)
-                .withColumnReference(new ColumnReference(tr, columnType))
+                .withColumnReference(new ColumnReference(column, tr, columnType))
                 .withColumn(column)
                 .build();
     }

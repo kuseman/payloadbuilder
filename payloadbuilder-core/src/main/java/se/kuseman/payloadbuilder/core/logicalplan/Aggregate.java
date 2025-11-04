@@ -18,7 +18,6 @@ import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 /** An aggregate either implicit or explicit */
 public class Aggregate implements ILogicalPlan
 {
-
     private final ILogicalPlan input;
     /** The expressions that is utilized when doing the aggregate. Empty if this is an implicit aggregate. */
     private final List<IExpression> aggregateExpressions;

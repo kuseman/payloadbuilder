@@ -22,8 +22,9 @@ import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 
 /**
  * Analyzes a join predicate
@@ -723,9 +724,9 @@ public class PredicateAnalyzer
             }
 
             TableSourceReference tableSource = AnalyzeItem.UNKNOWN_TABLE_SOURCE;
-            if (expression instanceof HasColumnReference htsr)
+            ColumnReference cr = SchemaUtils.getColumnReference(expression);
+            if (cr != null)
             {
-                ColumnReference cr = htsr.getColumnReference();
                 TableSourceReference columnTableSource = cr != null ? cr.tableSourceReference()
                         : null;
                 tableSource = getIfNull(columnTableSource, tableSource);

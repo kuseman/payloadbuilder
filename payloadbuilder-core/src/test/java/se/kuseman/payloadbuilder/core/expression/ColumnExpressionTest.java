@@ -15,9 +15,9 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link ColumnExpression} */
@@ -29,7 +29,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
     {
         TableSourceReference tableSource = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t");
         ColumnExpression.Builder.of("col", ResolvedType.of(Type.Any))
-                .withColumnReference(new ColumnReference(tableSource, CoreColumn.Type.REGULAR))
+                .withColumnReference(new ColumnReference("col", tableSource, CoreColumn.Type.REGULAR))
                 .build();
     }
 

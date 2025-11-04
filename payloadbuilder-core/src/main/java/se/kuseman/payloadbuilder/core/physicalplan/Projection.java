@@ -54,6 +54,11 @@ public class Projection implements IPhysicalPlan
         return input;
     }
 
+    public TableSourceReference getParentTableSource()
+    {
+        return parentTableSource;
+    }
+
     public List<IExpression> getExpressions()
     {
         return expressions;

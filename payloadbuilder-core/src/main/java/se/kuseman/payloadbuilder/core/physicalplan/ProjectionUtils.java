@@ -8,6 +8,7 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
@@ -16,7 +17,6 @@ import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression.Builder;
 import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
 /** Utility class for projections that handles asterisks in projection expressions. */
@@ -108,7 +108,7 @@ public class ProjectionUtils
 
                 if (columnTableSource != null)
                 {
-                    builder.withColumnReference(new ColumnReference(columnTableSource, columnType));
+                    builder.withColumnReference(new ColumnReference(column.getName(), columnTableSource, columnType));
                 }
 
                 IExpression columnExpression = builder.build();

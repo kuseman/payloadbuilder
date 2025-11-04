@@ -14,14 +14,16 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
+import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
+import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
+import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
 import se.kuseman.payloadbuilder.core.expression.HasAlias.Alias;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
 /** Utils when working with {@link Schema}' */
@@ -57,17 +59,6 @@ public class SchemaUtils
     {
         TableSourceReference tableRef = getTableSource(populatedSchema);
         return new CoreColumn(name, ResolvedType.table(populatedSchema), "", false, tableRef, CoreColumn.Type.POPULATED);
-    }
-
-    /** Creates a new column from provide column with a new name. */
-    public static Column rename(Column column, String newName)
-    {
-        if (column instanceof CoreColumn cc)
-        {
-            return new CoreColumn(cc, newName);
-        }
-
-        return new Column(newName, column.getType());
     }
 
     /** Creates a new column from provide column with a new type. */
@@ -339,27 +330,34 @@ public class SchemaUtils
         return new CoreColumn(name, type, outputName, expression.isInternal(), tableSourceReference, columnType);
     }
 
-    private static ColumnReference getColumnReference(IExpression e)
+    /** Extract a {@link ColumnExpression} from provided expression. */
+    public static ColumnReference getColumnReference(IExpression e)
     {
-        List<IExpression> queue = new ArrayList<>();
-        queue.add(e);
-        while (!queue.isEmpty())
+        // Unwrap nested expressions
+        if (e instanceof AggregateWrapperExpression awe)
         {
-            IExpression expr = queue.remove(0);
-            if (expr instanceof HasColumnReference hcr)
-            {
-                ColumnReference cr = hcr.getColumnReference();
-                if (cr != null)
-                {
-                    return cr;
-                }
-            }
-            // Only dig down into unary expressions
-            List<IExpression> children = expr.getChildren();
-            if (children.size() == 1)
-            {
-                queue.addAll(expr.getChildren());
-            }
+            e = awe.getExpression();
+        }
+        if (e instanceof AliasExpression ae)
+        {
+            e = ae.getExpression();
+        }
+
+        if (e instanceof AsteriskExpression ae
+                && ae.getTableSourceReferences()
+                        .size() == 1)
+        {
+            return new ColumnReference("*", ae.getTableSourceReferences()
+                    .iterator()
+                    .next(), CoreColumn.Type.ASTERISK);
+        }
+        else if (e instanceof ColumnExpression ce)
+        {
+            return ce.getColumnReference();
+        }
+        else if (e instanceof DereferenceExpression de)
+        {
+            return de.getColumnReference();
         }
         return null;
     }
