@@ -276,6 +276,236 @@
           [{ "key": "productNumber", "value": 1 },{ "key": "name", "value": "product-1" },{ "key": "options", "value": { "brand": "nike" } },{ "key": "articles", "value": [ { "articleNumber": "1-1", "color": "black", "variantCount": 2, "variants": [{"variantNumber":"1-1-1", "size":"M", "productNumber":"1", "articleNumber":"1-1"}, {"variantNumber":"1-1-2", "size":"L",  "productNumber":"1", "articleNumber":"1-1"}]}, { "articleNumber": "1-2", "color": "green" , "variantCount": 2, "variants": [{"variantNumber":"1-2-1", "size":"S", "productNumber":"1", "articleNumber":"1-2"}, {"variantNumber":"1-2-2", "size":"XL",  "productNumber":"1", "articleNumber":"1-2"}]} ]}],
           [{ "key": "productNumber", "value": 2 },{ "key": "name", "value": "product-2" },{ "key": "options", "value": { "brand": "adidas" } },{ "key": "articles", "value": [ { "articleNumber": "2-1", "color": "white", "variantCount": 2, "variants": [{"variantNumber":"2-1-1", "size":"M", "productNumber":"2", "articleNumber":"2-1"}, {"variantNumber":"2-1-2", "size":"XL", "productNumber":"2", "articleNumber":"2-1"}]}, { "articleNumber": "2-2", "color": "blue", "variantCount": 2, "variants": [{"variantNumber":"2-2-1", "size":"L", "productNumber":"2", "articleNumber":"2-2"}, {"variantNumber":"2-2-2", "size":"XXL", "productNumber":"2", "articleNumber":"2-2"}]} ]}]
         ]
+      ],
+      "expectedRuntimeSchemasAnyVectors": [
+        {
+          "schema": [
+            {
+              "name": "productNumber",
+              "type": "Any",
+              "metaData": {
+                "scale": 0,
+                "table": "product",
+                "name": "id"
+              }
+            },
+            {
+              "name": "name",
+              "type": "Any",
+              "metaData": {
+                "scale": 1,
+                "table": "product",
+                "name": "name"
+              }
+            },
+            {
+              "name": "options",
+              "type": {
+                "type": "Object",
+                "schema": [
+                  {
+                    "name": "brand",
+                    "type": "Any",
+                    "metaData": {
+                      "scale": 2,
+                      "table": "product",
+                      "name": "brand"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "articles",
+              "type": {
+                "type": "Table",
+                "schema": [
+                  {
+                    "name": "articleNumber",
+                    "type": "Any",
+                    "metaData": {
+                      "scale": 0,
+                      "table": "article",
+                      "name": "id"
+                    }
+                  },
+                  {
+                    "name": "color",
+                    "type": "Any",
+                    "metaData": {
+                      "scale": 2,
+                      "table": "article",
+                      "name": "color"
+                    }
+                  },
+                  {
+                    "name": "variantCount",
+                    "type": "Int"
+                  },
+                  {
+                    "name": "variants",
+                    "type": {
+                      "type": "Table",
+                      "schema": [
+                        {
+                          "name": "variantNumber",
+                          "type": "Any",
+                          "metaData": {
+                            "scale": 0,
+                            "table": "variant",
+                            "name": "id"
+                          }
+                        },
+                        {
+                          "name": "size",
+                          "type": "Any",
+                          "metaData": {
+                            "scale": 2,
+                            "table": "variant",
+                            "name": "size"
+                          }
+                        },
+                        {
+                          "name": "productNumber",
+                          "type": "Any",
+                          "metaData": {
+                            "scale": 0,
+                            "table": "product",
+                            "name": "id"
+                          }
+                        },
+                        {
+                          "name": "articleNumber",
+                          "type": "Any",
+                          "metaData": {
+                            "scale": 0,
+                            "table": "article",
+                            "name": "id"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "expectedRuntimeSchemasTypedVectors": [
+        {
+          "schema": [
+            {
+              "name": "productNumber",
+              "type": "String",
+              "metaData": {
+                "scale": 0,
+                "table": "product",
+                "name": "id"
+              }
+            },
+            {
+              "name": "name",
+              "type": "String",
+              "metaData": {
+                "scale": 1,
+                "table": "product",
+                "name": "name"
+              }
+            },
+            {
+              "name": "options",
+              "type": {
+                "type": "Object",
+                "schema": [
+                  {
+                    "name": "brand",
+                    "type": "String",
+                    "metaData": {
+                      "scale": 2,
+                      "table": "product",
+                      "name": "brand"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "articles",
+              "type": {
+                "type": "Table",
+                "schema": [
+                  {
+                    "name": "articleNumber",
+                    "type": "String",
+                    "metaData": {
+                      "scale": 0,
+                      "table": "article",
+                      "name": "id"
+                    }
+                  },
+                  {
+                    "name": "color",
+                    "type": "String",
+                    "metaData": {
+                      "scale": 2,
+                      "table": "article",
+                      "name": "color"
+                    }
+                  },
+                  {
+                    "name": "variantCount",
+                    "type": "Int"
+                  },
+                  {
+                    "name": "variants",
+                    "type": {
+                      "type": "Table",
+                      "schema": [
+                        {
+                          "name": "variantNumber",
+                          "type": "String",
+                          "metaData": {
+                            "scale": 0,
+                            "table": "variant",
+                            "name": "id"
+                          }
+                        },
+                        {
+                          "name": "size",
+                          "type": "String",
+                          "metaData": {
+                            "scale": 2,
+                            "table": "variant",
+                            "name": "size"
+                          }
+                        },
+                        {
+                          "name": "productNumber",
+                          "type": "String",
+                          "metaData": {
+                            "scale": 0,
+                            "table": "product",
+                            "name": "id"
+                          }
+                        },
+                        {
+                          "name": "articleNumber",
+                          "type": "String",
+                          "metaData": {
+                            "scale": 0,
+                            "table": "article",
+                            "name": "id"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
       ]
     },
     {

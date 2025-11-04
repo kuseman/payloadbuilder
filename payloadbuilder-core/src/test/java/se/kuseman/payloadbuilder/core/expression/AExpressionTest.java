@@ -91,9 +91,27 @@ public abstract class AExpressionTest extends Assert
     }
 
     /** Create an {@link ColumnExpression} */
+    protected ColumnExpression cre(String alias, TableSourceReference tr, String columnReferenceName, CoreColumn.Type columnType)
+    {
+        return cre(alias, tr, alias, ResolvedType.of(Type.Any), columnType, columnReferenceName);
+    }
+
+    /** Create an {@link ColumnExpression} */
+    protected ColumnExpression cre(String alias, TableSourceReference tr, CoreColumn.Type columnType, String columnReferenceName)
+    {
+        return cre(alias, tr, alias, ResolvedType.of(Type.Any), columnType, columnReferenceName);
+    }
+
+    /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String alias, TableSourceReference tr, int ordinal)
     {
         return cre(alias, tr, ordinal, ResolvedType.of(Type.Any));
+    }
+
+    /** Create an {@link ColumnExpression} */
+    protected ColumnExpression cre(String alias, TableSourceReference tr, int ordinal, CoreColumn.Type columnType)
+    {
+        return cre(alias, tr, ordinal, ResolvedType.of(Type.Any), columnType);
     }
 
     /** Create an {@link ColumnExpression} */
@@ -105,37 +123,43 @@ public abstract class AExpressionTest extends Assert
     /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String alias, TableSourceReference tr, int ordinal, ResolvedType type, CoreColumn.Type columnType)
     {
+        return cre(alias, tr, "", ordinal, type, columnType);
+    }
+
+    /** Create an {@link ColumnExpression} */
+    protected ColumnExpression cre(String alias, TableSourceReference tr, String column, int ordinal, ResolvedType type, CoreColumn.Type columnType)
+    {
         if (ordinal < 0)
         {
             throw new IllegalArgumentException("Ordinal must be grater of equal to zero");
         }
         return ColumnExpression.Builder.of(alias, type)
                 .withOrdinal(ordinal)
-                .withColumnReference(new ColumnReference(alias, tr))
-                .withPopulated(columnType == CoreColumn.Type.POPULATED)
+                .withColumnReference(new ColumnReference(alias, tr, Column.MetaData.EMPTY))
+                .withColumnType(columnType)
                 .build();
     }
 
     /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String alias, TableSourceReference tr, String column, ResolvedType type, CoreColumn.Type columnType)
     {
+        return cre(alias, tr, column, type, columnType, alias);
+    }
+
+    /** Create an {@link ColumnExpression} */
+    protected ColumnExpression cre(String alias, TableSourceReference tr, String column, ResolvedType type, CoreColumn.Type columnType, String columnReferenceName)
+    {
         return ColumnExpression.Builder.of(alias, type)
                 .withColumn(column)
-                .withColumnReference(new ColumnReference(alias, tr))
-                .withPopulated(columnType == CoreColumn.Type.POPULATED)
+                .withColumnReference(new ColumnReference(columnReferenceName, tr, Column.MetaData.EMPTY))
+                .withColumnType(columnType)
                 .build();
     }
 
     /** Create an {@link ColumnExpression} with no ordinal */
     protected ColumnExpression cre(String column, TableSourceReference tr)
     {
-        return cre(column, tr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR, column);
-    }
-
-    /** Create an {@link ColumnExpression} with no ordinal */
-    protected ColumnExpression cre(String column, TableSourceReference tr, String columnReferenceName)
-    {
-        return cre(column, tr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR, columnReferenceName);
+        return cre(column, tr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR);
     }
 
     /** Create an {@link ColumnExpression} with no ordinal */
@@ -161,26 +185,25 @@ public abstract class AExpressionTest extends Assert
     {
         return ColumnExpression.Builder.of(column, type)
                 .withColumn(column)
-                .withColumnReference(new ColumnReference(columnReferenceName, tr))
-                .withPopulated(columnType == CoreColumn.Type.POPULATED)
+                .withColumnReference(new ColumnReference(columnReferenceName, tr, Column.MetaData.EMPTY))
+                .withColumnType(columnType)
                 .build();
     }
 
     /** Create an {@link ColumnExpression} with lambda id */
     protected ColumnExpression lce(String alias, int lambdaId)
     {
-        if (lambdaId < 0)
-        {
-            throw new IllegalArgumentException("lambdaId must be grater of equal to zero");
-        }
-
-        return ColumnExpression.Builder.of(alias, ResolvedType.of(Type.Any))
-                .withLambdaId(lambdaId)
-                .build();
+        return lce(alias, lambdaId, ResolvedType.ANY, CoreColumn.Type.REGULAR);
     }
 
     /** Create an {@link ColumnExpression} with lambda id and type */
     protected ColumnExpression lce(String alias, int lambdaId, ResolvedType type)
+    {
+        return lce(alias, lambdaId, type, CoreColumn.Type.REGULAR);
+    }
+
+    /** Create an {@link ColumnExpression} with lambda id and type */
+    protected ColumnExpression lce(String alias, int lambdaId, ResolvedType type, CoreColumn.Type columnType)
     {
         if (lambdaId < 0)
         {
@@ -189,6 +212,7 @@ public abstract class AExpressionTest extends Assert
 
         return ColumnExpression.Builder.of(alias, type)
                 .withLambdaId(lambdaId)
+                .withColumnType(columnType)
                 .build();
     }
 
@@ -202,6 +226,12 @@ public abstract class AExpressionTest extends Assert
     protected ColumnExpression ocre(String column, TableSourceReference tr)
     {
         return ocre(column, tr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR);
+    }
+
+    /** Create an {@link ColumnExpression} with type, no ordinal and outer reference */
+    protected ColumnExpression ocre(String column, TableSourceReference tr, CoreColumn.Type columnType)
+    {
+        return ocre(column, tr, column, ResolvedType.of(Type.Any), columnType);
     }
 
     /** Create an {@link ColumnExpression} with type, no ordinal and outer reference */
@@ -225,9 +255,9 @@ public abstract class AExpressionTest extends Assert
         }
         return ColumnExpression.Builder.of(alias, type)
                 .withOuterReference(true)
-                .withColumnReference(new ColumnReference(alias, tr))
+                .withColumnReference(new ColumnReference(alias, tr, Column.MetaData.EMPTY))
                 .withOrdinal(ordinal)
-                .withPopulated(columnType == CoreColumn.Type.POPULATED)
+                .withColumnType(columnType)
                 .build();
     }
 
@@ -236,9 +266,9 @@ public abstract class AExpressionTest extends Assert
     {
         return ColumnExpression.Builder.of(alias, type)
                 .withOuterReference(true)
-                .withColumnReference(new ColumnReference(column, tr))
+                .withColumnReference(new ColumnReference(column, tr, Column.MetaData.EMPTY))
                 .withColumn(column)
-                .withPopulated(columnType == CoreColumn.Type.POPULATED)
+                .withColumnType(columnType)
                 .build();
     }
 
@@ -334,6 +364,16 @@ public abstract class AExpressionTest extends Assert
     }
 
     /** Construct a column */
+    protected CoreColumn col(Type type, String outputName)
+    {
+        return col("", ResolvedType.of(type), outputName, null, false, "");
+    }
+
+    protected CoreColumn col(ResolvedType type, String outputName)
+    {
+        return col("", type, outputName, null, false, "");
+    }
+
     protected CoreColumn col(String name, Type type)
     {
         return col(name, ResolvedType.of(type), "", null, false, name);
@@ -344,9 +384,9 @@ public abstract class AExpressionTest extends Assert
         return col(name, ResolvedType.of(type), outputName, null, false, name);
     }
 
-    protected CoreColumn col(String name, ResolvedType type)
+    protected CoreColumn col(String name, ResolvedType type, String outputName)
     {
-        return col(name, type, "", null, false, name);
+        return col(name, type, outputName, null, false, name);
     }
 
     /** Construct a column */
@@ -360,9 +400,14 @@ public abstract class AExpressionTest extends Assert
         return col(name, type, "", tableSourceReference, false, name);
     }
 
-    protected CoreColumn col(String name, ResolvedType type, TableSourceReference tableSourceReference, boolean internal)
+    protected CoreColumn col(String name, ResolvedType type, boolean internal)
     {
-        return col(name, type, "", tableSourceReference, internal, name);
+        return col(name, type, "", null, internal, name);
+    }
+
+    protected CoreColumn col(String name, ResolvedType type)
+    {
+        return col(name, type, "", null, false, name);
     }
 
     protected CoreColumn col(String name, ResolvedType type, String outputName, TableSourceReference tableSourceReference, boolean internal, String columnReferenceName)
@@ -370,9 +415,34 @@ public abstract class AExpressionTest extends Assert
         ColumnReference cr = null;
         if (tableSourceReference != null)
         {
-            cr = new ColumnReference(columnReferenceName, tableSourceReference);
+            cr = new ColumnReference(columnReferenceName, tableSourceReference, Column.MetaData.EMPTY);
         }
-        return new CoreColumn(name, type, outputName, internal, cr, CoreColumn.Type.REGULAR);
+        return CoreColumn.Builder.from(name, type)
+                .withOutputName(outputName)
+                .withInternal(internal)
+                .withColumnType(CoreColumn.Type.REGULAR)
+                .withColumnReference(cr)
+                .build();
+    }
+
+    protected CoreColumn nast(String name, ResolvedType type, TableSourceReference tableSourceReference)
+    {
+        return nast(name, type, "", tableSourceReference, false, name);
+    }
+
+    protected CoreColumn nast(String name, ResolvedType type, String outputName, TableSourceReference tableSourceReference, boolean internal, String columnReferenceName)
+    {
+        ColumnReference cr = null;
+        if (tableSourceReference != null)
+        {
+            cr = new ColumnReference(columnReferenceName, tableSourceReference, Column.MetaData.EMPTY);
+        }
+        return CoreColumn.Builder.from(name, type)
+                .withOutputName(outputName)
+                .withInternal(internal)
+                .withColumnType(CoreColumn.Type.NAMED_ASTERISK)
+                .withColumnReference(cr)
+                .build();
     }
 
     protected CoreColumn pop(String name, ResolvedType type, TableSourceReference tableSourceReference)
@@ -380,9 +450,12 @@ public abstract class AExpressionTest extends Assert
         ColumnReference cr = null;
         if (tableSourceReference != null)
         {
-            cr = new ColumnReference(name, tableSourceReference);
+            cr = new ColumnReference(name, tableSourceReference, Column.MetaData.EMPTY);
         }
-        return new CoreColumn(name, type, "", false, cr, CoreColumn.Type.POPULATED);
+        return CoreColumn.Builder.from(name, type)
+                .withColumnType(CoreColumn.Type.POPULATED)
+                .withColumnReference(cr)
+                .build();
     }
 
     // CSOFF
@@ -402,19 +475,24 @@ public abstract class AExpressionTest extends Assert
         return ast(name, type, "", tableSourceReference, false);
     }
 
-    protected CoreColumn ast(String name, ResolvedType type, TableSourceReference tableSourceReference, boolean internal)
+    protected CoreColumn ast(String name, ResolvedType type, boolean internal)
     {
-        return ast(name, type, "", tableSourceReference, internal);
+        return ast(name, type, "", null, internal);
     }
 
-    private CoreColumn ast(String name, ResolvedType type, String outputName, TableSourceReference tableSourceReference, boolean internal)
+    protected CoreColumn ast(String name, ResolvedType type, String outputName, TableSourceReference tableSourceReference, boolean internal)
     {
         ColumnReference cr = null;
         if (tableSourceReference != null)
         {
-            cr = new ColumnReference("*", tableSourceReference);
+            cr = new ColumnReference("*", tableSourceReference, Column.MetaData.EMPTY);
         }
-        return new CoreColumn(name, type, outputName, internal, cr, CoreColumn.Type.ASTERISK);
+        return CoreColumn.Builder.from(name, type)
+                .withOutputName(outputName)
+                .withInternal(internal)
+                .withColumnType(CoreColumn.Type.ASTERISK)
+                .withColumnReference(cr)
+                .build();
     }
 
     // CSOFF

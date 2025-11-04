@@ -1,7 +1,5 @@
 package se.kuseman.payloadbuilder.core;
 
-import java.util.function.Function;
-
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.statement.QueryStatement;
@@ -17,7 +15,7 @@ class RawQueryResultImpl extends AQueryResultImpl implements RawQueryResult
     }
 
     @Override
-    public void consumeResult(Function<TupleVector, Boolean> consumer)
+    public void consumeResult(ResultConsumer consumer)
     {
         processCurrentPlan(null, consumer);
     }

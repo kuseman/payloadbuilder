@@ -6,6 +6,7 @@ import static org.apache.commons.lang3.Strings.CI;
 import java.util.List;
 import java.util.Objects;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
@@ -48,8 +49,8 @@ public class ColumnExpression implements IColumnExpression, HasAlias
     /** Column reference of expression. */
     private final ColumnReference columnReference;
 
-    /** FLag that indicates that this expression is resolved to a populated column. */
-    private final boolean populated;
+    /** Column type of this column expression. */
+    private final CoreColumn.Type columnType;
 
     /**
      * Flag that indicates that this expression should resolve it's value from the outer reference in context and not by the input. This is a column in a correlated sub query.
@@ -69,7 +70,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias
     private final int lambdaId;
 
     /** Create a column reference expression. */
-    public ColumnExpression(String alias, String column, ResolvedType type, ColumnReference columnReference, int ordinal, boolean outerReference, int lambdaId, boolean populated)
+    public ColumnExpression(String alias, String column, ResolvedType type, ColumnReference columnReference, int ordinal, boolean outerReference, int lambdaId, CoreColumn.Type columnType)
     {
         this.alias = requireNonNull(alias, "alias");
         this.column = column;
@@ -78,7 +79,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias
         this.outerReference = outerReference;
         this.ordinal = ordinal;
         this.lambdaId = lambdaId;
-        this.populated = populated;
+        this.columnType = requireNonNull(columnType, "columnType");
         // Allowed states:
         // - lambdaId
         // - ordinal
@@ -95,7 +96,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias
     /** Copy column expression but change the ordinal */
     public ColumnExpression(ColumnExpression source, int ordinal)
     {
-        this(source.alias, source.column, source.resolvedType, source.columnReference, ordinal, source.outerReference, source.lambdaId, source.populated);
+        this(source.alias, source.column, source.resolvedType, source.columnReference, ordinal, source.outerReference, source.lambdaId, source.columnType);
     }
 
     @Override
@@ -122,9 +123,9 @@ public class ColumnExpression implements IColumnExpression, HasAlias
         return outerReference;
     }
 
-    public boolean isPopulated()
+    public CoreColumn.Type getColumnType()
     {
-        return populated;
+        return columnType;
     }
 
     public ColumnReference getColumnReference()
@@ -273,7 +274,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias
                     && outerReference == that.outerReference
                     && lambdaId == that.lambdaId
                     && resolvedType.equals(that.resolvedType)
-                    && populated == that.populated;
+                    && columnType == that.columnType;
         }
         return false;
     }
@@ -323,10 +324,8 @@ public class ColumnExpression implements IColumnExpression, HasAlias
         {
             sb.append(" outer=true");
         }
-        if (populated)
-        {
-            sb.append(" populated=true");
-        }
+        sb.append(" columnType=")
+                .append(columnType);
         if (columnReference != null)
         {
             sb.append(" columnReference=")
@@ -350,7 +349,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias
         private boolean outerReference;
         private int ordinal = -1;
         private int lambdaId = -1;
-        private boolean populated;
+        private CoreColumn.Type columnType;
 
         private Builder(String alias, ResolvedType type)
         {
@@ -393,15 +392,15 @@ public class ColumnExpression implements IColumnExpression, HasAlias
             return this;
         }
 
-        public Builder withPopulated(boolean populated)
+        public Builder withColumnType(CoreColumn.Type columnType)
         {
-            this.populated = populated;
+            this.columnType = columnType;
             return this;
         }
 
         public ColumnExpression build()
         {
-            return new ColumnExpression(alias, column, resolvedType, columnReference, ordinal, outerReference, lambdaId, populated);
+            return new ColumnExpression(alias, column, resolvedType, columnReference, ordinal, outerReference, lambdaId, ObjectUtils.getIfNull(columnType, CoreColumn.Type.REGULAR));
         }
 
         @Override

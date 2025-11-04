@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 
 import java.util.List;
 import java.util.Objects;
@@ -233,7 +234,13 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
                 && match == null
                 && throwIfNotFound)
         {
-            throw new ParseException("No column found in object named: " + right + ", expected one of: " + schema.getColumns(), location);
+            throw new ParseException("No column found in object named: " + right
+                                     + ", expected one of: "
+                                     + schema.getColumns()
+                                             .stream()
+                                             .map(c -> String.format("%s (%s)".formatted(c.getName(), c.getType())))
+                                             .collect(joining(",", "[", "]")),
+                    location);
         }
 
         return Pair.of(match, checkAsterisk

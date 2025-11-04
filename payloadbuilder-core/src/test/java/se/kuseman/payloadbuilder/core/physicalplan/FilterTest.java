@@ -20,6 +20,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 
@@ -90,7 +91,7 @@ public class FilterTest extends APhysicalPlanTest
         List<ValueVector> outerVectors = new ArrayList<>();
 
         IExpression col1 = ce("col1");
-        IExpression ocol4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 0, true, -1, false)
+        IExpression ocol4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 0, true, -1, CoreColumn.Type.REGULAR)
         {
             @Override
             public ValueVector eval(TupleVector input, IExecutionContext context)

@@ -38,7 +38,6 @@ import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.ArithmeticBinaryExpression;
@@ -141,10 +140,10 @@ public class HashAggregateTest extends APhysicalPlanTest
         // Plan schema
         //@formatter:off
         assertEquals(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Int), "count(col1)", false),
-                new CoreColumn("col2", ResolvedType.array(ResolvedType.of(Type.Any)), "", false),
-                new CoreColumn("", ResolvedType.of(Type.Int), "sum(col1)", false),
-                new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Int)), "col1 + col2", false)
+                col(ResolvedType.of(Type.Int), "count(col1)"),
+                col("col2", ResolvedType.array(ResolvedType.of(Type.Any))),
+                col(ResolvedType.of(Type.Int), "sum(col1)"),
+                col(ResolvedType.array(ResolvedType.of(Type.Int)), "col1 + col2")
                 ),
                 plan.getSchema());
         //@formatter:on
@@ -165,10 +164,10 @@ public class HashAggregateTest extends APhysicalPlanTest
         // Runtime schema (now we have data to return an INT that was object on plan level)
         //@formatter:off
         assertEquals(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Int), "count(col1)", false),
-                new CoreColumn("col2", ResolvedType.array(ResolvedType.of(Type.Any)), "", false),
-                new CoreColumn("", ResolvedType.of(Type.Int), "sum(col1)", false),
-                new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Int)), "col1 + col2", false)
+                col(ResolvedType.of(Type.Int), "count(col1)"),
+                col("col2", ResolvedType.array(ResolvedType.of(Type.Any))),
+                col(ResolvedType.of(Type.Int), "sum(col1)"),
+                col(ResolvedType.array(ResolvedType.of(Type.Int)), "col1 + col2")
                 ),
                 actual.getSchema());
         //@formatter:on

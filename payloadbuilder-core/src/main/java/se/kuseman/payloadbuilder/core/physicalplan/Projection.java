@@ -33,7 +33,7 @@ public class Projection implements IPhysicalPlan
     private final List<IExpression> expressions;
     private final Schema schema;
     private final boolean hasAsteriskProjection;
-    private final boolean hasAsteriskSchema;
+    private final boolean hasAsteriskSchemaOrInput;
     private final TableSourceReference parentTableSource;
 
     public Projection(int nodeId, IPhysicalPlan input, Schema schema, List<IExpression> expressions, TableSourceReference parentTableSource)
@@ -44,8 +44,8 @@ public class Projection implements IPhysicalPlan
         this.schema = requireNonNull(schema, "schema");
         this.hasAsteriskProjection = expressions.stream()
                 .anyMatch(e -> e instanceof AsteriskExpression);
-        this.hasAsteriskSchema = hasAsteriskProjection
-                || SchemaUtils.isAsterisk(schema);
+        this.hasAsteriskSchemaOrInput = hasAsteriskProjection
+                || SchemaUtils.isAsterisk(schema, true);
         this.parentTableSource = parentTableSource;
 
         if (expressions.size() != schema.getSize())
@@ -129,7 +129,7 @@ public class Projection implements IPhysicalPlan
                     vectors[i] = actualExpressions.get(i)
                             .eval(vector, context);
                 }
-                final Schema schema = hasAsteriskSchema ? SchemaUtils.getSchema(parentTableSource, actualExpressions, vectors, false)
+                final Schema schema = hasAsteriskSchemaOrInput ? SchemaUtils.getSchema(parentTableSource, actualExpressions, vectors, false)
                         : Projection.this.schema;
                 return new TupleVector()
                 {

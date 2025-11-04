@@ -12,6 +12,7 @@ import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression;
@@ -80,7 +81,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected = new Filter(
                 tableScan(schema, table),
                 table,
-                eq(cre("col1", table), LiteralBooleanExpression.TRUE)      // Predicate analyzer rewrites this to an equal
+                eq(cre("col1", table, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)      // Predicate analyzer rewrites this to an equal
                 );
         //@formatter:on
 
@@ -109,7 +110,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected = new Filter(
                 new TableFunctionScan(opencsv, schema, asList(), asList(), null),
                 opencsv,
-                eq(cre("col1", opencsv), LiteralBooleanExpression.TRUE)      // Predicate analyzer rewrites this to an equal
+                eq(cre("col1", opencsv, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)      // Predicate analyzer rewrites this to an equal
                 );
         //@formatter:on
 
@@ -167,13 +168,13 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                     new Filter(
                         tableScan(schemaA, tableA),
                         tableA,                                     // Verify filter got connected to tableA
-                        gt(cre("col1", tableA), intLit(10))),
+                        gt(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(10))),
                     subQuery(
                         new Projection(
                             new Filter(
                                 tableScan(schemaB, tableB),
                                 tableB,                             // Verify filter got connected to tableB
-                                eq(cre("col", tableB), intLit(666))),
+                                eq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), intLit(666))),
                             asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableB))),
                             subQueryX
                         ),
@@ -230,19 +231,19 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaA, tableA),
                             tableA,
-                            eq(cre("col4", tableA), new LiteralStringExpression("test"))),
+                            eq(cre("col4", tableA, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("test"))),
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            gt(cre("col5", tableB), intLit(100))),
+                            gt(cre("col5", tableB, CoreColumn.Type.NAMED_ASTERISK), intLit(100))),
                         Join.Type.INNER,
                         null,
-                        eq(cre("col3", tableA), cre("col4", tableB)),
+                        eq(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                         asSet(),
                         false,
                         Schema.EMPTY),
                     null,
-                    gt(cre("col7", tableA), cre("col8", tableB))
+                    gt(cre("col7", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col8", tableB, CoreColumn.Type.NAMED_ASTERISK))
                 );
         //@formatter:on
 
@@ -280,16 +281,16 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaA, tableA),
                             tableA,
-                            eq(cre("col4", tableA), new LiteralStringExpression("test"))),
+                            eq(cre("col4", tableA, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("test"))),
                         tableScan(schemaB, tableB),
                         Join.Type.INNER,
                         null,
-                        eq(cre("col3", tableA), cre("col4", tableB)),
+                        eq(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                         asSet(),
                         false,
                         Schema.EMPTY),
                     null,
-                    gt(cre("col7", tableA), cre("col8", tableB))
+                    gt(cre("col7", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col8", tableB, CoreColumn.Type.NAMED_ASTERISK))
                 );
         //@formatter:on
 
@@ -327,7 +328,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            eq(cre("active", tableB), LiteralBooleanExpression.TRUE)),
+                            eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)),
                         Join.Type.CROSS,
                         null,
                         null,
@@ -375,19 +376,20 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaA, tableA),
                             tableA,
-                            and(eq(cre("col10", tableA), new LiteralStringExpression("test2")), eq(cre("col4", tableA), new LiteralStringExpression("test")))),
+                            and(eq(cre("col10", tableA, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("test2")),
+                                    eq(cre("col4", tableA, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("test")))),
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            and(eq(cre("col9", tableB), LiteralBooleanExpression.TRUE), gt(cre("col5", tableB), intLit(100)))),
+                            and(eq(cre("col9", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE), gt(cre("col5", tableB, CoreColumn.Type.NAMED_ASTERISK), intLit(100)))),
                         Join.Type.INNER,
                         null,
-                        eq(cre("col3", tableA), cre("col4", tableB)),
+                        eq(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                         asSet(),
                         false,
                         Schema.EMPTY),
                     null,
-                    gt(cre("col7", tableA), cre("col8", tableB))
+                    gt(cre("col7", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col8", tableB, CoreColumn.Type.NAMED_ASTERISK))
                 );
         //@formatter:on
 
@@ -425,19 +427,21 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaA, tableA),
                             tableA,
-                            eq(cre("active", tableA), LiteralBooleanExpression.TRUE)),
+                            eq(cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)),
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            eq(cre("col9", tableB), LiteralBooleanExpression.TRUE)),
+                            eq(cre("col9", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)),
                         Join.Type.LEFT,
                         null,
-                        and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
+                        and(eq(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK),
+                                cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK)),
+                                eq(cre("col10", tableA, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("test2"))),
                         asSet(),
                         false,
                         Schema.EMPTY),
                     null,
-                    nullP(cre("col4", tableB), false)
+                    nullP(cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK), false)
                 );
         //@formatter:on
 
@@ -482,15 +486,17 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            eq(cre("col9", tableB), LiteralBooleanExpression.TRUE)),
+                            eq(cre("col9", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)),
                         Join.Type.LEFT,
                         null,
-                        and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
+                        and(eq(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK),
+                                cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK)),
+                                eq(cre("col10", tableA, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("test2"))),
                         asSet(),
                         false,
                         Schema.EMPTY),
                     null,
-                    nullP(cre("col4", tableB), true));
+                    nullP(cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK), true));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -534,15 +540,17 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            eq(cre("col9", tableB), LiteralBooleanExpression.TRUE)),
+                            eq(cre("col9", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)),
                         Join.Type.LEFT,
                         null,
-                        and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
+                        and(eq(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK),
+                                cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK)),
+                                eq(cre("col10", tableA, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("test2"))),
                         asSet(),
                         false,
                         Schema.EMPTY),
                     null,
-                    nullP(cre("col4", tableB), false)
+                    nullP(cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK), false)
                 );
         //@formatter:on
 
@@ -587,15 +595,17 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            eq(cre("col9", tableB), LiteralBooleanExpression.TRUE)),
+                            eq(cre("col9", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)),
                         Join.Type.LEFT,
                         null,
-                        and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
+                        and(eq(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK),
+                                cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK)),
+                                eq(cre("col10", tableA, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("test2"))),
                         asSet(),
                         false,
                         Schema.EMPTY),
                     null,
-                    nullP(cre("col4", tableB), true));
+                    nullP(cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK), true));
         //@formatter:on
 
         // System.out.println(expected.print(0));

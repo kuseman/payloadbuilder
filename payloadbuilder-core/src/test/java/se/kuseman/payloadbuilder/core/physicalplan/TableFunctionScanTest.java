@@ -8,6 +8,7 @@ import java.util.NoSuchElementException;
 
 import org.junit.Test;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -19,11 +20,32 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.QueryException;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 
 /** Test {@link TableFunctionScan} */
 public class TableFunctionScanTest extends APhysicalPlanTest
 {
+    @Test
+    public void test_runtime_schema_is_set()
+    {
+        TableSourceReference table = new TableSourceReference(666, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t");
+
+        TableFunctionInfo function = SystemCatalog.get()
+                .getTableFunction("range");
+        List<IExpression> arguments = asList(intLit(1), intLit(10));
+        Schema schema = function.getSchema(arguments);
+
+        TableFunctionScan plan = new TableFunctionScan(0, function.getSchema(null), table, "", "System", function, arguments, emptyList());
+        TupleIterator it = plan.execute(context);
+        while (it.hasNext())
+        {
+            it.next();
+        }
+        assertEquals(schema, context.getStatementContext()
+                .getRuntimeSchema(666));
+    }
+
     @Test
     public void test_no_such_element()
     {

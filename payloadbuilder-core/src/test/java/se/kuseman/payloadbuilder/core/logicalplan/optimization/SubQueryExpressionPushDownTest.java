@@ -19,7 +19,6 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
@@ -152,7 +151,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         List.of(
                         projection(
                             new OperatorFunctionScan(
-                                Schema.of(new CoreColumn("__expr0", ResolvedType.ANY, "", true)),
+                                Schema.of(col("__expr0", ResolvedType.ANY, true)),
                                 ConstantScan.create(List.of(new AliasExpression(stringLit("hello"), "col1")), null),
                                 "",
                                 "object",
@@ -160,7 +159,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             List.of(intLit(1), uce("__expr0"))),
                         projection(
                             new OperatorFunctionScan(
-                                Schema.of(new CoreColumn("__expr1", ResolvedType.ANY, "", true)),
+                                Schema.of(col("__expr1", ResolvedType.ANY, true)),
                                 ConstantScan.create(List.of(new AliasExpression(stringLit("world"), "col2")), null),
                                 "",
                                 "object",
@@ -254,7 +253,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
             .usingRecursiveComparison()
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
-                    col("images", ResolvedType.of(Type.Any), null)));
+                    col("images", ResolvedType.of(Type.Any))));
         //@formatter:on
 
         //@formatter:off
@@ -312,12 +311,12 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         false,
                         Schema.EMPTY),
                     new OperatorFunctionScan(
-                        Schema.of(col("__expr0", ResolvedType.of(Type.Any), null, true)),
+                        Schema.of(col("__expr0", ResolvedType.of(Type.Any), true)),
                         projection(
                             new Join(
                                 ConstantScan.ONE_ROW_EMPTY_SCHEMA,
                                 new OperatorFunctionScan(
-                                    Schema.of(col("__expr1", ResolvedType.of(Type.Any), null, true)),
+                                    Schema.of(col("__expr1", ResolvedType.of(Type.Any), true)),
                                     projection(
                                         new Filter(
                                             new Join(
@@ -423,7 +422,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             false,
                             Schema.EMPTY),
                         new OperatorFunctionScan(
-                                Schema.of(col("__expr0", ResolvedType.ANY, null, true)),
+                                Schema.of(col("__expr0", ResolvedType.ANY, true)),
                                 projection(
                                    new Join(
                                        new Join(
@@ -505,7 +504,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     new Join(
                         tableScan(schemaSTableA, sTableA),
                         new OperatorFunctionScan(
-                            Schema.of(col("__expr0", ResolvedType.ANY, null, true)),
+                            Schema.of(col("__expr0", ResolvedType.ANY, true)),
                             ConstantScan.create(List.of(
                                     new AliasExpression(intLit(1), "col1"), new AliasExpression(LiteralBooleanExpression.TRUE, "col2")
                             ), null),
@@ -540,7 +539,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     col("col1", Type.Int, sTableA),
                     col("col2", Type.String, sTableA),
                     col("col3", Type.Float, sTableA),
-                    col("__expr0", ResolvedType.ANY, null, true)));
+                    col("__expr0", ResolvedType.ANY, true)));
         //@formatter:on
 
         Assertions.assertThat(actual)
@@ -569,7 +568,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected =
                 projection(
                     new OperatorFunctionScan(
-                            Schema.of(col("__expr0", ResolvedType.ANY, null, true)),
+                            Schema.of(col("__expr0", ResolvedType.ANY, true)),
                             ConstantScan.create(List.of(
                                     new AliasExpression(intLit(1), "col1"), new AliasExpression(LiteralBooleanExpression.TRUE, "col2")
                             ), null),
@@ -595,7 +594,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
             .usingRecursiveComparison()
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
-                    col("__expr0", ResolvedType.ANY, null, true)));
+                    col("__expr0", ResolvedType.ANY, true)));
         //@formatter:on
 
         Assertions.assertThat(actual)
@@ -664,7 +663,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
                     ast("", table),
-                    col("__expr0", ResolvedType.ANY, null, true)));
+                    col("__expr0", ResolvedType.ANY, true)));
         //@formatter:on
 
         Assertions.assertThat(actual)
@@ -773,8 +772,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
             .isEqualTo(Schema.of(
                     ast("", table),
                     // NOTE! Single value is resolved at a later stage (ColumnResolver)
-                    col("__expr0", ResolvedType.array(ResolvedType.ANY), null, true),
-                    col("__expr1", ResolvedType.ANY, null, true)));
+                    col("__expr0", ResolvedType.array(ResolvedType.ANY), true),
+                    col("__expr1", ResolvedType.ANY, true)));
         //@formatter:on
 
         Assertions.assertThat(actual)
@@ -861,8 +860,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         .ignoringFieldsOfTypes(Location.class, Random.class)
         .isEqualTo(Schema.of(
                 ast("", table),
-                col("__expr0", ResolvedType.ANY, null, true),
-                col("__expr1", ResolvedType.ANY, null, true)));
+                col("__expr0", ResolvedType.ANY, true),
+                col("__expr1", ResolvedType.ANY, true)));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -943,17 +942,24 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
 
+        //@formatter:off
         Assertions.assertThat(actual.getSchema())
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
-                .isEqualTo(Schema.of(ast("", "*", null), col("values", Type.Any), col("otherValues", Type.Any)));
+                .isEqualTo(Schema.of(
+                        ast("", "*", null),
+                        col("values", Type.Any),
+                        col("otherValues", Type.Any)));
 
         // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
         Assertions.assertThat(((Projection) actual).getInput()
                 .getSchema())
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
-                .isEqualTo(Schema.of(ast("a", table), col("__expr0", ResolvedType.ANY, null, true), col("__expr1", ResolvedType.ANY, null, true)));
+                .isEqualTo(Schema.of(
+                        ast("a", table),
+                        col("__expr0", ResolvedType.ANY, true),
+                        col("__expr1", ResolvedType.ANY, true)));
         //@formatter:on
 
         Assertions.assertThat(actual)

@@ -16,6 +16,7 @@ import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn.Type;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
@@ -572,7 +573,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
             // A dereference of a populated column then add the right part as column name since that is the actual column
             // of the table source
             if (expression.getExpression() instanceof ColumnExpression ce
-                    && ce.isPopulated()
+                    && ce.getColumnType() == Type.POPULATED
                     && ce.getColumnReference() != null)
             {
                 add(expression, ce.getColumnReference(), expression.getRight(), context);

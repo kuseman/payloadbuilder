@@ -7,6 +7,7 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.commons.lang3.Strings.CI;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -62,6 +63,8 @@ import se.kuseman.payloadbuilder.core.CompiledQuery;
 import se.kuseman.payloadbuilder.core.Payloadbuilder;
 import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.QueryResult;
+import se.kuseman.payloadbuilder.core.RawQueryResult;
+import se.kuseman.payloadbuilder.core.RawQueryResult.ResultConsumer;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.ExpressionMath;
@@ -207,6 +210,8 @@ public class TestHarnessRunner
                 fail = true;
                 fail("Expected " + testCase.getExpectedException() + " to be thrown");
             }
+
+            assertSchemas(session, query);
         }
         catch (Throwable e)
         {
@@ -253,6 +258,93 @@ public class TestHarnessRunner
         {
             assertResultSetEqual(testCase.isOnlyAssertExpectedColumns(), schemaLess, i, testCase.getExpectedResultSets()
                     .get(i), actualResultSets.get(i));
+        }
+    }
+
+    private void assertSchemas(QuerySession session, CompiledQuery query)
+    {
+        List<Schema> actual = new ArrayList<>();
+        List<Schema> expected = new ArrayList<>();
+        boolean runtime = false;
+
+        if (!typedVectors
+                && !testCase.getExpectedRuntimeSchemasAnyVectors()
+                        .isEmpty())
+        {
+            expected.addAll(testCase.getExpectedRuntimeSchemasAnyVectors());
+            runtime = true;
+        }
+        else if (typedVectors
+                && !testCase.getExpectedRuntimeSchemasTypedVectors()
+                        .isEmpty())
+        {
+            expected.addAll(testCase.getExpectedRuntimeSchemasTypedVectors());
+            runtime = true;
+        }
+
+        if (!expected.isEmpty())
+        {
+            RawQueryResult result = query.executeRaw(session);
+            while (result.hasMoreResults())
+            {
+                result.consumeResult(new ResultConsumer()
+                {
+                    @Override
+                    public void schema(Schema schema)
+                    {
+                    }
+
+                    @Override
+                    public boolean consume(TupleVector vector)
+                    {
+                        // We assume only one vector per query
+                        actual.add(vector.getSchema());
+                        return false;
+                    }
+                });
+            }
+
+            String prefix = (schemaLess ? "SchemaLess"
+                    : "");
+            prefix += (runtime ? " Runtime "
+                    : " : ");
+            Assert.assertEquals(prefix + "Expected number of result schemas to be equal", expected.size(), actual.size());
+
+            for (int i = 0; i < expected.size(); i++)
+            {
+                assertSchemaEquals(prefix + "Schema " + i + ": ", expected.get(i), actual.get(i));
+            }
+        }
+    }
+
+    private void assertSchemaEquals(String prefix, Schema expected, Schema actual)
+    {
+        int size = expected.getSize();
+        Assert.assertEquals(prefix + "Expected number of columns to be equal", size, actual.getSize());
+
+        for (int j = 0; j < size; j++)
+        {
+            Column expectedColumn = expected.getColumns()
+                    .get(j);
+            Column actualColumn = actual.getColumns()
+                    .get(j);
+
+            assertEquals(prefix + "Expected name of column: " + j + " to be equal", expectedColumn.getName(), actualColumn.getName());
+            assertEquals(prefix + "Expected type of column: " + expectedColumn.getName() + " to be equal", expectedColumn.getType()
+                    .getType(),
+                    actualColumn.getType()
+                            .getType());
+            assertEquals(prefix + "Expected metaData of column: " + expectedColumn.getName() + " to be equal", expectedColumn.getMetaData(), actualColumn.getMetaData());
+
+            // Recursive compare of complex type
+            if (expectedColumn.getType()
+                    .getSchema() != null)
+            {
+                assertSchemaEquals(prefix + "Column: " + expectedColumn.getName() + " ", expectedColumn.getType()
+                        .getSchema(),
+                        actualColumn.getType()
+                                .getSchema());
+            }
         }
     }
 
@@ -474,11 +566,13 @@ public class TestHarnessRunner
             int size = table.getColumns()
                     .size();
             return new Schema(IntStream.range(0, size)
-                    .mapToObj(i -> Column.of(table.getColumns()
+                    .mapToObj(i -> new Column(table.getColumns()
                             .get(i),
                             typedVectors ? table.getTypes()
                                     .get(i)
-                                    : ResolvedType.of(Type.Any)))
+                                    : ResolvedType.of(Type.Any),
+                            new Column.MetaData(Map.of("scale", i, "name", table.getColumns()
+                                    .get(i), "table", table.getName()))))
                     .collect(toList()));
         }
 

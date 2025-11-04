@@ -64,6 +64,17 @@ public class TableSourceReference
         return parent;
     }
 
+    /** Return root table source reference from this node. */
+    public TableSourceReference getRoot()
+    {
+        TableSourceReference current = this;
+        while (current.parent != null)
+        {
+            current = current.parent;
+        }
+        return current;
+    }
+
     /** Create a new instance with a link to provided parent table source reference. */
     public TableSourceReference withParent(TableSourceReference parent)
     {

@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -107,6 +108,7 @@ public class TableScan implements IPhysicalPlan
                 // Concat the data source up to batch size, this might happen if catalog don't implement batch size correct
                 final TupleVector next = PlanUtils.concat(context, iterator, batchSize);
                 Schema vectorSchema = next.getSchema();
+                statementContext.setRuntimeSchema(tableSource.getId(), vectorSchema);
                 validate(vectorSchema, next.getRowCount());
                 // If asterisk schema then recreate the schema and attach a table source to make resolved columns properly detect it
                 // if not use the planned schema which already has table source attached
@@ -199,6 +201,14 @@ public class TableScan implements IPhysicalPlan
             {
                 Column schemaColumn = expected.getColumns()
                         .get(i);
+
+                // Don't validate any column
+                if (schemaColumn.getType()
+                        .getType() == Type.Any)
+                {
+                    continue;
+                }
+
                 Column vectorColumn = actual.getColumns()
                         .get(i);
 
@@ -226,7 +236,7 @@ public class TableScan implements IPhysicalPlan
             {
                 throw new QueryException("Runtime tuple vectors cannot contain asterisk columns");
             }
-            columns.add(CoreColumn.changeProperties(c, tableSource));
+            columns.add(CoreColumn.changeTableSource(c, tableSource));
         }
 
         return new Schema(columns);

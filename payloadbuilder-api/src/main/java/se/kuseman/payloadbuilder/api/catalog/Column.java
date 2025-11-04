@@ -1,18 +1,30 @@
 package se.kuseman.payloadbuilder.api.catalog;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.unmodifiableMap;
 import static java.util.Objects.requireNonNull;
+
+import java.util.Map;
 
 /** A column of a schema */
 public class Column
 {
     private final String name;
     private final ResolvedType type;
+    private final MetaData metaData;
 
-    /** Construct a column with a type and column reference */
+    /** Construct a column with a name and type. */
     public Column(String name, ResolvedType type)
+    {
+        this(name, type, MetaData.EMPTY);
+    }
+
+    /** Construct a column with a name,type and meta data. */
+    public Column(String name, ResolvedType type, MetaData metaData)
     {
         this.name = requireNonNull(name, "name");
         this.type = requireNonNull(type, "type");
+        this.metaData = requireNonNull(metaData, "metaData");
     }
 
     public String getName()
@@ -23,6 +35,11 @@ public class Column
     public ResolvedType getType()
     {
         return type;
+    }
+
+    public MetaData getMetaData()
+    {
+        return metaData;
     }
 
     public static Column of(String name, ResolvedType type)
@@ -56,7 +73,8 @@ public class Column
         {
             Column that = (Column) obj;
             return name.equals(that.name)
-                    && type.equals(that.type);
+                    && type.equals(that.type)
+                    && metaData.equals(that.metaData);
         }
         return false;
     }
@@ -64,7 +82,11 @@ public class Column
     @Override
     public String toString()
     {
-        return name + " (" + type + ")";
+        return name + " ("
+               + type
+               + ")"
+               + (metaData.properties.isEmpty() ? ""
+                       : ", meta: " + metaData.properties.toString());
     }
 
     /** Data type of column */
@@ -120,6 +142,81 @@ public class Column
         public boolean isPrimitive()
         {
             return primitive;
+        }
+    }
+
+    /**
+     * Meta data of a column. Catalogs can provide information like scale/precision/nullable etc. for usage in various places.
+     */
+    public static class MetaData
+    {
+        public static final MetaData EMPTY = new MetaData(emptyMap());
+
+        private final Map<String, Object> properties;
+        /** Scale of column for decimal types. */
+        public static final String SCALE = "scale";
+        /** Nullable flag for column. */
+        public static final String NULLABLE = "nullable";
+        /** Precision of column. Size of string etc. */
+        public static final String PRECISION = "precision";
+
+        public MetaData(Map<String, Object> properties)
+        {
+            this.properties = unmodifiableMap(requireNonNull(properties));
+        }
+
+        /** Returns true if column is nullable otherwise false. */
+        public boolean isNullable()
+        {
+            return (boolean) properties.getOrDefault(NULLABLE, true);
+        }
+
+        /** Return scale of column or -1 if not set. */
+        public int getScale()
+        {
+            return (int) properties.getOrDefault(SCALE, -1);
+        }
+
+        /** Return precision of column or -1 if not set. */
+        public int getPrecision()
+        {
+            return (int) properties.getOrDefault(PRECISION, -1);
+        }
+
+        /** Return metadata for provided key. */
+        public Object getMetaData(String key)
+        {
+            return properties.get(requireNonNull(key));
+        }
+
+        @Override
+        public String toString()
+        {
+            return properties.toString();
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return properties.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (obj == null)
+            {
+                return false;
+            }
+            else if (obj == this)
+            {
+                return true;
+            }
+            else if (obj instanceof MetaData that)
+            {
+                return properties.equals(that.properties);
+            }
+            return false;
         }
     }
 }

@@ -22,6 +22,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.execution.StatementContext;
 
 /** A table component in the logical plan */
 public class TableFunctionScan implements IPhysicalPlan
@@ -81,6 +82,7 @@ public class TableFunctionScan implements IPhysicalPlan
     public TupleIterator execute(IExecutionContext context)
     {
         final int batchSize = context.getBatchSize(options);
+        final StatementContext statementContext = (StatementContext) context.getStatementContext();
         final TupleIterator iterator = functionInfo.execute(context, catalogAlias, arguments, new FunctionData(nodeId, options));
         return new TupleIterator()
         {
@@ -108,6 +110,7 @@ public class TableFunctionScan implements IPhysicalPlan
                 final TupleVector next = PlanUtils.concat(context, iterator, batchSize);
                 Schema vectorSchema = next.getSchema();
                 validate(context, vectorSchema, next.getRowCount());
+                statementContext.setRuntimeSchema(tableSource.getId(), vectorSchema);
                 // If asterisk schema then recreate the schema and attach a table source to make resolved columns properly detect it
                 // if not use the planned schema which already has table source attached
                 final Schema actualSchema = asteriskSchema ? TableScan.recreateSchema(tableSource, vectorSchema)

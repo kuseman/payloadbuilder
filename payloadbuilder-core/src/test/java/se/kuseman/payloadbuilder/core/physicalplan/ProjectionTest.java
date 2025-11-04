@@ -57,16 +57,15 @@ public class ProjectionTest extends APhysicalPlanTest
         IExpression col3 = ce("col3");
 
         MutableBoolean closed = new MutableBoolean(false);
-        IPhysicalPlan plan = new Projection(
-                1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY), Schema.of(new CoreColumn("col1", ResolvedType.of(Type.Any), "", false),
-                        new CoreColumn("", ResolvedType.of(Type.Boolean), "col1 >= col3", false), new CoreColumn("col3", ResolvedType.of(Type.Any), "", false)),
+        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY),
+                Schema.of(col("col1", Type.Any), col(ResolvedType.of(Type.Boolean), "col1 >= col3"), col("col3", Type.Any)),
                 asList(col1, new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, col1, col3), col3), null);
 
         //@formatter:off
         Schema expectedSchema = Schema.of(
-                new CoreColumn("col1", ResolvedType.of(Type.Any), "", false),
-                new CoreColumn("", ResolvedType.of(Type.Boolean), "col1 >= col3", false),
-                new CoreColumn("col3", ResolvedType.of(Type.Any), "", false));
+                col("col1", ResolvedType.of(Type.Any)),
+                col(ResolvedType.of(Type.Boolean), "col1 >= col3"),
+                col("col3", ResolvedType.of(Type.Any)));
         //@formatter:on
 
         assertEquals(expectedSchema, plan.getSchema());
@@ -161,8 +160,7 @@ public class ProjectionTest extends APhysicalPlanTest
             }
         };
 
-        IPhysicalPlan plan = new Projection(1, input,
-                Schema.of(ast("", "a.*", tableA), col("col3", ResolvedType.of(Type.Any), tableB), new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false)),
+        IPhysicalPlan plan = new Projection(1, input, Schema.of(ast("", "a.*", tableA), col("col3", ResolvedType.of(Type.Any), tableB), col(ResolvedType.of(Type.Boolean), "a.col2 > b.col2")),
                 asList(aastExp, bcol3Exp, calcExp), null);
 
         // Asterisks => empty schema
@@ -173,7 +171,7 @@ public class ProjectionTest extends APhysicalPlanTest
             .isEqualTo(Schema.of(
                 ast("", "a.*", tableA),
                 col("col3", ResolvedType.of(Type.Any), tableB),
-                new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false)));
+                col(ResolvedType.of(Type.Boolean), "a.col2 > b.col2")));
         //@formatter:on
 
         TupleIterator it = plan.execute(context);
@@ -185,7 +183,7 @@ public class ProjectionTest extends APhysicalPlanTest
                 col("col2", Type.Any, tableA),
                 col("col3", Type.Any, tableA),
                 col("col3", Type.Any, tableB),
-                new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false));
+                col(ResolvedType.of(Type.Boolean), "a.col2 > b.col2"));
         //@formatter:on
 
         Assertions.assertThat(actual.getSchema())
@@ -219,7 +217,7 @@ public class ProjectionTest extends APhysicalPlanTest
 
         IExpression col1 = ce("col1");
         IExpression col3 = ce("col3");
-        IExpression ocol4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 0, true, -1, false)
+        IExpression ocol4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 0, true, -1, CoreColumn.Type.REGULAR)
         {
             @Override
             public ValueVector eval(TupleVector input, IExecutionContext context)

@@ -135,7 +135,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan expected = new Filter(
                 1,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
-                new ExpressionPredicate(and(gt(cre("col1", tableA), intLit(10)), gt(cre("col", tableA), intLit(20))))
+                new ExpressionPredicate(and(gt(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(10)), gt(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(20))))
                 );
         //@formatter:on
 
@@ -190,7 +190,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
                                 1,
                                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList())
                             ),
-                            new ExpressionPredicate(and(gt(cre("col1", tableA), intLit(10)), gt(cre("col", tableA), intLit(20))))
+                            new ExpressionPredicate(and(gt(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(10)),
+                                    gt(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(20))))
                         )),
                     true);
         //@formatter:on
@@ -246,10 +247,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 1,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 Schema.of(
-                    col("col1", Type.Any, tableA),
-                    col("col2", Type.Any, tableA)
+                    nast("col1", ResolvedType.ANY, tableA),
+                    nast("col2", ResolvedType.ANY, tableA)
                 ),
-                List.of(cre("col1", tableA), cre("col2", tableA)),
+                List.of(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK)),
                 null
                 );
         //@formatter:on
@@ -297,11 +298,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 2,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 Schema.of(
-                    col("col1", ResolvedType.ANY, tableA),
-                    col("col2", ResolvedType.ANY, tableA),
+                    nast("col1", ResolvedType.ANY, tableA),
+                    nast("col2", ResolvedType.ANY, tableA),
                     col("", Type.Any, "col3 + col2")
                 ),
-                List.of(cre("col1", tableA), cre("col2", tableA), add(cre("col3", tableA), cre("col2", tableA))),
+                List.of(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK),
+                        cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK),
+                        add(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK))),
                 subQueryX
                 );
         //@formatter:on
@@ -358,11 +361,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
                                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList())
                             ),
                             Schema.of(
-                              col("col1", Type.Any, tableA),
-                              col("col2", Type.Any, tableA),
+                              nast("col1", ResolvedType.ANY, tableA),
+                              nast("col2", ResolvedType.ANY, tableA),
                               col("", Type.Any, "col3 + col2")
                             ),
-                            List.of(cre("col1", tableA), cre("col2", tableA), add(cre("col3", tableA), cre("col2", tableA))),
+                            List.of(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK),
+                                    add(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK))),
                             subQueryX
                         )
                     ),
@@ -416,7 +420,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 Schema.of(
                     col("col", Type.Any, subQueryX)
                 ),
-                List.of(new AliasExpression(add(cre("col1", tableA), cre("col2", tableA)), "col")),
+                List.of(new AliasExpression(add(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK)), "col")),
                 subQueryX
                 );
         //@formatter:on
@@ -472,9 +476,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 2,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new TableScan(1, expectedSchemaA1, tableA1, "test", t.scanDataSources.get(1), emptyList()),
-                List.of(cre("value", tableA, ResolvedType.of(Type.Any))),
-                List.of(cre("value", tableA1, ResolvedType.of(Type.Any))),
-                new ExpressionPredicate(eq(cre("value", tableA1, ResolvedType.of(Type.Any)), cre("value", tableA, ResolvedType.of(Type.Any)))),
+                List.of(cre("value", tableA, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK)),
+                List.of(cre("value", tableA1, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK)),
+                new ExpressionPredicate(eq(cre("value", tableA1, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK),
+                        cre("value", tableA, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK))),
                 null,
                 false,
                 false);
@@ -535,11 +540,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
                   Schema.of(
                       col("value", Type.Any, subQueryT)
                   ),
-                  List.of(new AliasExpression(add(cre("col1", tableA1), cre("col2", tableA1)), "value")),
+                  List.of(new AliasExpression(add(cre("col1", tableA1, CoreColumn.Type.NAMED_ASTERISK),
+                          cre("col2", tableA1, CoreColumn.Type.NAMED_ASTERISK)), "value")),
                   subQueryT),
-                List.of(cre("value", tableA, ResolvedType.of(Type.Any))),
+                List.of(cre("value", tableA, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK)),
                 List.of(cre("value", subQueryT, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR)),
-                new ExpressionPredicate(eq(cre("value", subQueryT, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR), cre("value", tableA, ResolvedType.of(Type.Any)))),
+                new ExpressionPredicate(eq(cre("value", subQueryT, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR),
+                        cre("value", tableA, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK))),
                 null,
                 false,
                 false);
@@ -600,7 +607,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     Schema.of(
                         col("value", Type.Any, subQueryF)
                     ),
-                    List.of(new AliasExpression(add(cre("col3", tableA), cre("col4", tableA)), "value")),
+                    List.of(new AliasExpression(add(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK),
+                            cre("col4", tableA, CoreColumn.Type.NAMED_ASTERISK)), "value")),
                     subQueryF),
                 new Projection(
                     3,
@@ -608,7 +616,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     Schema.of(
                         col("value", Type.Any, subQueryT)
                     ),
-                    List.of(new AliasExpression(add(cre("col1", tableA1), cre("col2", tableA1)), "value")),
+                    List.of(new AliasExpression(add(cre("col1", tableA1, CoreColumn.Type.NAMED_ASTERISK),
+                            cre("col2", tableA1, CoreColumn.Type.NAMED_ASTERISK)), "value")),
                     subQueryT),
                 List.of(cre("value", subQueryF, 0)),
                 List.of(cre("value", subQueryT, 1)),
@@ -670,7 +679,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     2,
                     new TableScan(1, expectedSchemaA1, tableA1, "test", t.scanDataSources.get(1), emptyList())
                 ),
-                new ExpressionPredicate(gt(cre("value", tableA1, ResolvedType.of(Type.Any)), cre("value", tableA, ResolvedType.of(Type.Any)))),
+                new ExpressionPredicate(gt(cre("value", tableA1, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK),
+                        cre("value", tableA, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK))),
                 null,
                 false);
         //@formatter:on
@@ -769,8 +779,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
-                    new ExpressionPredicate(eq(cre("id", tableB), ocre("id", tableA)))),
-                asSet(col("id", ResolvedType.of(Type.Any), tableA)),
+                    new ExpressionPredicate(eq(cre("id", tableB, CoreColumn.Type.NAMED_ASTERISK), ocre("id", tableA, CoreColumn.Type.NAMED_ASTERISK)))),
+                asSet(nast("id", ResolvedType.of(Type.Any), tableA)),
                 null,
                 expectedSchemaA);
         //@formatter:on
@@ -820,8 +830,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
-                    new ExpressionPredicate(eq(cre("id", tableB), ocre("id", tableA)))),
-                asSet(col("id", ResolvedType.of(Type.Any), tableA)),
+                    new ExpressionPredicate(eq(cre("id", tableB, CoreColumn.Type.NAMED_ASTERISK), ocre("id", tableA, CoreColumn.Type.NAMED_ASTERISK)))),
+                asSet(nast("id", ResolvedType.of(Type.Any), tableA)),
                 null,
                 expectedSchemaA);
         //@formatter:on
@@ -883,7 +893,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     new Filter(
                         2,
                         new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
-                        new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE)))
+                        new ExpressionPredicate(eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)))
                 ),
                 null,
                 false);
@@ -946,7 +956,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
-                    new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
+                    new ExpressionPredicate(eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE))),
                 null,
                 false);
         //@formatter:on
@@ -1123,7 +1133,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Sort(
                     1,
                     new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
-                    asList(sortItem(cre("col", tableA), Order.DESC, NullOrder.UNDEFINED)));
+                    asList(sortItem(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK), Order.DESC, NullOrder.UNDEFINED)));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -1190,7 +1200,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         ),
                         null,
                         false),
-                    asList(sortItem(cre("col", tableA), Order.DESC, NullOrder.UNDEFINED), sortItem(cre("col2", tableB), Order.ASC, NullOrder.UNDEFINED)));
+                    asList(sortItem(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK), Order.DESC, NullOrder.UNDEFINED),
+                            sortItem(cre("col2", tableB, CoreColumn.Type.NAMED_ASTERISK), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -1257,7 +1268,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         ),
                         null,
                         false),
-                    asList(sortItem(cre("col2", tableB), Order.ASC, NullOrder.UNDEFINED)));
+                    asList(sortItem(cre("col2", tableB, CoreColumn.Type.NAMED_ASTERISK), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -1400,9 +1411,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
                                 2,
                                 new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                                 Schema.of(
-                                    col("__expr0", ResolvedType.ANY, "", tableB, true, "col1")
+                                    nast("__expr0", ResolvedType.ANY, "", tableB, true, "col1")
                                 ),
-                                asList(new AliasExpression(cre("col1", tableB), "__expr0", true)),
+                                asList(new AliasExpression(cre("col1", tableB, CoreColumn.Type.NAMED_ASTERISK), "__expr0", true)),
                                 null),
                             1)
                         ),
@@ -1410,9 +1421,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     false),
                 Schema.of(
                     ast("", "*", tableA),
-                    col("values", ResolvedType.ANY, "", tableB, false, "col1")
+                    nast("values", ResolvedType.ANY, "", tableB, false, "col1")
                 ),
-                asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableA)), new AliasExpression(cre("__expr0", tableB, "col1"), "values")),
+                asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableA)),
+                        new AliasExpression(cre("__expr0", tableB, "col1", CoreColumn.Type.NAMED_ASTERISK), "values")),
                 null);
         //@formatter:on
 
@@ -1461,8 +1473,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         //@formatter:off
         Schema objectArraySchema = Schema.of(
-                col("col1", ResolvedType.of(Type.Any), e_b.withParent(tableB)),
-                col("col2", ResolvedType.of(Type.Any), e_b.withParent(tableB))
+                nast("col1", ResolvedType.of(Type.Any), e_b.withParent(tableB)),
+                nast("col2", ResolvedType.of(Type.Any), e_b.withParent(tableB))
         );
 
         IPhysicalPlan expected = new Projection(
@@ -1473,9 +1485,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         2,
                         new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                         new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
-                        List.of(cre("col", tableA)),
-                        List.of(cre("col", tableB)),
-                        new ExpressionPredicate(eq(cre("col", tableB), cre("col", tableA))),
+                        List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                        List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
+                        new ExpressionPredicate(eq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK))),
                         "b",
                         false,
                         false),
@@ -1489,14 +1501,15 @@ public class QueryPlannerTest extends APhysicalPlanTest
                                 e_bExpectedSchema,
                                 ocre("b", tableB, ResolvedType.table(expectedSchemaB), CoreColumn.Type.POPULATED)),
                             Schema.of(
-                                col("col1", Type.Any, e_b.withParent(tableB)),
-                                col("col2", Type.Any, e_b.withParent(tableB))
+                                nast("col1", ResolvedType.ANY, e_b.withParent(tableB)),
+                                nast("col2", ResolvedType.ANY, e_b.withParent(tableB))
                             ),
-                            asList(cre("col1", e_b.withParent(tableB)), cre("col2", e_b.withParent(tableB))),
+                            asList(cre("col1", e_b.withParent(tableB), CoreColumn.Type.NAMED_ASTERISK),
+                                    cre("col2", e_b.withParent(tableB), CoreColumn.Type.NAMED_ASTERISK)),
                             null),
                         SystemCatalog.get().getOperatorFunction("object_array"),
                         "sys",
-                        Schema.of(col("__expr0", ResolvedType.table(objectArraySchema), null, true))),
+                        Schema.of(ast("__expr0", ResolvedType.table(objectArraySchema), true))),
                     asSet(pop("b", ResolvedType.table(expectedSchemaB), tableB)),
                     null,
                     SchemaUtils.joinSchema(expectedSchemaA, expectedSchemaB, "b")),
@@ -1564,7 +1577,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         
         SeekPredicate expectedSeekPredicate = new SeekPredicate(1,
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
-                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)))));
 
         IPhysicalPlan expected = new HashMatch(
                 3,
@@ -1572,11 +1585,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
-                    new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
-                List.of(cre("col", tableA)),
-                List.of(cre("col", tableB)),
+                    new ExpressionPredicate(eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE))),
+                List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                 new ExpressionPredicate(
-                    and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("active", tableA), LiteralBooleanExpression.TRUE))
+                    and(eq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                            eq(cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE))
                 ),
                 null,
                 true,
@@ -1640,11 +1654,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), List.of(new Option(QueryPlanner.FORCE_NO_INDEX, LiteralBooleanExpression.TRUE))),
-                    new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
-                List.of(cre("col", tableA)),
-                List.of(cre("col", tableB)),
+                    new ExpressionPredicate(eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE))),
+                List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                 new ExpressionPredicate(
-                    and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("active", tableA), LiteralBooleanExpression.TRUE))
+                    and(eq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK),
+                            cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                            eq(cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE))
                 ),
                 null,
                 true,
@@ -1701,7 +1717,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     1,
                     new TableScan(0, expectedSchemaB, tableB, "test", t.scanDataSources.get(0), emptyList()),
-                    new ExpressionPredicate(in(cre("col", tableB), asList(intLit(1), intLit(2), intLit(3)), true)));
+                    new ExpressionPredicate(in(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), asList(intLit(1), intLit(2), intLit(3)), true)));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -1754,7 +1770,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     1,
                     new TableScan(0, expectedSchemaB, tableB, "test", t.scanDataSources.get(0), emptyList()),
-                    new ExpressionPredicate(neq(cre("col", tableB), intLit(3))));
+                    new ExpressionPredicate(neq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), intLit(3))));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -1805,7 +1821,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         SeekPredicate expectedSeekPredicate = new SeekPredicate(0,
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
-                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(intLit(1), intLit(2), intLit(3)))), true);
 
         IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
         //@formatter:on
@@ -1862,7 +1878,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         SeekPredicate expectedSeekPredicate = new SeekPredicate(0,
                 new Index(QualifiedName.of("tableB"), emptyList(), ColumnsType.WILDCARD), List.of(
-                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(intLit(1), intLit(2), intLit(3)))), true);
 
         IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
         //@formatter:on
@@ -1919,7 +1935,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         SeekPredicate expectedSeekPredicate = new SeekPredicate(0,
                 new Index(QualifiedName.of("tableB"),  List.of("COL"), ColumnsType.ALL), List.of(
-                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(intLit(1), intLit(2), intLit(3)))), true);
 
         IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
         //@formatter:on
@@ -1978,7 +1994,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         SeekPredicate expectedSeekPredicate = new SeekPredicate(0,
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
-                        new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(3)))
+                        new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(intLit(3)))
                         ), true);
 
         IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
@@ -2042,8 +2058,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaB = Schema.of(ast("b", tableB));
 
         SeekPredicate expectedSeekPredicate = new SeekPredicate(0, index, List.of(
-                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(3))),
-                new SeekPredicate.SeekPredicateItem("col2", cre("col2", tableB), List.of(intLit(10)))
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(intLit(3))),
+                new SeekPredicate.SeekPredicateItem("col2", cre("col2", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(intLit(10)))
                 ), true);
 
         IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
@@ -2108,7 +2124,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         SeekPredicate expectedSeekPredicate = new SeekPredicate(1,
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
-                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)))));
         
         IPhysicalPlan expected = NestedLoop.leftJoin(
                 3,
@@ -2116,9 +2132,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
-                    new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
+                    new ExpressionPredicate(eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE))),
                 new ExpressionPredicate(
-                    and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("active", tableA), LiteralBooleanExpression.TRUE))
+                    and(eq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                            eq(cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE))
                 ),
                 null,
                 true);
@@ -2181,17 +2198,19 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         SeekPredicate expectedSeekPredicate = new SeekPredicate(1,
                 new Index(QualifiedName.of("tableB"), asList("col", "active"), ColumnsType.ALL), List.of(
-                    new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA))),
-                    new SeekPredicate.SeekPredicateItem("active", cre("active", tableB), List.of(cre("active", tableA)))));
+                    new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK))),
+                    new SeekPredicate.SeekPredicateItem("active", cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK)))));
 
         IPhysicalPlan expected = new HashMatch(
                 2,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
-                List.of(cre("col", tableA), cre("active", tableA)),
-                List.of(cre("col", tableB), cre("active", tableB)),
+                List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                 new ExpressionPredicate(
-                    and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("active", tableB), cre("active", tableA)))
+                    and(eq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK),
+                            cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                            eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK)))
                 ),
                 null,
                 false,
@@ -2253,8 +2272,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         SeekPredicate expectedSeekPredicate = new SeekPredicate(1,
                 new Index(QualifiedName.of("tableB"), asList(), ColumnsType.WILDCARD), asList(
-                new SeekPredicate.SeekPredicateItem("active", cre("active", tableB), List.of(cre("active", tableA))),
-                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
+                new SeekPredicate.SeekPredicateItem("active", cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK))),
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)))));
         //@formatter:on
 
         //@formatter:off
@@ -2262,10 +2281,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 2,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
-                List.of(cre("active", tableA), cre("col", tableA)),
-                List.of(cre("active", tableB), cre("col", tableB)),
+                List.of(cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK),
+                        cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                List.of(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK),
+                        cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                 new ExpressionPredicate(
-                    and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("active", tableB), cre("active", tableA)))
+                    and(eq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK),
+                            cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                            eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK)))
                 ),
                 null,
                 false,
@@ -2329,11 +2352,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
-                    new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
-                List.of(cre("col", tableA)),
-                List.of(cre("col", tableB)),
+                    new ExpressionPredicate(eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE))),
+                List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                 new ExpressionPredicate(
-                    and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("active", tableA), LiteralBooleanExpression.TRUE))
+                    and(eq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                            eq(cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE))
                 ),
                 null,
                 true,
@@ -2406,10 +2430,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         SeekPredicate expectedSeekPredicateB = new SeekPredicate(2,
                 new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
-                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK),
+                        List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)))));
         SeekPredicate expectedSeekPredicateC = new SeekPredicate(3,
                 new Index(QualifiedName.of("tableC"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
-                new SeekPredicate.SeekPredicateItem("col", cre("col", tableC), List.of(cre("col", tableB)))));
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableC, CoreColumn.Type.NAMED_ASTERISK),
+                        List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)))));
 
         //CSOFF
         IPhysicalPlan expected = new HashMatch(
@@ -2421,17 +2447,17 @@ public class QueryPlannerTest extends APhysicalPlanTest
                        3,
                        new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicateB, t.seekDataSources.get(0), emptyList()),
                        new IndexSeek(2, expectedSchemaC, tableC, "test", expectedSeekPredicateC, t.seekDataSources.get(1), emptyList()),
-                       List.of(cre("col", tableB)),
-                       List.of(cre("col", tableC)),
+                       List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
+                       List.of(cre("col", tableC, CoreColumn.Type.NAMED_ASTERISK)),
                        new ExpressionPredicate(
-                               eq(cre("col", tableC), cre("col", tableB))
+                               eq(cre("col", tableC, CoreColumn.Type.NAMED_ASTERISK), cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK))
                        ),
                        null,
                        false,
                        true),
-                       asList(cre("col", tableB)),
+                       asList(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                        asList(
-                            new AggregateWrapperExpression(cre("col", tableB), true, false),
+                            new AggregateWrapperExpression(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), true, false),
                             new AggregateWrapperExpression(new AliasExpression(
                                     new ComparisonExpression(
                                         IComparisonExpression.Type.GREATER_THAN,
@@ -2441,15 +2467,15 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         ),
                        subQueryB
                     ),
-                List.of(cre("col", tableA)),
-                List.of(cre("col", tableB, CoreColumn.Type.REGULAR)),
+                List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                 new ExpressionPredicate(
                     and(
                         and(
                             eq(
-                                cre("col", tableB, CoreColumn.Type.REGULAR),
-                                cre("col", tableA)),
-                            eq(cre("active", tableA), LiteralBooleanExpression.TRUE)),
+                                cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK),
+                                cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                            eq(cre("active", tableA, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)),
                         eq(
                             cre("active", subQueryB, ResolvedType.of(Type.Boolean), CoreColumn.Type.REGULAR),
                             LiteralBooleanExpression.TRUE))
@@ -2514,17 +2540,22 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         SeekPredicate expectedSeekPredicate = new SeekPredicate(1,
                 new Index(QualifiedName.of("tableB"), asList("col", "col2"), ColumnsType.ANY_IN_ORDER), List.of(
-                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA))),
-                new SeekPredicate.SeekPredicateItem("col2", cre("col2", tableB), List.of(cre("col2", tableA)))));
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK),
+                        List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK))),
+                new SeekPredicate.SeekPredicateItem("col2", cre("col2", tableB, CoreColumn.Type.NAMED_ASTERISK),
+                        List.of(cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK)))));
 
         IPhysicalPlan expected = new HashMatch(
                 2,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
-                List.of(cre("col", tableA), cre("col2", tableA)),
-                List.of(cre("col", tableB), cre("col2", tableB)),
+                List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK),
+                        cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK),
+                        cre("col2", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                 new ExpressionPredicate(
-                    and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("col2", tableB), cre("col2", tableA)))
+                    and(eq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
+                            eq(cre("col2", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK)))
                 ),
                 null,
                 false,
@@ -2587,10 +2618,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new ExpressionPredicate(
                     and(
                         and(
-                            new InExpression(cre("col2", table), asList(intLit(10), intLit(20)), false),
-                            new LikeExpression(cre("col3", table), new LiteralStringExpression("string"), false, null)
+                            new InExpression(cre("col2", table, CoreColumn.Type.NAMED_ASTERISK), asList(intLit(10), intLit(20)), false),
+                            new LikeExpression(cre("col3", table, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("string"), false, null)
                         ),
-                        new NullPredicateExpression(cre("col4", table), false)))
+                        new NullPredicateExpression(cre("col4", table, CoreColumn.Type.NAMED_ASTERISK), false)))
                 );
         //@formatter:on
 
@@ -2600,7 +2631,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 Triple.of(QualifiedName.of("col5"), IPredicate.Type.FUNCTION_CALL, asList(
                         new FunctionCallExpression(Catalog.SYSTEM_CATALOG_ALIAS, SystemCatalog.get().getScalarFunction("contains"), null, asList(
                                 new VariableExpression("var"),
-                                cre("col5", table))))),
+                                cre("col5", table, CoreColumn.Type.NAMED_ASTERISK))))),
                 Triple.of(null, IPredicate.Type.FUNCTION_CALL, asList(new FunctionCallExpression("t", someFunc, null, asList()))),
                 Triple.of(QualifiedName.of("col"), IPredicate.Type.COMPARISION, asList(intLit(10)))
                 ), catalog.consumedPredicate.get(QualifiedName.of("table")));
@@ -2638,7 +2669,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
         assertEquals(asList(
-                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)), asList(cre("col2", table)), false)))
+                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)),
+                        asList(cre("col2", table, CoreColumn.Type.NAMED_ASTERISK)), false)))
                 ), catalog.consumedPredicate.get(QualifiedName.of("table")));
         //@formatter:on
 
@@ -2678,7 +2710,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
         assertEquals(asList(
-                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)), asList(cre("col2", table), intLit(10)), false)))
+                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)),
+                        asList(cre("col2", table, CoreColumn.Type.NAMED_ASTERISK), intLit(10)), false)))
                 ), catalog.consumedPredicate.get(QualifiedName.of("table")));
         //@formatter:on
 
@@ -2718,7 +2751,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
         assertEquals(asList(
-                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)), asList(cre("col2", table)), true)))
+                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)),
+                        asList(cre("col2", table, CoreColumn.Type.NAMED_ASTERISK)), true)))
                 ), catalog.consumedPredicate.get(QualifiedName.of("table")));
         //@formatter:on
 
@@ -2777,7 +2811,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         assertEquals(1, catalog.consumedPredicate.size());
         assertEquals(asList(
                 Triple.of(null, IPredicate.Type.FUNCTION_CALL, asList(new FunctionCallExpression("t", someFunc, null, asList()))),
-                Triple.of(null, IPredicate.Type.UNDEFINED, asList(or(gt(cre("col8", table), intLit(10)), lt(cre("col9", table), intLit(20))))),
+                Triple.of(null, IPredicate.Type.UNDEFINED, asList(or(gt(cre("col8", table, CoreColumn.Type.NAMED_ASTERISK), intLit(10)),
+                        lt(cre("col9", table, CoreColumn.Type.NAMED_ASTERISK), intLit(20))))),
                 Triple.of(QualifiedName.of("map", "col7"), IPredicate.Type.NULL, asList(new LiteralStringExpression("NOT NULL"))),
                 Triple.of(QualifiedName.of("map", "col6"), IPredicate.Type.NULL, asList(new LiteralStringExpression("NULL"))),
                 Triple.of(QualifiedName.of("map", "col5"), IPredicate.Type.LIKE, asList(new LiteralStringExpression("NOT"), new LiteralStringExpression("string"))),
@@ -2847,10 +2882,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         new ExpressionPredicate(
                             and(
                                 and(
-                                    new InExpression(cre("col2", table), asList(intLit(10), intLit(20)), false),
-                                    new LikeExpression(cre("col3", table), new LiteralStringExpression("string"), false, null)
+                                    new InExpression(cre("col2", table, CoreColumn.Type.NAMED_ASTERISK), asList(intLit(10), intLit(20)), false),
+                                    new LikeExpression(cre("col3", table, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("string"), false, null)
                                 ),
-                                new NullPredicateExpression(cre("col4", table), false)))
+                                new NullPredicateExpression(cre("col4", table, CoreColumn.Type.NAMED_ASTERISK), false)))
                         )),
                 true);
         //@formatter:on
