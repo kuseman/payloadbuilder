@@ -9,6 +9,7 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
@@ -19,10 +20,32 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 
 /** Test {@link TableScan} */
 public class TableScanTest extends APhysicalPlanTest
 {
+    @Test
+    public void test_runtime_schema_is_set()
+    {
+        TableSourceReference table = new TableSourceReference(666, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t");
+
+        Schema schema = Schema.of(col("Value", ResolvedType.of(Type.Int), table));
+
+        IDatasource datasource = schemaLessDS(() ->
+        {
+        }, TupleVector.of(schema, asList(ValueVector.literalInt(100, 100))), TupleVector.of(schema, asList(ValueVector.literalInt(100, 100))));
+
+        TableScan plan = new TableScan(0, schema, table, "", datasource, emptyList());
+        TupleIterator it = plan.execute(context);
+        while (it.hasNext())
+        {
+            it.next();
+        }
+        assertEquals(schema, context.getStatementContext()
+                .getRuntimeSchema(666));
+    }
+
     @Test
     public void test_no_such_element()
     {

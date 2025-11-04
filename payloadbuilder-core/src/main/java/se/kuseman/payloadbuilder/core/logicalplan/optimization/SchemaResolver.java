@@ -12,6 +12,7 @@ import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Option;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -158,7 +159,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
         // No schema returned, create an asterisk column with table source ref.
         if (Schema.EMPTY.equals(schema))
         {
-            schema = Schema.of(CoreColumn.asterisk(plan.getAlias(), plan.getTableSource()));
+            schema = Schema.of(CoreColumn.asterisk(plan.getAlias(), ResolvedType.ANY, plan.getTableSource()));
         }
         // .. else recreate the schema and tag the table source to all columns
         else
@@ -215,7 +216,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
     {
         return new Schema(schema.getColumns()
                 .stream()
-                .map(c -> CoreColumn.changeProperties(c, tableSource))
+                .map(c -> CoreColumn.changeTableSource(c, tableSource))
                 .collect(toList()));
     }
 

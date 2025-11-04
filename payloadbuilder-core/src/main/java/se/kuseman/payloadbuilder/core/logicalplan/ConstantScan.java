@@ -7,8 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
-import org.apache.commons.lang3.ObjectUtils;
-
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -139,19 +137,10 @@ public class ConstantScan implements ILogicalPlan
             return this;
         }
 
-        List<ResolvedType> columnTypes = getTypesFromRows(rowsExpressions, location);
-        List<TableSourceReference> tableSourceReferences = getTableSourceReferenceFromRows(null, rowsExpressions, location);
+        List<ColumnData> columnDatas = getColumnDataFromRows(null, rowsExpressions, location);
         List<Column> columns = this.schema.getColumns();
         Schema schema = new Schema(IntStream.range(0, columns.size())
-                .mapToObj(i ->
-                {
-                    // Use the new ref if non null else keep the existing
-                    TableSourceReference ref = ObjectUtils.getIfNull(tableSourceReferences.get(i), SchemaUtils.getTableSource(this.getSchema()
-                            .getColumns()
-                            .get(i)));
-
-                    return (Column) CoreColumn.changeProperties(columns.get(i), columnTypes.get(i), ref);
-                })
+                .mapToObj(i -> getColumn(columns.get(i), null, columnDatas.get(i)))
                 .toList());
         return new ConstantScan(schema, rowsExpressions, location);
     }
@@ -167,15 +156,9 @@ public class ConstantScan implements ILogicalPlan
     {
         requireNonNull(tableSource);
         // Create schema from provided row expressions. Highest priority of each column
-        List<ResolvedType> columnTypes = getTypesFromRows(rowsExpressions, location);
-        // Pick table source ref. for each column
-        List<TableSourceReference> tableSourceReferences = getTableSourceReferenceFromRows(tableSource, rowsExpressions, location);
+        List<ColumnData> columnDatas = getColumnDataFromRows(tableSource, rowsExpressions, location);
         Schema schema = new Schema(IntStream.range(0, columnNames.size())
-                .mapToObj(i ->
-                {
-                    TableSourceReference ts = tableSourceReferences.get(i);
-                    return (Column) CoreColumn.of(columnNames.get(i), columnTypes.get(i), ts);
-                })
+                .mapToObj(i -> getColumn(null, columnNames.get(i), columnDatas.get(i)))
                 .toList());
 
         return new ConstantScan(schema, rowsExpressions, location);
@@ -192,14 +175,47 @@ public class ConstantScan implements ILogicalPlan
     public static ConstantScan createFromRows(List<List<IExpression>> rowsExpressions, Location location)
     {
         // Extract the schema from the first row
-        List<ResolvedType> columnTypes = getTypesFromRows(rowsExpressions, location);
-        Schema schema = new Schema(IntStream.range(0, columnTypes.size())
-                .mapToObj(i -> (Column) CoreColumn.of("column" + i, columnTypes.get(i)))
+        List<ColumnData> columnDatas = getColumnDataFromRows(null, rowsExpressions, location);
+
+        Schema schema = new Schema(IntStream.range(0, columnDatas.size())
+                .mapToObj(i -> getColumn(null, "column" + i, columnDatas.get(i)))
                 .toList());
         return new ConstantScan(schema, rowsExpressions, location);
     }
 
-    private static List<ResolvedType> getTypesFromRows(List<List<IExpression>> rowsExpressions, Location location)
+    private static Column getColumn(Column column, String columnName, ColumnData columnData)
+    {
+        assert (column != null
+                && columnName == null)
+                || (column == null
+                        && columnName != null) : "column and columnName are mutual exclusive";
+        Column.MetaData metaData = columnData.metadata;
+        ResolvedType type = columnData.resolvedType;
+        CoreColumn.Type columnType = columnData.columnType;
+        TableSourceReference tableSourceRef = columnData.tableSourceReference;
+        if (tableSourceRef == null
+                && column != null)
+        {
+            tableSourceRef = SchemaUtils.getTableSource(column);
+        }
+
+        ColumnReference cr = null;
+        if (tableSourceRef != null)
+        {
+            cr = new ColumnReference(column != null ? column.getName()
+                    : columnName, tableSourceRef, metaData);
+        }
+
+        CoreColumn.Builder builder = column != null ? CoreColumn.Builder.from(column)
+                : CoreColumn.Builder.from(columnName, type);
+        return builder.withColumnType(columnType)
+                .withMetaData(metaData)
+                .withResolvedType(type)
+                .withColumnReference(cr)
+                .build();
+    }
+
+    private static List<ColumnData> getColumnDataFromRows(TableSourceReference parentTableSourceReference, List<List<IExpression>> rowsExpressions, Location location)
     {
         if (rowsExpressions.isEmpty())
         {
@@ -208,83 +224,69 @@ public class ConstantScan implements ILogicalPlan
 
         int count = rowsExpressions.get(0)
                 .size();
-        List<ResolvedType> columnTypes = new ArrayList<>(count);
+        List<ColumnData> columnDatas = new ArrayList<>(count);
         int rowCount = rowsExpressions.size();
         for (int i = 0; i < count; i++)
         {
-            columnTypes.add(ResolvedType.ANY);
+            ResolvedType resolvedType = ResolvedType.ANY;
+            TableSourceReference tableSourceReference = null;
+            CoreColumn.Type columnType = CoreColumn.Type.REGULAR;
+            Column.MetaData metaData = Column.MetaData.EMPTY;
 
             for (int j = 0; j < rowCount; j++)
             {
                 List<IExpression> rowExpressions = rowsExpressions.get(j);
+
                 if (rowExpressions.size() != count)
                 {
                     throw new ParseException("All rows expressions must be of equal size.", location);
                 }
 
+                // Highest precedence type from each column
                 IExpression expression = rowExpressions.get(i);
                 if (expression.getType()
                         .getType()
-                        .getPrecedence() > columnTypes.get(i)
-                                .getType()
+                        .getPrecedence() > resolvedType.getType()
                                 .getPrecedence())
                 {
-                    columnTypes.set(i, expression.getType());
+                    resolvedType = expression.getType();
+                }
+
+                columnType = SchemaUtils.getColumnType(rowExpressions.get(i));
+                ColumnReference cr = SchemaUtils.getColumnReference(rowExpressions.get(i));
+                if (cr == null)
+                {
+                    continue;
+                }
+
+                if (tableSourceReference == null)
+                {
+                    tableSourceReference = cr.tableSourceReference();
+                    metaData = cr.metaData();
+                }
+                // Different table sources among column => clear
+                else if (tableSourceReference.getId() != cr.tableSourceReference()
+                        .getId())
+                {
+                    tableSourceReference = null;
+                    metaData = Column.MetaData.EMPTY;
+                    columnType = CoreColumn.Type.REGULAR;
+                    break;
                 }
             }
+
+            if (tableSourceReference == null)
+            {
+                tableSourceReference = parentTableSourceReference;
+                metaData = Column.MetaData.EMPTY;
+            }
+
+            columnDatas.add(new ColumnData(resolvedType, tableSourceReference, columnType, metaData));
         }
-        return columnTypes;
+        return columnDatas;
     }
 
-    private static List<TableSourceReference> getTableSourceReferenceFromRows(TableSourceReference tableSource, List<List<IExpression>> rowsExpressions, Location location)
+    private record ColumnData(ResolvedType resolvedType, TableSourceReference tableSourceReference, CoreColumn.Type columnType, Column.MetaData metadata)
     {
-        if (rowsExpressions.isEmpty())
-        {
-            return emptyList();
-        }
-
-        int count = rowsExpressions.get(0)
-                .size();
-        List<TableSourceReference> tableSources = new ArrayList<>(count);
-        int rowCount = rowsExpressions.size();
-        for (int i = 0; i < count; i++)
-        {
-            TableSourceReference rowTableSource = null;
-
-            for (int j = 0; j < rowCount; j++)
-            {
-                List<IExpression> rowExpressions = rowsExpressions.get(j);
-
-                if (rowExpressions.size() != count)
-                {
-                    throw new ParseException("All rows expressions must be of equal size.", location);
-                }
-
-                IExpression expression = rowExpressions.get(i);
-                ColumnReference cr = SchemaUtils.getColumnReference(expression);
-                if (cr != null)
-                {
-                    if (rowTableSource == null)
-                    {
-                        rowTableSource = cr.tableSourceReference();
-                    }
-                    // We have different sources, null out the reference
-                    else if (!rowTableSource.equals(cr.tableSourceReference()))
-                    {
-                        rowTableSource = null;
-                        break;
-                    }
-                }
-            }
-
-            // If there was no table source for the current row pick the provided (subquery)
-            if (rowTableSource == null)
-            {
-                rowTableSource = tableSource;
-            }
-
-            tableSources.add(rowTableSource);
-        }
-        return tableSources;
     }
 }

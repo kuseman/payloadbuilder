@@ -569,7 +569,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                 .allMatch(l -> l.stream()
                         .allMatch(IExpression::isConstant)))
         {
-            TupleVector vector = se.kuseman.payloadbuilder.core.physicalplan.ConstantScan.vectorize(plan.getSchema(), rowsExpressions, context.context);
+            TupleVector vector = se.kuseman.payloadbuilder.core.physicalplan.ConstantScan.vectorize(plan.getSchema(), rowsExpressions, context.context, false);
             return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), vector));
         }
 

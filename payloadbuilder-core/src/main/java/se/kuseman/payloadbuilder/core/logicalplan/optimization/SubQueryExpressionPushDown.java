@@ -189,7 +189,10 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
                 .getColumns()
                 .get(0);
 
-        CoreColumn newCol = new CoreColumn(alias, column.getType(), null, true);
+        CoreColumn newCol = CoreColumn.Builder.from(column)
+                .withName(alias)
+                .withInternal(true)
+                .build();
         Schema schema = Schema.of(newCol);
         return new OperatorFunctionScan(schema, input, plan.getCatalogAlias(), plan.getFunction(), plan.getLocation());
     }

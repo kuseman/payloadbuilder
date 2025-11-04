@@ -18,6 +18,7 @@ import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn.Type;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.execution.StatementContext;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
@@ -62,10 +63,13 @@ public final class SchemaUtils
         ColumnReference cr = null;
         if (tableRef != null)
         {
-            cr = new ColumnReference(name, tableRef);
+            cr = new ColumnReference(name, tableRef, Column.MetaData.EMPTY);
         }
 
-        return new CoreColumn(name, ResolvedType.table(populatedSchema), "", false, cr, CoreColumn.Type.POPULATED);
+        return CoreColumn.Builder.from(name, ResolvedType.table(populatedSchema))
+                .withColumnType(CoreColumn.Type.POPULATED)
+                .withColumnReference(cr)
+                .build();
     }
 
     /** Return a new schema which concats to other schemas */
@@ -93,6 +97,12 @@ public final class SchemaUtils
     /** Returns true if this schema contains asterisk columns */
     public static boolean isAsterisk(Schema schema)
     {
+        return isAsterisk(schema, false);
+    }
+
+    /** Returns true if this schema contains asterisk columns */
+    public static boolean isAsterisk(Schema schema, boolean includeNamedAsterisks)
+    {
         if (schema == null)
         {
             return false;
@@ -107,7 +117,7 @@ public final class SchemaUtils
         {
             Column column = schema.getColumns()
                     .get(i);
-            if (isAsterisk(column))
+            if (isAsterisk(column, includeNamedAsterisks))
             {
                 return true;
             }
@@ -120,9 +130,19 @@ public final class SchemaUtils
      */
     public static boolean isAsterisk(Column column)
     {
+        return isAsterisk(column, false);
+    }
+
+    /**
+     * Returns true if provided column is asterisk.
+     */
+    public static boolean isAsterisk(Column column, boolean includeNamedAsterisks)
+    {
         if (column instanceof CoreColumn cc)
         {
-            if (cc.getColumnType() == CoreColumn.Type.ASTERISK)
+            if (cc.getColumnType() == CoreColumn.Type.ASTERISK
+                    || (includeNamedAsterisks
+                            && cc.getColumnType() == Type.NAMED_ASTERISK))
             {
                 return true;
             }
@@ -133,17 +153,6 @@ public final class SchemaUtils
                 return isAsterisk(cc.getType()
                         .getSchema());
             }
-
-            // If we have an internal column who's type is a table that is an asterisk schema
-            // this column is treated as asterisk
-            if (cc.isInternal()
-                    && cc.getType()
-                            .getType() == Column.Type.Table)
-            {
-                return isAsterisk(cc.getType()
-                        .getSchema());
-            }
-
         }
         return false;
     }
@@ -231,6 +240,70 @@ public final class SchemaUtils
         return emptySet();
     }
 
+    /** Re-writes the input schema and connects runtime schema data in schema less queries. */
+    public static Schema rewriteSchema(Schema schema, StatementContext statementContext)
+    {
+        return new Schema(schema.getColumns()
+                .stream()
+                .map(c -> rewriteColumn(c, statementContext))
+                .toList());
+    }
+
+    private static Column rewriteColumn(Column column, StatementContext statementContexnt)
+    {
+        ResolvedType type = column.getType();
+        if (column.getType()
+                .getSchema() != null)
+        {
+            Schema schema = rewriteSchema(column.getType()
+                    .getSchema(), statementContexnt);
+            type = column.getType()
+                    .getType() == Column.Type.Object ? ResolvedType.object(schema)
+                            : ResolvedType.table(schema);
+        }
+        else if (column.getType()
+                .getSubType() != null
+                && column.getType()
+                        .getSubType()
+                        .getSchema() != null)
+        {
+            Schema schema = rewriteSchema(column.getType()
+                    .getSubType()
+                    .getSchema(), statementContexnt);
+            ResolvedType subType = column.getType()
+                    .getSubType()
+                    .getType() == Column.Type.Object ? ResolvedType.object(schema)
+                            : ResolvedType.table(schema);
+            type = ResolvedType.array(subType);
+        }
+
+        // Fetch the meta data from the runtime data
+        ColumnReference cr = getColumnReference(column);
+        Column.MetaData metaData = Column.MetaData.EMPTY;
+        if (cr != null)
+        {
+            Schema runtimeSchema = statementContexnt.getRuntimeSchema(cr.tableSourceReference()
+                    .getRoot()
+                    .getId());
+            if (runtimeSchema != null)
+            {
+                Column runtimeColumn = runtimeSchema.getColumns()
+                        .stream()
+                        .filter(c -> c.getName()
+                                .equalsIgnoreCase(cr.columnName()))
+                        .findFirst()
+                        .orElse(null);
+                metaData = runtimeColumn != null ? runtimeColumn.getMetaData()
+                        : Column.MetaData.EMPTY;
+            }
+        }
+
+        return CoreColumn.Builder.from(column)
+                .withResolvedType(type)
+                .withMetaData(metaData)
+                .build();
+    }
+
     /**
      * Create a schema from provided expressions.
      *
@@ -292,9 +365,20 @@ public final class SchemaUtils
                 && parentTableSource != null)
         {
             cr = new ColumnReference(columnType == Type.ASTERISK ? "*"
-                    : name, parentTableSource);
+                    : name, parentTableSource, Column.MetaData.EMPTY);
         }
-        return new CoreColumn(name, type, outputName, expression.isInternal(), cr, columnType);
+        return CoreColumn.Builder.from(name, type)
+                .withOutputName(outputName)
+                .withInternal(expression.isInternal())
+                .withColumnReference(cr)
+                .withColumnType(columnType)
+                .build();
+    }
+
+    private static ColumnReference getColumnReference(Column column)
+    {
+        return column instanceof CoreColumn cc ? cc.getColumnReference()
+                : null;
     }
 
     /** Extract a {@link ColumnExpression} from provided expression. */
@@ -316,7 +400,7 @@ public final class SchemaUtils
         {
             return new ColumnReference("*", ae.getTableSourceReferences()
                     .iterator()
-                    .next());
+                    .next(), Column.MetaData.EMPTY);
         }
         else if (e instanceof ColumnExpression ce)
         {
@@ -325,17 +409,20 @@ public final class SchemaUtils
         // Deref on a populated column expression => return the column expression reference but with the de-refs right part
         else if (e instanceof DereferenceExpression de
                 && de.getExpression() instanceof ColumnExpression ce
-                && ce.isPopulated()
+                && ce.getColumnType() == CoreColumn.Type.POPULATED
                 && ce.getColumnReference() != null)
         {
             return new ColumnReference(de.getRight(), ce.getColumnReference()
-                    .tableSourceReference());
+                    .tableSourceReference(),
+                    ce.getColumnReference()
+                            .metaData());
         }
+
         return null;
     }
 
     // CSOFF
-    private static CoreColumn.Type getColumnType(IExpression e)
+    public static CoreColumn.Type getColumnType(IExpression e)
     // CSON
     {
         // Unwrap nested expressions
@@ -352,10 +439,9 @@ public final class SchemaUtils
         {
             return CoreColumn.Type.ASTERISK;
         }
-        else if (e instanceof ColumnExpression ce
-                && ce.isPopulated())
+        else if (e instanceof ColumnExpression ce)
         {
-            return CoreColumn.Type.POPULATED;
+            return ce.getColumnType();
         }
 
         return CoreColumn.Type.REGULAR;

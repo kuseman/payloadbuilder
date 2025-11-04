@@ -69,7 +69,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                         tableScan(schemaB, tableB, List.of("col", "col2", "col3")),
                         Join.Type.INNER,
                         "b",
-                        eq(cre("col", tableB), cre("col", tableA)),
+                        eq(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
                         null,
                         false,
                         Schema.EMPTY),
@@ -144,12 +144,12 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                     new Join(
                         tableScan(schema, table),
                         subQuery(
-                            ConstantScan.create(subQueryX, List.of("col"), List.of(List.of(ocre("col", table))), null),
+                            ConstantScan.create(subQueryX, List.of("col"), List.of(List.of(ocre("col", table, CoreColumn.Type.NAMED_ASTERISK))), null),
                             subQueryX),
                         Join.Type.INNER,
                         null,
                         null,
-                        Set.of(col("col", ResolvedType.ANY, table)),
+                        Set.of(nast("col", ResolvedType.ANY, table)),
                         false,
                         Schema.of(ast("t", table))),
                     List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(table))),
@@ -239,7 +239,10 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected = 
                 projection(
                     tableScan(schema, table),
-                asList(cre("col", table), new AsteriskExpression(QualifiedName.of("t"), null, Set.of(table)), cre("col2", table)));
+                asList(
+                    cre("col", table, CoreColumn.Type.NAMED_ASTERISK),
+                    new AsteriskExpression(QualifiedName.of("t"), null, Set.of(table)),
+                    cre("col2", table, CoreColumn.Type.NAMED_ASTERISK)));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -290,10 +293,10 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                     subQuery(
                         projection(
                             tableScan(schema, table, asList("col1", "col2")),
-                            asList(cre("col1", table), cre("col2", table)),
+                            asList(cre("col1", table, CoreColumn.Type.NAMED_ASTERISK), cre("col2", table, CoreColumn.Type.NAMED_ASTERISK)),
                             subQueryX),
                     subQueryX),
-                    asList(cre("col1", table, 0))
+                    asList(cre("col1", table, 0, CoreColumn.Type.NAMED_ASTERISK))
                     );
         //@formatter:on
 
@@ -323,7 +326,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected = projection(
                 tableScan(schema, table, asList("col1")),
-                asList(cre("col1", table))
+                asList(cre("col1", table, CoreColumn.Type.NAMED_ASTERISK))
                 );
         //@formatter:on
 
@@ -360,14 +363,14 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                 projection(
                     new Join(
                         tableScan(schema, table, List.of("col1", "table")),
-                        new ExpressionScan(toTable, toTableSchema, new FunctionCallExpression("sys", toTableFunc, null, asList(ocre("table", table))), null),
+                        new ExpressionScan(toTable, toTableSchema, new FunctionCallExpression("sys", toTableFunc, null, asList(ocre("table", table, CoreColumn.Type.NAMED_ASTERISK))), null),
                         Join.Type.INNER,
                         null,
                         null,
-                        Set.of(col("table", ResolvedType.ANY, table)),
+                        Set.of(nast("table", ResolvedType.ANY, table)),
                         false,
                         Schema.of(ast("t", table))),
-                    asList(cre("col1", table), cre("col2", toTable))
+                    asList(cre("col1", table, CoreColumn.Type.NAMED_ASTERISK), cre("col2", toTable, CoreColumn.Type.NAMED_ASTERISK))
                 );
         //@formatter:on
 
@@ -410,14 +413,17 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                 projection(
                     new Join(
                         tableScan(schema, table),
-                        new ExpressionScan(toTable, toTableSchema, new FunctionCallExpression("sys", toTableFunc, null, asList(ocre("table", table))), null),
+                        new ExpressionScan(toTable, toTableSchema, new FunctionCallExpression("sys", toTableFunc, null, asList(ocre("table", table, CoreColumn.Type.NAMED_ASTERISK))), null),
                         Join.Type.INNER,
                         null,
                         null,
-                        Set.of(col("table", ResolvedType.ANY, table)),
+                        Set.of(nast("table", ResolvedType.ANY, table)),
                         false,
                         Schema.of(ast("t", table))),
-                    asList(cre("col1", table), cre("col2", toTable), new AsteriskExpression(QualifiedName.of("t"), null, Set.of(table))
+                    asList(
+                        cre("col1", table, CoreColumn.Type.NAMED_ASTERISK),
+                        cre("col2", toTable, CoreColumn.Type.NAMED_ASTERISK),
+                        new AsteriskExpression(QualifiedName.of("t"), null, Set.of(table))
                 ));
         //@formatter:on
 
@@ -475,15 +481,17 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                                  tableScan(schemaB, tableB, asList("col2", "col4", "col6", "col8")),
                                  Join.Type.INNER,
                                  null,
-                                 eq(cre("col3", tableA), cre("col4", tableB)),
+                                 eq(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col4", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                                  asSet(),
                                  false,
                                  Schema.EMPTY),
                              null,
-                             gt(cre("col7", tableA), cre("col8", tableB))
+                             gt(cre("col7", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col8", tableB, CoreColumn.Type.NAMED_ASTERISK))
                          ),
-                         asList(new SortItem(cre("col5", tableA), Order.ASC, NullOrder.UNDEFINED, null), new SortItem(cre("col6", tableB), Order.ASC, NullOrder.UNDEFINED, null))),
-                     asList(cre("col1", tableA), cre("col2", tableB)));
+                         asList(
+                             new SortItem(cre("col5", tableA, CoreColumn.Type.NAMED_ASTERISK), Order.ASC, NullOrder.UNDEFINED, null),
+                             new SortItem(cre("col6", tableB, CoreColumn.Type.NAMED_ASTERISK), Order.ASC, NullOrder.UNDEFINED, null))),
+                     asList(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableB, CoreColumn.Type.NAMED_ASTERISK)));
         //@formatter:on
 
         // System.out.println(expected.print(0));

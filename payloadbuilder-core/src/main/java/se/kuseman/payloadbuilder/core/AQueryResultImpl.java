@@ -6,7 +6,6 @@ import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.time.StopWatch;
@@ -17,6 +16,7 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.core.RawQueryResult.ResultConsumer;
 import se.kuseman.payloadbuilder.core.cache.Cache;
 import se.kuseman.payloadbuilder.core.cache.CacheProvider;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
@@ -211,12 +211,22 @@ abstract class AQueryResultImpl implements BaseQueryResult, StatementVisitor<Voi
 
     // CSOFF
     /** Process the current plan. */
-    protected void processCurrentPlan(OutputWriter writer, Function<TupleVector, Boolean> vectorConsumer)
+    protected void processCurrentPlan(OutputWriter writer, ResultConsumer resultConsumer)
     // CSON
     {
         if (currentPlan == null)
         {
             throw new IllegalArgumentException("No more results");
+        }
+
+        Schema schema = currentPlan.getSchema();
+        boolean currentPlanIsAsterisk = SchemaUtils.isAsterisk(schema);
+        boolean currentPlanHasAsteriskInput = currentPlanIsAsterisk
+                || SchemaUtils.isAsterisk(schema, true);
+        if (resultConsumer != null)
+        {
+            resultConsumer.schema(currentPlanIsAsterisk ? Schema.EMPTY
+                    : schema);
         }
 
         StopWatch sw = StopWatch.createStarted();
@@ -225,7 +235,6 @@ abstract class AQueryResultImpl implements BaseQueryResult, StatementVisitor<Voi
         StatementContext statementContext = context.getStatementContext();
         try
         {
-            Schema schema = currentPlan.getSchema();
             statementContext.setOuterTupleVector(null);
             boolean initCompleted = false;
             iterator = currentPlan.execute(context);
@@ -237,7 +246,7 @@ abstract class AQueryResultImpl implements BaseQueryResult, StatementVisitor<Voi
                     {
                         // Asterisk schema, then we cannot init the result with it since
                         // it's not the actual one that will come
-                        if (SchemaUtils.isAsterisk(schema))
+                        if (currentPlanIsAsterisk)
                         {
                             writer.initResult(ArrayUtils.EMPTY_STRING_ARRAY);
                         }
@@ -250,9 +259,9 @@ abstract class AQueryResultImpl implements BaseQueryResult, StatementVisitor<Voi
                                     .map(c ->
                                     {
                                         String outputName = c.getName();
-                                        if (c instanceof CoreColumn)
+                                        if (c instanceof CoreColumn cc)
                                         {
-                                            outputName = ((CoreColumn) c).getOutputName();
+                                            outputName = cc.getOutputName();
                                         }
                                         return outputName;
                                     })
@@ -268,10 +277,17 @@ abstract class AQueryResultImpl implements BaseQueryResult, StatementVisitor<Voi
                 }
 
                 TupleVector tv = iterator.next();
-                rowCount += tv.getRowCount();
-                if (vectorConsumer != null)
+
+                // Wrap the tuple vector in a proxy to generate a correct runtime schema in asterisk mode
+                if (currentPlanHasAsteriskInput)
                 {
-                    if (!vectorConsumer.apply(tv))
+                    tv = createProxyVector(tv);
+                }
+
+                rowCount += tv.getRowCount();
+                if (resultConsumer != null)
+                {
+                    if (!resultConsumer.consume(tv))
                     {
                         break;
                     }
@@ -313,6 +329,30 @@ abstract class AQueryResultImpl implements BaseQueryResult, StatementVisitor<Voi
         // Build a buffer allocator that keeps all allocated buffers in internal lists
         // When we have written the result we can clear the buffer allocator and make it
         // reused for next query
+    }
+
+    private TupleVector createProxyVector(TupleVector tv)
+    {
+        return new TupleVector()
+        {
+            @Override
+            public Schema getSchema()
+            {
+                return SchemaUtils.rewriteSchema(tv.getSchema(), context.getStatementContext());
+            }
+
+            @Override
+            public int getRowCount()
+            {
+                return tv.getRowCount();
+            }
+
+            @Override
+            public ValueVector getColumn(int column)
+            {
+                return tv.getColumn(column);
+            }
+        };
     }
 
     /* Non executable statements */

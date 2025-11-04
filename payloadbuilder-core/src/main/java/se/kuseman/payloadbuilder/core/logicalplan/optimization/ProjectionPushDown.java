@@ -18,6 +18,7 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn.Type;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
@@ -152,18 +153,14 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
         {
             for (ColumnReferenceExtractorResult ce : e.getValue())
             {
-                TableSourceReference tableSource = getRoot(ce.columnReference()
-                        .tableSourceReference());
-                if (tableSource == null)
-                {
-                    tableSource = ce.columnReference()
-                            .tableSourceReference();
-                }
+                TableSourceReference tableSource = ce.columnReference()
+                        .tableSourceReference()
+                        .getRoot();
 
                 // Populated column should not be projected since they are not real columns
                 // But instead go into the populated schema and add those columns if they are static
                 if (ce.expression() instanceof ColumnExpression cexp
-                        && cexp.isPopulated())
+                        && cexp.getColumnType() == Type.POPULATED)
                 {
                     if (ce.expression()
                             .getType()
@@ -191,18 +188,6 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
         }
 
         return expressions;
-    }
-
-    /** Get concrete table source (table or function) from provided table source. */
-    private TableSourceReference getRoot(TableSourceReference tableSource)
-    {
-        while (tableSource != null
-                && tableSource.getType() != TableSourceReference.Type.TABLE
-                && tableSource.getType() != TableSourceReference.Type.FUNCTION)
-        {
-            tableSource = tableSource.getParent();
-        }
-        return tableSource;
     }
 
     private void appendColumn(TableSourceReference tableSource, String column, Ctx context)

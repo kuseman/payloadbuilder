@@ -104,7 +104,7 @@ public final class ProjectionUtils
                         .withOrdinal(i);
                 if (columnTableSource != null)
                 {
-                    builder.withColumnReference(new ColumnReference(column.getName(), columnTableSource));
+                    builder.withColumnReference(new ColumnReference(column.getName(), columnTableSource, column.getMetaData()));
                 }
 
                 IExpression columnExpression = builder.build();

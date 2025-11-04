@@ -5,11 +5,13 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
@@ -18,12 +20,15 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.QueryException;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 
 /** A scan operator returning constant values for one or more rows. */
 public class ConstantScan implements IPhysicalPlan
 {
     private final int nodeId;
     private final Schema schema;
+    private final boolean hasAsteriskSchemaOrInput;
     private final List<List<IExpression>> rowsExpressions;
     private final TupleVector vector;
 
@@ -33,6 +38,7 @@ public class ConstantScan implements IPhysicalPlan
         this.schema = schema;
         this.rowsExpressions = requireNonNull(rowsExpressions);
         this.vector = null;
+        this.hasAsteriskSchemaOrInput = SchemaUtils.isAsterisk(schema, true);
     }
 
     public ConstantScan(int nodeId, TupleVector vector)
@@ -41,6 +47,7 @@ public class ConstantScan implements IPhysicalPlan
         this.schema = null;
         this.rowsExpressions = null;
         this.vector = requireNonNull(vector);
+        this.hasAsteriskSchemaOrInput = false;
     }
 
     @Override
@@ -107,7 +114,7 @@ public class ConstantScan implements IPhysicalPlan
             return TupleIterator.singleton(vector);
         }
 
-        return TupleIterator.singleton(vectorize(schema, rowsExpressions, context));
+        return TupleIterator.singleton(vectorize(schema, rowsExpressions, context, hasAsteriskSchemaOrInput));
     }
 
     @Override
@@ -156,7 +163,7 @@ public class ConstantScan implements IPhysicalPlan
     /**
      * Turn a schema and a set of expressions into a {@link TupleVector}.
      */
-    public static TupleVector vectorize(Schema schema, List<List<IExpression>> rowsExpressions, IExecutionContext context)
+    public static TupleVector vectorize(Schema schema, List<List<IExpression>> rowsExpressions, IExecutionContext context, boolean hasAsteriskSchemaOrInput)
     {
         int rowSize = rowsExpressions.size();
         int columnSize = rowsExpressions.get(0)
@@ -167,22 +174,47 @@ public class ConstantScan implements IPhysicalPlan
             throw new QueryException("Schema column count must match row expressions count");
         }
 
-        List<ValueVector> values = new ArrayList<>(columnSize);
+        List<MutableValueVector> values = new ArrayList<>(Collections.nCopies(columnSize, null));
 
         for (int i = 0; i < columnSize; i++)
         {
-            MutableValueVector mutableVector = context.getVectorFactory()
-                    .getMutableVector(schema.getColumns()
-                            .get(i)
-                            .getType(), rowSize);
-            values.add(mutableVector);
+            if (!hasAsteriskSchemaOrInput)
+            {
+                MutableValueVector mutableVector = context.getVectorFactory()
+                        .getMutableVector(schema.getColumns()
+                                .get(i)
+                                .getType(), rowSize);
+                values.set(i, mutableVector);
+            }
 
             for (int j = 0; j < rowSize; j++)
             {
-                mutableVector.copy(j, rowsExpressions.get(j)
+                ValueVector result = rowsExpressions.get(j)
                         .get(i)
-                        .eval(context));
+                        .eval(context);
+
+                MutableValueVector mutableVector = values.get(i);
+                if (mutableVector == null)
+                {
+                    mutableVector = context.getVectorFactory()
+                            .getMutableVector(result.type(), rowSize);
+                    values.set(i, mutableVector);
+                }
+
+                mutableVector.copy(j, result);
             }
+        }
+
+        // If we have asterisk input then we need to re-construct the schema from the actual vectors
+        if (hasAsteriskSchemaOrInput)
+        {
+            List<Column> columns = schema.getColumns();
+            schema = new Schema(IntStream.range(0, schema.getSize())
+                    .mapToObj(i -> (Column) CoreColumn.Builder.from(columns.get(i))
+                            .withResolvedType(values.get(i)
+                                    .type())
+                            .build())
+                    .toList());
         }
 
         return TupleVector.of(schema, values);

@@ -91,7 +91,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select concat('hello', 123)");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(col("", ResolvedType.of(Type.String), "concat('hello', 123)", null, false, ""));
+        Schema expectedSchema = Schema.of(col(ResolvedType.of(Type.String), "concat('hello', 123)"));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
@@ -101,7 +101,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select sum(col2) from \"table\" group by col");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(col("", ResolvedType.of(Type.Any), "sum(col2)", null, false, ""));
+        Schema expectedSchema = Schema.of(col(ResolvedType.of(Type.Any), "sum(col2)"));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
@@ -111,7 +111,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select sum(sum(col2)) from \"table\" group by col");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(col("", ResolvedType.of(Type.Any), "sum(sum(col2))", null, false, ""));
+        Schema expectedSchema = Schema.of(col(ResolvedType.of(Type.Any), "sum(sum(col2))"));
         assertEquals(expectedSchema, actual.getSchema());
     }
 

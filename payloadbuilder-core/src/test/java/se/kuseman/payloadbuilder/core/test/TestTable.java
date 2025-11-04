@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.collections4.MapUtils;
+
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -78,23 +80,48 @@ public class TestTable
             });
 
             return list.stream()
-                    .map(ResolvedTypeDeserializer::from)
+                    .map(ResolvedTypeDeserializer::typeFrom)
                     .toList();
         }
 
-        private static ResolvedType from(Map<String, Object> map)
+        static ResolvedType typeFrom(Object value)
         {
-            Column.Type type = Column.Type.valueOf(String.valueOf(map.get("type")));
-
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> schemaList = (List<Map<String, Object>>) map.get("schema");
-            Schema schema = from(schemaList);
+            Schema schema;
+            Column.Type type;
+            if (value instanceof String str)
+            {
+                type = Column.Type.valueOf(str);
+                schema = null;
+            }
+            else if (value instanceof Map map)
+            {
+                type = Column.Type.valueOf(String.valueOf(map.get("type")));
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> schemaList = (List<Map<String, Object>>) map.get("schema");
+                schema = schemaFrom(schemaList);
+            }
+            else
+            {
+                throw new IllegalArgumentException("Cannot construct a type from: " + value);
+            }
+            /*
+             * @formatter:off
+             * "schema": [
+             *   {
+             *      "name": "col",
+             *      "type": {
+             *        "type": "Int"
+             *      }
+             *   }
+             * ]
+             * @formatter:on
+             */
 
             return new ResolvedType(type, null, schema);
         }
 
         @SuppressWarnings("unchecked")
-        private static Schema from(List<Map<String, Object>> list)
+        static Schema schemaFrom(List<Map<String, Object>> list)
         {
             if (list == null)
             {
@@ -102,7 +129,13 @@ public class TestTable
             }
 
             return new Schema(list.stream()
-                    .map(m -> Column.of(String.valueOf(m.get("name")), from((Map<String, Object>) m.get("type"))))
+                    .map(m ->
+                    {
+                        Map<String, Object> metaData = (Map<String, Object>) m.get("metaData");
+                        Column.MetaData md = MapUtils.isEmpty(metaData) ? Column.MetaData.EMPTY
+                                : new Column.MetaData(metaData);
+                        return new Column(String.valueOf(m.get("name")), typeFrom(m.get("type")), md);
+                    })
                     .toList());
         }
     }

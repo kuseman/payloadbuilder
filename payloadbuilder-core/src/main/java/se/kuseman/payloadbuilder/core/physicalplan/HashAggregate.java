@@ -190,7 +190,7 @@ public class HashAggregate implements IPhysicalPlan
         }
 
         IAggregator[] aggregators = null;
-        Schema resultSchema = null;
+        Schema runtimeSchema = null;
         int groupCounter = 0;
         List<? extends IExpression> actualExpressions = null;
         try
@@ -227,9 +227,9 @@ public class HashAggregate implements IPhysicalPlan
                 {
                     // We pick the resulting schema from the first vector
                     // This might be problematic when schema less but a future problem
-                    if (resultSchema == null)
+                    if (runtimeSchema == null)
                     {
-                        resultSchema = vector.getSchema();
+                        runtimeSchema = vector.getSchema();
                     }
 
                     vectorSize = vector.getSchema()
@@ -336,7 +336,7 @@ public class HashAggregate implements IPhysicalPlan
         if (distinct)
         {
             final List<GroupKey> keys = new ArrayList<>(table.keySet());
-            final Schema s = resultSchema;
+            final Schema s = runtimeSchema;
             return new TupleIterator()
             {
                 int index = 0;

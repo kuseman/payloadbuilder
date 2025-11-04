@@ -28,6 +28,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
@@ -401,10 +402,10 @@ public class NestedLoopTest extends AJoinTest
         IDatasource dsOuter = schemaLessDS(() -> outerClosed.incrementAndGet(), TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6))));
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3))));
 
-        IExpression col1 = new ColumnExpression("col1", "col1", ResolvedType.of(Type.Any), null, 0, true, -1, false);
-        IExpression col2 = new ColumnExpression("col2", "col2", ResolvedType.of(Type.Any), null, 1, true, -1, false);
-        IExpression col3 = new ColumnExpression("col3", "col3", ResolvedType.of(Type.Any), null, 0, false, -1, false);
-        IExpression col4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 1, false, -1, false);
+        IExpression col1 = new ColumnExpression("col1", "col1", ResolvedType.of(Type.Any), null, 0, true, -1, CoreColumn.Type.REGULAR);
+        IExpression col2 = new ColumnExpression("col2", "col2", ResolvedType.of(Type.Any), null, 1, true, -1, CoreColumn.Type.REGULAR);
+        IExpression col3 = new ColumnExpression("col3", "col3", ResolvedType.of(Type.Any), null, 0, false, -1, CoreColumn.Type.REGULAR);
+        IExpression col4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 1, false, -1, CoreColumn.Type.REGULAR);
 
         //@formatter:off
         IPhysicalPlan plan = NestedLoop.leftJoin(
@@ -441,11 +442,11 @@ public class NestedLoopTest extends AJoinTest
         Schema expectedSchema = Schema.of(
                 col("col1", ResolvedType.of(Type.Any), table),
                 col("col2", ResolvedType.of(Type.Any), table),
-                col("oCol1", ResolvedType.of(Type.Any), null),
-                col("oCol2", ResolvedType.of(Type.Any), null),
-                col("col3", ResolvedType.of(Type.Any), null),
-                col("col4", ResolvedType.of(Type.Any), null),
-                col("oCalc", ResolvedType.of(Type.Any), null)
+                col("oCol1", ResolvedType.of(Type.Any)),
+                col("oCol2", ResolvedType.of(Type.Any)),
+                col("col3", ResolvedType.of(Type.Any)),
+                col("col4", ResolvedType.of(Type.Any)),
+                col("oCalc", ResolvedType.of(Type.Any))
                 );
         //@formatter:on
 

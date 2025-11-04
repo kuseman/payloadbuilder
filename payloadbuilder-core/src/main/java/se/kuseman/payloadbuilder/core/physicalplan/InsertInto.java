@@ -9,8 +9,10 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
 
 /** Physical plan of an insert into statement. */
@@ -19,6 +21,7 @@ public class InsertInto implements IPhysicalPlan
     private final int nodeId;
     private final List<String> insertColumns;
     private final IPhysicalPlan input;
+    private final boolean hasAsteriskSchemaOrInput;
     private final IDatasink datasink;
 
     public InsertInto(int nodeId, IPhysicalPlan input, List<String> insertColumns, IDatasink datasink)
@@ -27,6 +30,7 @@ public class InsertInto implements IPhysicalPlan
         this.input = requireNonNull(input, "input");
         this.insertColumns = insertColumns;
         this.datasink = requireNonNull(datasink, " datasink");
+        this.hasAsteriskSchemaOrInput = SchemaUtils.isAsterisk(input.getSchema(), true);
     }
 
     @Override
@@ -167,8 +171,15 @@ public class InsertInto implements IPhysicalPlan
                                          + next.getSchema()
                                                  .getColumns());
             }
-
             rowCount += next.getRowCount();
+
+            // Create a proxy vector if the input is asterisk to have a proper schema with meta etc.
+            // that is only known runtime
+            if (hasAsteriskSchemaOrInput)
+            {
+                next = createProxyVector(next);
+            }
+
             return next;
         }
 
@@ -179,6 +190,30 @@ public class InsertInto implements IPhysicalPlan
                 iterator = input.execute(context);
             }
             return iterator;
+        }
+
+        private TupleVector createProxyVector(TupleVector tv)
+        {
+            return new TupleVector()
+            {
+                @Override
+                public Schema getSchema()
+                {
+                    return SchemaUtils.rewriteSchema(tv.getSchema(), (StatementContext) context.getStatementContext());
+                }
+
+                @Override
+                public int getRowCount()
+                {
+                    return tv.getRowCount();
+                }
+
+                @Override
+                public ValueVector getColumn(int column)
+                {
+                    return tv.getColumn(column);
+                }
+            };
         }
     }
 }

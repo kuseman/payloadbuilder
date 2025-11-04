@@ -26,7 +26,7 @@ public class OperatorFunctionScan implements IPhysicalPlan
     private final OperatorFunctionInfo function;
     private final Schema schema;
     private final String catalogAlias;
-    private final boolean schemaIsAsterisk;
+    private final boolean hasAsteriskSchemaOrInput;
 
     public OperatorFunctionScan(int nodeId, IPhysicalPlan input, OperatorFunctionInfo function, String catalogAlias, Schema schema)
     {
@@ -35,7 +35,7 @@ public class OperatorFunctionScan implements IPhysicalPlan
         this.function = requireNonNull(function, "function");
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.schema = requireNonNull(schema, "schema");
-        this.schemaIsAsterisk = SchemaUtils.isAsterisk(schema);
+        this.hasAsteriskSchemaOrInput = SchemaUtils.isAsterisk(schema, true);
         if (schema.getColumns()
                 .size() != 1)
         {
@@ -75,17 +75,38 @@ public class OperatorFunctionScan implements IPhysicalPlan
         ValueVector vv = function.eval(context, catalogAlias, inputVector);
         Schema schema;
         // Recreate the schema from input if planed one was asterisk
-        if (schemaIsAsterisk)
+        if (hasAsteriskSchemaOrInput)
         {
-            schema = Schema.of(CoreColumn.changeProperties(this.schema.getColumns()
-                    .get(0), vv.type()));
+            schema = Schema.of(CoreColumn.Builder.from(this.schema.getColumns()
+                    .get(0))
+                    .withResolvedType(vv.type())
+                    .build());
         }
         else
         {
             schema = this.schema;
         }
 
-        TupleVector result = TupleVector.of(schema, singletonList(vv));
+        TupleVector result = new TupleVector()
+        {
+            @Override
+            public Schema getSchema()
+            {
+                return schema;
+            }
+
+            @Override
+            public int getRowCount()
+            {
+                return vv.size();
+            }
+
+            @Override
+            public ValueVector getColumn(int column)
+            {
+                return vv;
+            }
+        };
         return TupleIterator.singleton(result);
     }
 

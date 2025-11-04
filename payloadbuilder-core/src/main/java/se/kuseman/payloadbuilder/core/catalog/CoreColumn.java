@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core.catalog;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.Objects;
 
@@ -40,14 +41,9 @@ public class CoreColumn extends Column
     /** Internal column that should not be used as output */
     private final boolean internal;
 
-    public CoreColumn(String name, ResolvedType type, String outputName, boolean internal)
+    private CoreColumn(String name, ResolvedType type, MetaData metaData, String outputName, boolean internal, ColumnReference columnReference, Type columnType)
     {
-        this(name, type, outputName, internal, null, Type.REGULAR);
-    }
-
-    public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, ColumnReference columnReference, Type columnType)
-    {
-        super(name, type);
+        super(name, type, metaData);
         this.outputName = Objects.toString(outputName, "");
         this.internal = internal;
         this.columnReference = columnReference;
@@ -113,104 +109,58 @@ public class CoreColumn extends Column
     @Override
     public String toString()
     {
-        return getName() + " ("
-               + (!StringUtils.isBlank(outputName) ? outputName + " "
-                       : "")
-               + getType()
-               + ")";
-    }
+        StringBuilder sb = new StringBuilder(super.toString()).append(", columnType=")
+                .append(columnType);
 
-    /** Construct a {@link CoreColumn} from name and type */
-    public static CoreColumn of(String name, ResolvedType type)
-    {
-        return of(name, type, null);
-    }
-
-    /** Construct a {@link CoreColumn} from name and type */
-    public static CoreColumn of(String name, ResolvedType type, TableSourceReference tableSourceReference)
-    {
-        return of(name, type, tableSourceReference, Type.REGULAR);
-    }
-
-    /** Construct a {@link CoreColumn} from name and type */
-    public static CoreColumn of(String name, ResolvedType type, TableSourceReference tableSourceReference, Type columnType)
-    {
-        ColumnReference cr = null;
-        if (tableSourceReference != null)
+        if (internal)
         {
-            cr = new ColumnReference(name, tableSourceReference);
+            sb.append(", internal");
         }
-        return new CoreColumn(name, type, "", false, cr, columnType);
+        if (!isBlank(outputName))
+        {
+            sb.append(", outputName=")
+                    .append(outputName);
+
+        }
+        if (columnReference != null)
+        {
+            sb.append(", columnReference=")
+                    .append(columnReference);
+        }
+
+        return sb.toString();
     }
 
-    /** Convert provided column to a {@link CoreColumn} and change properties. */
-    public static CoreColumn changeProperties(Column column, TableSourceReference tableSourceReference)
+    /** Convert provided column to a {@link CoreColumn} and change it's {@link TableSourceReference}. */
+    public static CoreColumn changeTableSource(Column column, TableSourceReference tableSourceReference)
     {
-        return changeProperties(column, column.getType(), tableSourceReference);
-    }
-
-    /** Convert provided column to a {@link CoreColumn} and change properties. */
-    public static CoreColumn changeProperties(Column column, ResolvedType type)
-    {
-        return changeProperties(column, type, null);
-    }
-
-    /** Convert provided column to a {@link CoreColumn} and change properties. */
-    public static CoreColumn changeProperties(Column column, ResolvedType type, TableSourceReference tableSourceReference)
-    {
-        boolean internal = false;
-        String outputName = "";
-        Type columnType = Type.REGULAR;
+        requireNonNull(tableSourceReference);
+        Builder builder = Builder.from(column);
         String columnReferenceName = column.getName();
         TableSourceReference columnTableSourceReference = null;
-        if (column instanceof CoreColumn cc)
+        if (builder.columnReference != null)
         {
-            internal = cc.internal;
-            outputName = cc.outputName;
-            columnType = cc.columnType;
-            if (cc.columnReference != null)
-            {
-                columnReferenceName = cc.columnReference.columnName();
-                columnTableSourceReference = cc.columnReference.tableSourceReference();
-            }
+            columnTableSourceReference = builder.columnReference.tableSourceReference();
+            columnReferenceName = builder.columnReference.columnName();
         }
-        ColumnReference cr = null;
-        // Use the columns table source reference if input is null
-        if (tableSourceReference == null)
-        {
-            tableSourceReference = columnTableSourceReference;
-        }
-        // Link the columns table source reference with the input
-        else if (columnTableSourceReference != null)
+        // If there already was a table source connected to input column link it with the provided one
+        if (columnTableSourceReference != null)
         {
             tableSourceReference = tableSourceReference.withParent(columnTableSourceReference);
         }
-
-        if (tableSourceReference != null)
-        {
-            cr = new ColumnReference(columnReferenceName, tableSourceReference);
-        }
-        return new CoreColumn(column.getName(), type, outputName, internal, cr, columnType);
+        return builder.withColumnReference(new ColumnReference(columnReferenceName, tableSourceReference, builder.metaData))
+                .build();
     }
 
-    /** Construct an asterisk column for provided alias and table source. */
-    public static CoreColumn asterisk(String alias, TableSourceReference tableSourceRefernece)
+    /** Construct an asterisk column for provided alias, type and table source. */
+    public static CoreColumn asterisk(String alias, ResolvedType type, TableSourceReference tableSourceReference)
     {
-        return asterisk(alias, ResolvedType.ANY, tableSourceRefernece);
+        requireNonNull(tableSourceReference);
+        ColumnReference cr = new ColumnReference("*", tableSourceReference, Column.MetaData.EMPTY);
+        return new CoreColumn(alias, type, MetaData.EMPTY, "", false, cr, Type.ASTERISK);
     }
 
-    /** Construct an asterisk column for provided alias and table source. */
-    public static CoreColumn asterisk(String alias, ResolvedType type, TableSourceReference tableSourceRefernece)
-    {
-        ColumnReference cr = null;
-        if (tableSourceRefernece != null)
-        {
-            cr = new ColumnReference("*", tableSourceRefernece);
-        }
-        return new CoreColumn(alias, type, "", false, cr, Type.ASTERISK);
-    }
-
-    /** Reference column type */
+    /** Core column type */
     public enum Type
     {
         /**
@@ -218,10 +168,114 @@ public class CoreColumn extends Column
          */
         ASTERISK,
 
+        /** A column that is derived from an {@link #ASTERISK} column. This to distinguish between a regular schema and an asterisk schema but with resolved asterisk columns. */
+        NAMED_ASTERISK,
+
         /** A regular column. */
         REGULAR,
 
         /** A populated column. */
         POPULATED,
+    }
+
+    /** Builder. */
+    public static class Builder
+    {
+        private String name;
+        private ResolvedType resolvedType;
+        private MetaData metaData = MetaData.EMPTY;
+        private ColumnReference columnReference;
+        private String outputName;
+        private boolean internal;
+        private Type columnType = Type.REGULAR;
+
+        private Builder(Column column)
+        {
+            requireNonNull(column);
+            this.name = column.getName();
+            this.resolvedType = column.getType();
+            this.metaData = column.getMetaData();
+
+            if (column instanceof CoreColumn cc)
+            {
+                this.columnReference = cc.columnReference;
+                this.outputName = cc.outputName;
+                this.internal = cc.internal;
+                this.columnType = cc.columnType;
+                if (cc.columnReference != null)
+                {
+                    this.metaData = cc.columnReference.metaData();
+                }
+            }
+        }
+
+        private Builder(String name, ResolvedType type)
+        {
+            this.name = requireNonNull(name);
+            this.resolvedType = requireNonNull(type);
+        }
+
+        public static Builder from(Column column)
+        {
+            return new Builder(column);
+        }
+
+        public static Builder from(String name, ResolvedType type)
+        {
+            return new Builder(name, type);
+        }
+
+        public Builder withName(String newName)
+        {
+            this.name = requireNonNull(newName);
+            return this;
+        }
+
+        public Builder withResolvedType(ResolvedType resolvedType)
+        {
+            this.resolvedType = requireNonNull(resolvedType);
+            return this;
+        }
+
+        public Builder withMetaData(MetaData metaData)
+        {
+            this.metaData = requireNonNull(metaData);
+            return this;
+        }
+
+        // CSOFF
+        public Builder withColumnReference(ColumnReference columnReference)
+        // CSON
+        {
+            if (columnReference != null)
+            {
+                this.metaData = columnReference.metaData();
+            }
+            this.columnReference = columnReference;
+            return this;
+        }
+
+        public Builder withOutputName(String outputName)
+        {
+            this.outputName = outputName;
+            return this;
+        }
+
+        public Builder withInternal(boolean internal)
+        {
+            this.internal = internal;
+            return this;
+        }
+
+        public Builder withColumnType(Type columnType)
+        {
+            this.columnType = columnType;
+            return this;
+        }
+
+        public CoreColumn build()
+        {
+            return new CoreColumn(name, resolvedType, metaData, outputName, internal, columnReference, columnType);
+        }
     }
 }

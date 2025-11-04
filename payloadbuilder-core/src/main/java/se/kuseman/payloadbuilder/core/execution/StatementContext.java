@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
 import se.kuseman.payloadbuilder.api.execution.IStatementContext;
@@ -53,6 +54,11 @@ public class StatementContext implements IStatementContext
     /** Cache of seeks keys for index seek predicate. Used to avoid multiple calculations if called twice. */
     private Map<Integer, List<ISeekPredicate.ISeekKey>> indexSeekKeysByTableSourceReferenceId;
 
+    /**
+     * Schema returned by catalogs at runtime. Used to rewrite schemas in various places to get correct meta data etc. that is only known at runtime.
+     */
+    private Map<Integer, Schema> runtimeSchemaByTableSourceReferenceId;
+
     public StatementContext()
     {
         nodeDataById = new ConcurrentHashMap<>();
@@ -90,6 +96,7 @@ public class StatementContext implements IStatementContext
         nodeDataById.clear();
         indexSeekTupleVector = null;
         indexSeekKeysByTableSourceReferenceId = null;
+        runtimeSchemaByTableSourceReferenceId = null;
     }
 
     public Map<Integer, ? extends NodeData> getNodeData()
@@ -174,7 +181,7 @@ public class StatementContext implements IStatementContext
     {
         if (indexSeekKeysByTableSourceReferenceId == null)
         {
-            indexSeekKeysByTableSourceReferenceId = new HashMap<>();
+            return null;
         }
         return indexSeekKeysByTableSourceReferenceId.get(tableSourceReferenceId);
     }
@@ -187,6 +194,26 @@ public class StatementContext implements IStatementContext
             this.indexSeekKeysByTableSourceReferenceId = new HashMap<>();
         }
         indexSeekKeysByTableSourceReferenceId.put(tableSourceReferenceId, indexSeekKeys);
+    }
+
+    /** Get schema for provided table source reference id. */
+    public Schema getRuntimeSchema(int tableSourceReferenceId)
+    {
+        if (runtimeSchemaByTableSourceReferenceId == null)
+        {
+            return Schema.EMPTY;
+        }
+        return runtimeSchemaByTableSourceReferenceId.getOrDefault(tableSourceReferenceId, Schema.EMPTY);
+    }
+
+    /** Set runtime schema for provided table source reference. */
+    public void setRuntimeSchema(int tableSourceReferenceId, Schema schema)
+    {
+        if (runtimeSchemaByTableSourceReferenceId == null)
+        {
+            runtimeSchemaByTableSourceReferenceId = new HashMap<>();
+        }
+        runtimeSchemaByTableSourceReferenceId.put(tableSourceReferenceId, schema);
     }
 
     /**

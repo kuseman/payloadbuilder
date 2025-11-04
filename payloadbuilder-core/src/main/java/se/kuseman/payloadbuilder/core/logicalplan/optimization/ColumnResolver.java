@@ -502,7 +502,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Empty schema => create an asterisk column with the table source
         if (Schema.EMPTY.equals(schema))
         {
-            originalSchema = schema = Schema.of(CoreColumn.asterisk(plan.getAlias(), tableSource));
+            originalSchema = schema = Schema.of(CoreColumn.asterisk(plan.getAlias(), ResolvedType.ANY, tableSource));
         }
         else
         {
@@ -629,7 +629,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Create an asterisk column with the table source ref if no schema was provided.
         if (Schema.EMPTY.equals(schema))
         {
-            originalSchema = schema = Schema.of(CoreColumn.asterisk(plan.getAlias(), tableSource));
+            originalSchema = schema = Schema.of(CoreColumn.asterisk(plan.getAlias(), ResolvedType.ANY, tableSource));
         }
         else
         {
@@ -666,15 +666,24 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         String name = planColumn.getName();
         boolean isInternal = SchemaUtils.isInternal(planColumn);
 
-        Column resolvedColumn = context.getSchema(input)
-                .getSchema()
-                .getColumns()
-                .get(0);
-        CoreColumn.Type columnType = SchemaUtils.getColumnType(resolvedColumn);
+        ResolvedType type = pair.getValue()
+                .getType(input.getSchema());
+
+        // If the function type has a sub schema which is asterisk then we treat this column as asterisk
+        // to easier detect if a schema is asterisk without the need to dig into the sub schema
+        CoreColumn.Type columnType = CoreColumn.Type.REGULAR;
+        if (type.getSchema() != null
+                && SchemaUtils.isAsterisk(type.getSchema(), true))
+        {
+            columnType = CoreColumn.Type.ASTERISK;
+        }
+
         // Recreate the operator schema
         // Use type from the resolved input and name from the plans schema
-        Schema schema = Schema.of(new CoreColumn(name, pair.getValue()
-                .getType(input.getSchema()), "", isInternal, null, columnType));
+        Schema schema = Schema.of(CoreColumn.Builder.from(name, type)
+                .withColumnType(columnType)
+                .withInternal(isInternal)
+                .build());
 
         context.planSchema.push(new ResolveSchema(schema));
         return new OperatorFunctionScan(schema, input, plan.getCatalogAlias(), plan.getFunction(), plan.getLocation());
@@ -1011,7 +1020,6 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                                 .getType()
                                 .getSchema();
                     }
-
                     TableSourceReference tableSource = SchemaUtils.getTableSource(schema);
                     context.outerReferences.add(CoreColumn.asterisk(alias, ResolvedType.table(schema), tableSource));
                 }
@@ -1490,7 +1498,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
 
             if (populatedMatch)
             {
-                builder.withPopulated(true);
+                builder.withColumnType(CoreColumn.Type.POPULATED);
             }
 
             // If column did not have a table source use the one from schema (sub query)
@@ -1507,19 +1515,25 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                         : null;
                 if (cr == null)
                 {
-                    cr = new ColumnReference(resolvedColumnName, tableRef);
+                    cr = new ColumnReference(resolvedColumnName, tableRef, match.getMetaData());
                 }
 
                 // Switch asterisk to regular upon match
                 if (columnType == CoreColumn.Type.ASTERISK)
                 {
-                    columnType = CoreColumn.Type.REGULAR;
+                    columnType = CoreColumn.Type.NAMED_ASTERISK;
                     // Always create a new column reference when going from asterisk to regular
-                    cr = new ColumnReference(resolvedColumnName, tableRef);
+                    cr = new ColumnReference(resolvedColumnName, tableRef, match.getMetaData());
                 }
 
-                match = new CoreColumn(resolvedColumnName, match.getType(), "", false, cr, columnType);
-                builder.withColumnReference(cr);
+                match = CoreColumn.Builder.from(resolvedColumnName, match.getType())
+                        .withMetaData(match.getMetaData())
+                        .withColumnReference(cr)
+                        .withColumnType(columnType)
+                        .build();
+
+                builder.withColumnType(columnType)
+                        .withColumnReference(cr);
             }
 
             // Add column to outer references and set outer reference to column builder
