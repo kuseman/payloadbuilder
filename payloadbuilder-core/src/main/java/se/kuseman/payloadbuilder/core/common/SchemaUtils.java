@@ -27,7 +27,7 @@ import se.kuseman.payloadbuilder.core.expression.HasAlias.Alias;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
 /** Utils when working with {@link Schema}' */
-public class SchemaUtils
+public final class SchemaUtils
 {
     /** Create a join schema from two provided schemas */
     public static Schema joinSchema(Schema outer, Schema inner)
@@ -314,14 +314,12 @@ public class SchemaUtils
                     : expression.getType();
         }
         TableSourceReference tableSourceReference = null;
-        CoreColumn.Type columnType = isAsteriskExpression(expression) ? CoreColumn.Type.ASTERISK
-                : CoreColumn.Type.REGULAR;
+        CoreColumn.Type columnType = getColumnType(expression);
 
         ColumnReference cr = getColumnReference(expression);
         if (cr != null)
         {
             tableSourceReference = cr.tableSourceReference();
-            columnType = cr.columnType();
         }
         if (tableSourceReference == null)
         {
@@ -349,23 +347,48 @@ public class SchemaUtils
         {
             return new ColumnReference("*", ae.getTableSourceReferences()
                     .iterator()
-                    .next(), CoreColumn.Type.ASTERISK);
+                    .next());
         }
         else if (e instanceof ColumnExpression ce)
         {
             return ce.getColumnReference();
         }
-        else if (e instanceof DereferenceExpression de)
+        // Deref on a populated column expression => return the column expression reference but with the de-refs right part
+        else if (e instanceof DereferenceExpression de
+                && de.getExpression() instanceof ColumnExpression ce
+                && ce.isPopulated()
+                && ce.getColumnReference() != null)
         {
-            return de.getColumnReference();
+            return new ColumnReference(de.getRight(), ce.getColumnReference()
+                    .tableSourceReference());
         }
         return null;
     }
 
-    private static boolean isAsteriskExpression(IExpression expression)
+    // CSOFF
+    private static CoreColumn.Type getColumnType(IExpression e)
+    // CSON
     {
-        return expression instanceof AsteriskExpression
-                || expression instanceof AggregateWrapperExpression awe
-                        && awe.getExpression() instanceof AsteriskExpression;
+        // Unwrap nested expressions
+        if (e instanceof AggregateWrapperExpression awe)
+        {
+            e = awe.getExpression();
+        }
+        if (e instanceof AliasExpression ae)
+        {
+            e = ae.getExpression();
+        }
+
+        if (e instanceof AsteriskExpression)
+        {
+            return CoreColumn.Type.ASTERISK;
+        }
+        else if (e instanceof ColumnExpression ce
+                && ce.isPopulated())
+        {
+            return CoreColumn.Type.POPULATED;
+        }
+
+        return CoreColumn.Type.REGULAR;
     }
 }

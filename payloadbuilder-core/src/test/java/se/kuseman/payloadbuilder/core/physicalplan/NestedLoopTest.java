@@ -401,10 +401,10 @@ public class NestedLoopTest extends AJoinTest
         IDatasource dsOuter = schemaLessDS(() -> outerClosed.incrementAndGet(), TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6))));
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3))));
 
-        IExpression col1 = new ColumnExpression("col1", "col1", ResolvedType.of(Type.Any), null, 0, true, -1);
-        IExpression col2 = new ColumnExpression("col2", "col2", ResolvedType.of(Type.Any), null, 1, true, -1);
-        IExpression col3 = new ColumnExpression("col3", "col3", ResolvedType.of(Type.Any), null, 0, false, -1);
-        IExpression col4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 1, false, -1);
+        IExpression col1 = new ColumnExpression("col1", "col1", ResolvedType.of(Type.Any), null, 0, true, -1, false);
+        IExpression col2 = new ColumnExpression("col2", "col2", ResolvedType.of(Type.Any), null, 1, true, -1, false);
+        IExpression col3 = new ColumnExpression("col3", "col3", ResolvedType.of(Type.Any), null, 0, false, -1, false);
+        IExpression col4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 1, false, -1, false);
 
         //@formatter:off
         IPhysicalPlan plan = NestedLoop.leftJoin(

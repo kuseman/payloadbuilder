@@ -29,7 +29,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
     {
         TableSourceReference tableSource = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t");
         ColumnExpression.Builder.of("col", ResolvedType.of(Type.Any))
-                .withColumnReference(new ColumnReference("col", tableSource, CoreColumn.Type.REGULAR))
+                .withColumnReference(new ColumnReference("col", tableSource))
                 .build();
     }
 

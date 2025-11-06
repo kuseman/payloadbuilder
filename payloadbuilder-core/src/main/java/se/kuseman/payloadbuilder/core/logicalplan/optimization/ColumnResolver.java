@@ -1478,6 +1478,11 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 builder.withColumn(resolvedColumnName);
             }
 
+            if (populatedMatch)
+            {
+                builder.withPopulated(true);
+            }
+
             // If column did not have a table source use the one from schema (sub query)
             if (tableRef == null)
             {
@@ -1495,7 +1500,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 }
 
                 match = new CoreColumn(resolvedColumnName, match.getType(), "", false, tableRef, columnType);
-                builder.withColumnReference(new ColumnReference(resolvedColumnName, tableRef, columnType));
+                builder.withColumnReference(new ColumnReference(resolvedColumnName, tableRef));
             }
 
             // Add column to outer references and set outer reference to column builder

@@ -111,7 +111,8 @@ public abstract class AExpressionTest extends Assert
         }
         return ColumnExpression.Builder.of(alias, type)
                 .withOrdinal(ordinal)
-                .withColumnReference(new ColumnReference(alias, tr, columnType))
+                .withColumnReference(new ColumnReference(alias, tr))
+                .withPopulated(columnType == CoreColumn.Type.POPULATED)
                 .build();
     }
 
@@ -126,7 +127,8 @@ public abstract class AExpressionTest extends Assert
     {
         return ColumnExpression.Builder.of(alias, type)
                 .withColumn(column)
-                .withColumnReference(new ColumnReference(alias, tr, columnType))
+                .withColumnReference(new ColumnReference(alias, tr))
+                .withPopulated(columnType == CoreColumn.Type.POPULATED)
                 .build();
     }
 
@@ -153,7 +155,8 @@ public abstract class AExpressionTest extends Assert
     {
         return ColumnExpression.Builder.of(column, type)
                 .withColumn(column)
-                .withColumnReference(new ColumnReference(column, tr, columnType))
+                .withColumnReference(new ColumnReference(column, tr))
+                .withPopulated(columnType == CoreColumn.Type.POPULATED)
                 .build();
     }
 
@@ -198,11 +201,7 @@ public abstract class AExpressionTest extends Assert
     /** Create an {@link ColumnExpression} with type, no ordinal and outer reference */
     protected ColumnExpression ocre(String column, TableSourceReference tr, ResolvedType type, CoreColumn.Type columnType)
     {
-        return ColumnExpression.Builder.of(column, type)
-                .withColumnReference(new ColumnReference(column, tr, columnType))
-                .withColumn(column)
-                .withOuterReference(true)
-                .build();
+        return ocre(column, tr, column, type, columnType);
     }
 
     /** Create an {@link ColumnExpression} with ordinal and outer reference */
@@ -220,8 +219,9 @@ public abstract class AExpressionTest extends Assert
         }
         return ColumnExpression.Builder.of(alias, type)
                 .withOuterReference(true)
-                .withColumnReference(new ColumnReference(alias, tr, columnType))
+                .withColumnReference(new ColumnReference(alias, tr))
                 .withOrdinal(ordinal)
+                .withPopulated(columnType == CoreColumn.Type.POPULATED)
                 .build();
     }
 
@@ -230,8 +230,9 @@ public abstract class AExpressionTest extends Assert
     {
         return ColumnExpression.Builder.of(alias, type)
                 .withOuterReference(true)
-                .withColumnReference(new ColumnReference(column, tr, columnType))
+                .withColumnReference(new ColumnReference(column, tr))
                 .withColumn(column)
+                .withPopulated(columnType == CoreColumn.Type.POPULATED)
                 .build();
     }
 

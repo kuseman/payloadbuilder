@@ -47,6 +47,10 @@ public class ColumnExpression implements IColumnExpression, HasAlias
 
     /** Column reference of expression. */
     private final ColumnReference columnReference;
+
+    /** FLag that indicates that this expression is resolved to a populated column. */
+    private final boolean populated;
+
     /**
      * Flag that indicates that this expression should resolve it's value from the outer reference in context and not by the input. This is a column in a correlated sub query.
      */
@@ -65,7 +69,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias
     private final int lambdaId;
 
     /** Create a column reference expression. */
-    public ColumnExpression(String alias, String column, ResolvedType type, ColumnReference columnReference, int ordinal, boolean outerReference, int lambdaId)
+    public ColumnExpression(String alias, String column, ResolvedType type, ColumnReference columnReference, int ordinal, boolean outerReference, int lambdaId, boolean populated)
     {
         this.alias = requireNonNull(alias, "alias");
         this.column = column;
@@ -74,7 +78,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias
         this.outerReference = outerReference;
         this.ordinal = ordinal;
         this.lambdaId = lambdaId;
-
+        this.populated = populated;
         // Allowed states:
         // - lambdaId
         // - ordinal
@@ -91,7 +95,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias
     /** Copy column expression but change the ordinal */
     public ColumnExpression(ColumnExpression source, int ordinal)
     {
-        this(source.alias, source.column, source.resolvedType, source.columnReference, ordinal, source.outerReference, source.lambdaId);
+        this(source.alias, source.column, source.resolvedType, source.columnReference, ordinal, source.outerReference, source.lambdaId, source.populated);
     }
 
     @Override
@@ -116,6 +120,11 @@ public class ColumnExpression implements IColumnExpression, HasAlias
     public boolean isOuterReference()
     {
         return outerReference;
+    }
+
+    public boolean isPopulated()
+    {
+        return populated;
     }
 
     public ColumnReference getColumnReference()
@@ -263,7 +272,8 @@ public class ColumnExpression implements IColumnExpression, HasAlias
                     && ordinal == that.ordinal
                     && outerReference == that.outerReference
                     && lambdaId == that.lambdaId
-                    && resolvedType.equals(that.resolvedType);
+                    && resolvedType.equals(that.resolvedType)
+                    && populated == that.populated;
         }
         return false;
     }
@@ -313,12 +323,14 @@ public class ColumnExpression implements IColumnExpression, HasAlias
         {
             sb.append(" outer=true");
         }
+        if (populated)
+        {
+            sb.append(" populated=true");
+        }
         if (columnReference != null)
         {
-            sb.append(" table=")
-                    .append(columnReference.tableSourceReference())
-                    .append(", columnType=")
-                    .append(columnReference.columnType());
+            sb.append(" columnReference=")
+                    .append(columnReference);
         }
 
         if (hasOptions)
@@ -338,6 +350,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias
         private boolean outerReference;
         private int ordinal = -1;
         private int lambdaId = -1;
+        private boolean populated;
 
         private Builder(String alias, ResolvedType type)
         {
@@ -380,9 +393,15 @@ public class ColumnExpression implements IColumnExpression, HasAlias
             return this;
         }
 
+        public Builder withPopulated(boolean populated)
+        {
+            this.populated = populated;
+            return this;
+        }
+
         public ColumnExpression build()
         {
-            return new ColumnExpression(alias, column, resolvedType, columnReference, ordinal, outerReference, lambdaId);
+            return new ColumnExpression(alias, column, resolvedType, columnReference, ordinal, outerReference, lambdaId, populated);
         }
 
         @Override

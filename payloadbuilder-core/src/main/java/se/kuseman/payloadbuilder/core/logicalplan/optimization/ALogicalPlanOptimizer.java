@@ -22,7 +22,6 @@ import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
-import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ALogicalPlanVisitor;
@@ -543,7 +542,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         return columns;
     }
 
-    protected record ColumnReferenceExtractorResult(IExpression expression, ColumnReference columnReference)
+    protected record ColumnReferenceExtractorResult(IExpression expression, ColumnReference columnReference, String columnName)
     {
     }
 
@@ -562,25 +561,28 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         public Void visit(IColumnExpression expression, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
         {
             ColumnExpression ce = (ColumnExpression) expression;
-            add(ce, ce.getColumnReference(), context);
+            add(ce, ce.getColumnReference(), ce.getAlias()
+                    .getAlias(), context);
             return null;
         }
 
         @Override
         public Void visit(IDereferenceExpression expression, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
         {
-            // If there is a column reference of the dereference then use that one else
-            // traverse
-            ColumnReference cr = ((DereferenceExpression) expression).getColumnReference();
-            if (cr != null)
+            // A dereference of a populated column then add the right part as column name since that is the actual column
+            // of the table source
+            if (expression.getExpression() instanceof ColumnExpression ce
+                    && ce.isPopulated()
+                    && ce.getColumnReference() != null)
             {
-                add(expression, cr, context);
+                add(expression, ce.getColumnReference(), expression.getRight(), context);
                 return null;
             }
+
             return super.visit(expression, context);
         }
 
-        private void add(IExpression expression, ColumnReference colRef, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
+        private void add(IExpression expression, ColumnReference colRef, String column, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
         {
             TableSourceReference tableRef = null;
             if (colRef != null)
@@ -590,7 +592,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
             if (tableRef != null)
             {
                 context.computeIfAbsent(tableRef, k -> new HashSet<>())
-                        .add(new ColumnReferenceExtractorResult(expression, colRef));
+                        .add(new ColumnReferenceExtractorResult(expression, colRef, column));
             }
         }
     }

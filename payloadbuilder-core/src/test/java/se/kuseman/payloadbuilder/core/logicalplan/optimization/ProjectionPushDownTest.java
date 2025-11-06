@@ -17,7 +17,6 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
@@ -74,10 +73,8 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                         null,
                         false,
                         Schema.EMPTY),
-                    List.of(new DereferenceExpression(cre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED), "col2", -1, ResolvedType.array(Type.Any),
-                                new ColumnReference("col2", tableB, CoreColumn.Type.REGULAR)),
-                            new DereferenceExpression(cre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED), "col3", -1, ResolvedType.array(Type.Any),
-                                new ColumnReference("col3", tableB, CoreColumn.Type.REGULAR)))
+                    List.of(new DereferenceExpression(cre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED), "col2", -1, ResolvedType.array(Type.Any)),
+                            new DereferenceExpression(cre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED), "col3", -1, ResolvedType.array(Type.Any)))
                 );
         //@formatter:on
         Assertions.assertThat(actual)
