@@ -19,11 +19,11 @@ import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn.Type;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
+import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 
@@ -163,8 +163,8 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
 
                 // Populated column should not be projected since they are not real columns
                 // But instead go into the populated schema and add those columns if they are static
-                if (ce.columnReference()
-                        .columnType() == Type.POPULATED)
+                if (ce.expression() instanceof ColumnExpression cexp
+                        && cexp.isPopulated())
                 {
                     Schema schema = null;
                     if (ce.expression()
@@ -196,9 +196,7 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
                     continue;
                 }
 
-                String column = ce.columnReference()
-                        .name();
-                appendColumn(tableSource, column, context);
+                appendColumn(tableSource, ce.columnName(), context);
             }
         }
 

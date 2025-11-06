@@ -21,7 +21,8 @@ public class CoreColumn extends Column
     private final Type columnType;
 
     /**
-     * Name of the column when written to output. Some columns are generated during planning and have a auto generated schema name ({@link #name} but a different name when written to output.
+     * Name of the column when written to output. Some columns are generated during planning and have a auto generated schema name ({@link Column#getName()}) but a different name when written to
+     * output.
      * 
      * <pre>
      * For example

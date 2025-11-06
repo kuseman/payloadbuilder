@@ -204,7 +204,7 @@ public class ProjectionTest extends APhysicalPlanTest
 
         IExpression col1 = ce("col1");
         IExpression col3 = ce("col3");
-        IExpression ocol4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 0, true, -1)
+        IExpression ocol4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 0, true, -1, false)
         {
             @Override
             public ValueVector eval(TupleVector input, IExecutionContext context)

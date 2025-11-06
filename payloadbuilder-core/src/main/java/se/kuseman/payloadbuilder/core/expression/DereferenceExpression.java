@@ -19,9 +19,6 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
-import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.parser.Location;
@@ -34,7 +31,6 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
     private final String right;
     private final int ordinal;
     private final ResolvedType resolvedType;
-    private final ColumnReference columnReference;
 
     /** Unresolved ctor */
     public DereferenceExpression(IExpression left, String right)
@@ -43,23 +39,15 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
         this.right = requireNonNull(right, "right");
         this.ordinal = -1;
         this.resolvedType = null;
-        this.columnReference = null;
     }
 
     /** Resolved ctor */
     public DereferenceExpression(IExpression left, String right, int ordinal, ResolvedType resolvedType)
     {
-        this(left, right, ordinal, resolvedType, null);
-    }
-
-    /** Resolved ctor */
-    public DereferenceExpression(IExpression left, String right, int ordinal, ResolvedType resolvedType, ColumnReference columnReference)
-    {
         this.left = requireNonNull(left, "left");
         this.right = requireNonNull(right, "right");
         this.ordinal = ordinal;
         this.resolvedType = requireNonNull(resolvedType);
-        this.columnReference = columnReference;
     }
 
     @Override
@@ -95,16 +83,6 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
     public List<IExpression> getChildren()
     {
         return List.of(left);
-    }
-
-    /** Get column reference from this dereference. */
-    public ColumnReference getColumnReference()
-    {
-        if (columnReference != null)
-        {
-            return columnReference;
-        }
-        return null;
     }
 
     @Override
@@ -285,9 +263,8 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
         {
             return true;
         }
-        else if (obj instanceof DereferenceExpression)
+        else if (obj instanceof DereferenceExpression that)
         {
-            DereferenceExpression that = (DereferenceExpression) obj;
             return left.equals(that.left)
                     && right.equals(that.right)
                     && Objects.equals(resolvedType, that.resolvedType)
@@ -316,25 +293,6 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
     /** Create a resolved dereference expression. NOTE! Requires that expression is resolved */
     public static IExpression create(IExpression expression, QualifiedName qname, Location location)
     {
-        ColumnReference inputColRef = null;
-        boolean columnReferenceSet = false;
-        // If we are dereferencing a column expression with a column reference that means
-        // we are targeting a nested property like a map etc. and then we should not add another column reference
-        // on resulting deref.
-        if (expression instanceof ColumnExpression ce
-                && ce.getColumnReference() != null)
-        {
-            ColumnReference cf = ce.getColumnReference();
-            // If the dereferenced expression is of populated type then we need to change the column type
-            // of the dereference to a regular type since it's not going to be populated any more
-            // Also pick the first part of the qname since that is the actual column name
-            if (cf.columnType() == CoreColumn.Type.POPULATED)
-            {
-                inputColRef = new ColumnReference(qname.getFirst(), cf.tableSourceReference(), CoreColumn.Type.REGULAR);
-            }
-            columnReferenceSet = true;
-        }
-
         IExpression result = expression;
         // Create nested dereference for all parts in qname
         int size = qname.size();
@@ -344,32 +302,19 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
                     .get(i);
 
             ResolveResult resolveResult = resolvePart(part, result.getType(), location);
-            ColumnReference colRef = resolveResult.ref;
-            // We only set column reference once for each dereference chain
-            if (columnReferenceSet)
-            {
-                colRef = inputColRef;
-                inputColRef = null;
-            }
-            else if (colRef != null)
-            {
-                columnReferenceSet = true;
-            }
-
-            result = new DereferenceExpression(result, part, resolveResult.ordinal, resolveResult.resolvedType, colRef);
+            result = new DereferenceExpression(result, part, resolveResult.ordinal, resolveResult.resolvedType);
         }
 
         return result;
     }
 
-    record ResolveResult(ColumnReference ref, int ordinal, ResolvedType resolvedType)
+    record ResolveResult(int ordinal, ResolvedType resolvedType)
     {
     }
 
     private static ResolveResult resolvePart(String part, ResolvedType type, Location location)
     {
         int ordinal = -1;
-        ColumnReference colRef = null;
         ResolvedType resolvedType = ResolvedType.of(Type.Any);
 
         if (type.getType() == Type.Table
@@ -379,41 +324,20 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
             ordinal = pair.getValue();
             if (pair.getKey() != null)
             {
-                Column column = pair.getKey();
                 // If table then wrap type in an array
                 resolvedType = type.getType() == Type.Table ? ResolvedType.array(pair.getKey()
                         .getType())
                         : pair.getKey()
                                 .getType();
-
-                TableSourceReference tableSource = SchemaUtils.getTableSource(pair.getKey());
-                if (tableSource != null)
-                {
-                    colRef = new ColumnReference(column.getName(), tableSource, SchemaUtils.getColumnType(column));
-                }
             }
             else
             {
                 // If table then wrap type in an array
                 resolvedType = type.getType() == Type.Table ? ResolvedType.array(resolvedType)
                         : resolvedType;
-                // Asterisk schema, pick the column reference from the first column
-                if (type.getSchema()
-                        .getSize() == 1
-                        && SchemaUtils.isAsterisk(type.getSchema()))
-                {
-                    Column column = type.getSchema()
-                            .getColumns()
-                            .get(0);
-                    TableSourceReference tableSource = SchemaUtils.getTableSource(column);
-                    if (tableSource != null)
-                    {
-                        colRef = new ColumnReference(column.getName(), tableSource, SchemaUtils.getColumnType(column));
-                    }
-                }
             }
         }
 
-        return new ResolveResult(colRef, ordinal, resolvedType);
+        return new ResolveResult(ordinal, resolvedType);
     }
 }
