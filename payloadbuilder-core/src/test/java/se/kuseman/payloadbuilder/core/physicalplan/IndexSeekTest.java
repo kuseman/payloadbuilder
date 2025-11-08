@@ -25,7 +25,6 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
@@ -78,7 +77,7 @@ public class IndexSeekTest extends APhysicalPlanTest
 
         assertTrue(it.hasNext());
 
-        TupleVector tv1Expected = TupleVector.of(Schema.of(CoreColumn.of("col1", ResolvedType.of(Type.Int), tsf)), List.of(VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
+        TupleVector tv1Expected = TupleVector.of(Schema.of(col("col1", ResolvedType.of(Type.Int), tsf)), List.of(VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
         VectorTestUtils.assertTupleVectorsEquals(tv1Expected, it.next());
 
         assertFalse(it.hasNext());
@@ -118,7 +117,7 @@ public class IndexSeekTest extends APhysicalPlanTest
         assertEquals(3, it.estimatedBatchCount());
         assertEquals(5, it.estimatedRowCount());
 
-        Schema expectedSchema = Schema.of(CoreColumn.of("col1", ResolvedType.of(Type.Int), tsf));
+        Schema expectedSchema = Schema.of(col("col1", ResolvedType.of(Type.Int), tsf));
 
         //@formatter:off
         List<TupleVector> expectedVectors = List.of(
@@ -203,7 +202,7 @@ public class IndexSeekTest extends APhysicalPlanTest
     {
         TableSourceReference tsf = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tbl"), "t");
 
-        Schema schema = Schema.of(CoreColumn.of("col1", ResolvedType.of(Type.Int), tsf));
+        Schema schema = Schema.of(col("col1", ResolvedType.of(Type.Int), tsf));
         AtomicInteger closedCount = new AtomicInteger(0);
         IDatasource ds = schemaLessDS(() -> closedCount.incrementAndGet(), ctx ->
         {

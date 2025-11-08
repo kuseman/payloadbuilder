@@ -16,7 +16,6 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
@@ -178,7 +177,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
         TableSourceReference tableSource = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "a");
         TableSourceReference tableSourceB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
         e = cre("col", tableSourceB, ResolvedType.of(Type.Int));
-        tv = TupleVector.of(Schema.of(CoreColumn.of("col", ResolvedType.of(Type.Int), tableSource)), asList(vv(Type.Int, 0, 0)));
+        tv = TupleVector.of(Schema.of(col("col", ResolvedType.of(Type.Int), tableSource)), asList(vv(Type.Int, 0, 0)));
 
         assertEquals("col", e.getAlias()
                 .getAlias());
@@ -197,14 +196,14 @@ public class ColumnExpressionTest extends APhysicalPlanTest
         assertVectorsEquals(ValueVector.literalNull(ResolvedType.of(Type.Any), 2), actual);
 
         // Matching table source, non matching column
-        tv = TupleVector.of(Schema.of(CoreColumn.of("col2", ResolvedType.of(Type.Int), tableSourceB)), asList(vv(Type.Int, 0, 0)));
+        tv = TupleVector.of(Schema.of(col("col2", ResolvedType.of(Type.Int), tableSourceB)), asList(vv(Type.Int, 0, 0)));
         assertEquals(Type.Int, e.getType()
                 .getType());
         actual = e.eval(tv, context);
         assertVectorsEquals(ValueVector.literalNull(ResolvedType.of(Type.Any), 2), actual);
 
         // Matching table source
-        tv = TupleVector.of(Schema.of(CoreColumn.of("col", ResolvedType.of(Type.Int), tableSourceB)), asList(vv(Type.Int, 0, 0)));
+        tv = TupleVector.of(Schema.of(col("col", ResolvedType.of(Type.Int), tableSourceB)), asList(vv(Type.Int, 0, 0)));
         assertEquals(Type.Int, e.getType()
                 .getType());
         actual = e.eval(tv, context);
@@ -237,7 +236,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
          */
 
         Schema innerSchema = Schema.of(col("b", Type.Int));
-        Schema schema = Schema.of(new CoreColumn("col", ResolvedType.table(innerSchema), "", false, tableSource, CoreColumn.Type.REGULAR));
+        Schema schema = Schema.of(col("col", ResolvedType.table(innerSchema), tableSource));
 
         // Test nested tuple vector, this will return a vector of value vectors
         e = cre("col", tableSource, ResolvedType.array(Type.Any));
@@ -254,7 +253,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
 
         // Test nested map
         //@formatter:off
-        actual = e.eval(TupleVector.of(Schema.of(new CoreColumn("col", ResolvedType.of(Type.Any), "", false, tableSource, CoreColumn.Type.REGULAR)), asList(
+        actual = e.eval(TupleVector.of(Schema.of(col("col", ResolvedType.of(Type.Any), tableSource)), asList(
                 vv(Type.Any, ofEntries(entry("b", 123)), null, ofEntries(entry("b", 456))))), context);
         //@formatter:on
         assertEquals(ResolvedType.of(Type.Any), actual.type());

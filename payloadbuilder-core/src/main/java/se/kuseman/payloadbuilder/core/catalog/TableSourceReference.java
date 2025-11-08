@@ -67,10 +67,18 @@ public class TableSourceReference
     /** Create a new instance with a link to provided parent table source reference. */
     public TableSourceReference withParent(TableSourceReference parent)
     {
+        // Parent is the same as this
         if (requireNonNull(parent).getId() == id)
         {
             return this;
         }
+        // This parent is already the input parent
+        else if (this.parent != null
+                && this.parent.id == parent.id)
+        {
+            return this;
+        }
+
         return new TableSourceReference(id, type, catalogAlias, name, alias, parent);
     }
 

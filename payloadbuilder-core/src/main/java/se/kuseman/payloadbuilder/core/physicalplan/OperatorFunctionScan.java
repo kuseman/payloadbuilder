@@ -14,6 +14,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 
@@ -76,7 +77,7 @@ public class OperatorFunctionScan implements IPhysicalPlan
         // Recreate the schema from input if planed one was asterisk
         if (schemaIsAsterisk)
         {
-            schema = Schema.of(SchemaUtils.changeType(this.schema.getColumns()
+            schema = Schema.of(CoreColumn.changeProperties(this.schema.getColumns()
                     .get(0), vv.type()));
         }
         else

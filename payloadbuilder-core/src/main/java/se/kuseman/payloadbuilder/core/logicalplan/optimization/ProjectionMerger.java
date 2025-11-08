@@ -12,8 +12,8 @@ import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
 import se.kuseman.payloadbuilder.core.expression.HasAlias.Alias;
 
-/** Class that merges two projects that is nested. */
-public class ProjectionMerger
+/** Class that merges two projections that is nested. */
+public final class ProjectionMerger
 {
     private ProjectionMerger()
     {

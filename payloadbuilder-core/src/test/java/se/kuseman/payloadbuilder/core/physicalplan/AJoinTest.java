@@ -26,7 +26,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
 import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
@@ -43,8 +42,8 @@ public abstract class AJoinTest extends APhysicalPlanTest
     /** Create a physical plan to test for left join implementations */
     abstract IPhysicalPlan createLeftJoin(IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> predicate, String populateAlias);
 
-    protected Schema outerSchema = Schema.of(col("col1", ResolvedType.of(Type.Any), table), CoreColumn.of("col2", ResolvedType.of(Type.Any), table));
-    protected Schema innerSchema = Schema.of(col("col3", ResolvedType.of(Type.Any), tableB), CoreColumn.of("col4", ResolvedType.of(Type.Any), tableB));
+    protected Schema outerSchema = Schema.of(col("col1", ResolvedType.of(Type.Any), table), col("col2", ResolvedType.of(Type.Any), table));
+    protected Schema innerSchema = Schema.of(col("col3", ResolvedType.of(Type.Any), tableB), col("col4", ResolvedType.of(Type.Any), tableB));
 
     /** Create a physical plan to test for inner join implementations with index */
     protected IPhysicalPlan createIndexInnerJoin(IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> predicate, String populateAlias)
@@ -58,8 +57,8 @@ public abstract class AJoinTest extends APhysicalPlanTest
         return null;
     }
 
-    protected Schema outerSchemaLess = Schema.of(ast("t", ResolvedType.of(Type.Any), table));
-    protected Schema innerSchemaLess = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+    protected Schema outerSchemaLess = Schema.of(ast("t", table));
+    protected Schema innerSchemaLess = Schema.of(ast("b", tableB));
 
     // outer.col1 = inner.col1
     protected IExpression predicate = new ComparisonExpression(IComparisonExpression.Type.EQUAL, ce("col1"), ce("col3"));

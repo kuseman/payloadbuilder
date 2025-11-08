@@ -46,7 +46,7 @@ public class ObjectArrayFunctionTest extends APhysicalPlanTest
         //@formatter:on
 
         actual = aggregator.combine(context);
-        schema = Schema.of(col("col1", Column.Type.Any, null));
+        schema = Schema.of(col("col1", Column.Type.Any));
         assertEquals(ResolvedType.table(schema), scalar.getAggregateType(asList(col1)));
         assertVectorsEquals(vv(ResolvedType.table(schema)), actual);
 
@@ -66,7 +66,7 @@ public class ObjectArrayFunctionTest extends APhysicalPlanTest
         //@formatter:on
 
         actual = aggregator.combine(context);
-        schema = Schema.of(col("col1", Column.Type.Any, null), col("col2", Column.Type.Any, null));
+        schema = Schema.of(col("col1", Column.Type.Any), col("col2", Column.Type.Any));
         assertVectorsEquals(vv(ResolvedType.table(schema), TupleVector.of(schema, asList(vv(Type.Any, 1, 2, 3), vv(Type.Any, 4, 5, 6)))), actual);
 
         // Multi vector
@@ -78,7 +78,7 @@ public class ObjectArrayFunctionTest extends APhysicalPlanTest
         //@formatter:on
 
         actual = aggregator.combine(context);
-        schema = Schema.of(col("col1", Column.Type.Any, null), col("col2", Column.Type.Any, null));
+        schema = Schema.of(col("col1", Column.Type.Any), col("col2", Column.Type.Any));
         assertVectorsEquals(vv(ResolvedType.table(schema), TupleVector.of(schema, asList(vv(Type.Any, 1, 2, 3, 1, 2, 3), vv(Type.Any, 4, 5, 6, 4, 5, 6)))), actual);
     }
 

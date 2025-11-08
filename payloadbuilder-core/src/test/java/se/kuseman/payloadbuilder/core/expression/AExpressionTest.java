@@ -117,12 +117,6 @@ public abstract class AExpressionTest extends Assert
     }
 
     /** Create an {@link ColumnExpression} */
-    protected ColumnExpression cre(String alias, TableSourceReference tr, String column, ResolvedType type)
-    {
-        return cre(alias, tr, column, type, CoreColumn.Type.REGULAR);
-    }
-
-    /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String alias, TableSourceReference tr, String column, ResolvedType type, CoreColumn.Type columnType)
     {
         return ColumnExpression.Builder.of(alias, type)
@@ -135,27 +129,39 @@ public abstract class AExpressionTest extends Assert
     /** Create an {@link ColumnExpression} with no ordinal */
     protected ColumnExpression cre(String column, TableSourceReference tr)
     {
-        return cre(column, tr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR);
+        return cre(column, tr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR, column);
+    }
+
+    /** Create an {@link ColumnExpression} with no ordinal */
+    protected ColumnExpression cre(String column, TableSourceReference tr, String columnReferenceName)
+    {
+        return cre(column, tr, ResolvedType.of(Type.Any), CoreColumn.Type.REGULAR, columnReferenceName);
     }
 
     /** Create an {@link ColumnExpression} with no ordinal */
     protected ColumnExpression cre(String column, TableSourceReference tr, CoreColumn.Type columnType)
     {
-        return cre(column, tr, ResolvedType.of(Type.Any), columnType);
+        return cre(column, tr, ResolvedType.of(Type.Any), columnType, column);
     }
 
     /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String column, TableSourceReference tr, ResolvedType type)
     {
-        return cre(column, tr, type, CoreColumn.Type.REGULAR);
+        return cre(column, tr, type, CoreColumn.Type.REGULAR, column);
     }
 
     /** Create an {@link ColumnExpression} */
     protected ColumnExpression cre(String column, TableSourceReference tr, ResolvedType type, CoreColumn.Type columnType)
     {
+        return cre(column, tr, type, columnType, column);
+    }
+
+    /** Create an {@link ColumnExpression} */
+    protected ColumnExpression cre(String column, TableSourceReference tr, ResolvedType type, CoreColumn.Type columnType, String columnReferenceName)
+    {
         return ColumnExpression.Builder.of(column, type)
                 .withColumn(column)
-                .withColumnReference(new ColumnReference(column, tr))
+                .withColumnReference(new ColumnReference(columnReferenceName, tr))
                 .withPopulated(columnType == CoreColumn.Type.POPULATED)
                 .build();
     }
@@ -328,57 +334,87 @@ public abstract class AExpressionTest extends Assert
     }
 
     /** Construct a column */
+    protected CoreColumn col(String name, Type type)
+    {
+        return col(name, ResolvedType.of(type), "", null, false, name);
+    }
+
+    protected CoreColumn col(String name, Type type, String outputName)
+    {
+        return col(name, ResolvedType.of(type), outputName, null, false, name);
+    }
+
+    protected CoreColumn col(String name, ResolvedType type)
+    {
+        return col(name, type, "", null, false, name);
+    }
+
+    /** Construct a column */
     protected CoreColumn col(String name, Type type, TableSourceReference tableSourceReference)
     {
-        return CoreColumn.of(name, ResolvedType.of(type), tableSourceReference);
+        return col(name, ResolvedType.of(type), "", tableSourceReference, false, name);
     }
 
     protected CoreColumn col(String name, ResolvedType type, TableSourceReference tableSourceReference)
     {
-        return CoreColumn.of(name, type, tableSourceReference);
+        return col(name, type, "", tableSourceReference, false, name);
     }
 
     protected CoreColumn col(String name, ResolvedType type, TableSourceReference tableSourceReference, boolean internal)
     {
-        return new CoreColumn(name, type, "", internal, tableSourceReference, CoreColumn.Type.REGULAR);
+        return col(name, type, "", tableSourceReference, internal, name);
     }
 
-    /** Construct a column */
-    protected CoreColumn col(String name, Type type)
+    protected CoreColumn col(String name, ResolvedType type, String outputName, TableSourceReference tableSourceReference, boolean internal, String columnReferenceName)
     {
-        return CoreColumn.of(name, ResolvedType.of(type), null);
+        ColumnReference cr = null;
+        if (tableSourceReference != null)
+        {
+            cr = new ColumnReference(columnReferenceName, tableSourceReference);
+        }
+        return new CoreColumn(name, type, outputName, internal, cr, CoreColumn.Type.REGULAR);
     }
 
     protected CoreColumn pop(String name, ResolvedType type, TableSourceReference tableSourceReference)
     {
-        return new CoreColumn(name, type, "", false, tableSourceReference, CoreColumn.Type.POPULATED);
+        ColumnReference cr = null;
+        if (tableSourceReference != null)
+        {
+            cr = new ColumnReference(name, tableSourceReference);
+        }
+        return new CoreColumn(name, type, "", false, cr, CoreColumn.Type.POPULATED);
     }
 
     // CSOFF
     /** Construct a column */
-    protected CoreColumn ast(String name, Type type, TableSourceReference tableSourceReference)
+    protected CoreColumn ast(String name, String outputName, TableSourceReference tableSourceReference)
     {
-        return new CoreColumn(name, ResolvedType.of(type), "", false, tableSourceReference, CoreColumn.Type.ASTERISK);
-    }
-
-    protected CoreColumn ast(String name, String outputName, Type type, TableSourceReference tableSourceReference)
-    {
-        return new CoreColumn(name, ResolvedType.of(type), outputName, false, tableSourceReference, CoreColumn.Type.ASTERISK);
+        return ast(name, ResolvedType.ANY, outputName, tableSourceReference, false);
     }
 
     protected CoreColumn ast(String name, TableSourceReference tableSourceReference)
     {
-        return new CoreColumn(name, ResolvedType.of(Type.Any), "", false, tableSourceReference, CoreColumn.Type.ASTERISK);
+        return ast(name, ResolvedType.of(Type.Any), "", tableSourceReference, false);
     }
 
     protected CoreColumn ast(String name, ResolvedType type, TableSourceReference tableSourceReference)
     {
-        return new CoreColumn(name, type, "", false, tableSourceReference, CoreColumn.Type.ASTERISK);
+        return ast(name, type, "", tableSourceReference, false);
     }
 
     protected CoreColumn ast(String name, ResolvedType type, TableSourceReference tableSourceReference, boolean internal)
     {
-        return new CoreColumn(name, type, "", internal, tableSourceReference, CoreColumn.Type.ASTERISK);
+        return ast(name, type, "", tableSourceReference, internal);
+    }
+
+    private CoreColumn ast(String name, ResolvedType type, String outputName, TableSourceReference tableSourceReference, boolean internal)
+    {
+        ColumnReference cr = null;
+        if (tableSourceReference != null)
+        {
+            cr = new ColumnReference("*", tableSourceReference);
+        }
+        return new CoreColumn(name, type, outputName, internal, cr, CoreColumn.Type.ASTERISK);
     }
 
     // CSOFF

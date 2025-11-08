@@ -150,7 +150,7 @@ public class ConstantScan implements ILogicalPlan
                             .getColumns()
                             .get(i)));
 
-                    return SchemaUtils.changeType(columns.get(i), columnTypes.get(i), ref);
+                    return (Column) CoreColumn.changeProperties(columns.get(i), columnTypes.get(i), ref);
                 })
                 .toList());
         return new ConstantScan(schema, rowsExpressions, location);
@@ -171,7 +171,11 @@ public class ConstantScan implements ILogicalPlan
         // Pick table source ref. for each column
         List<TableSourceReference> tableSourceReferences = getTableSourceReferenceFromRows(tableSource, rowsExpressions, location);
         Schema schema = new Schema(IntStream.range(0, columnNames.size())
-                .mapToObj(i -> (Column) CoreColumn.of(columnNames.get(i), columnTypes.get(i), tableSourceReferences.get(i)))
+                .mapToObj(i ->
+                {
+                    TableSourceReference ts = tableSourceReferences.get(i);
+                    return (Column) CoreColumn.of(columnNames.get(i), columnTypes.get(i), ts);
+                })
                 .toList());
 
         return new ConstantScan(schema, rowsExpressions, location);

@@ -20,7 +20,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 
@@ -75,7 +74,7 @@ public class FilterTest extends APhysicalPlanTest
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
-        assertEquals(Schema.of(col("col1", ResolvedType.of(Type.Any), table), CoreColumn.of("col2", ResolvedType.of(Type.Any), table)), actual.getSchema());
+        assertEquals(Schema.of(col("col1", ResolvedType.of(Type.Any), table), col("col2", ResolvedType.of(Type.Any), table)), actual.getSchema());
 
         assertEquals(3, actual.getRowCount());
         assertVectorsEquals(vv(Type.Any, 3, 4, 5), actual.getColumn(0));

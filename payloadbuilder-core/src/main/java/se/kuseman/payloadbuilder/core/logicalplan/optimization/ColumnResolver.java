@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.Strings.CI;
 
 import java.util.ArrayDeque;
@@ -264,7 +265,9 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Collect outer table sources, these are used to know if this
         // join is directly referencing any outer columns => we need to loop
         // row by row, otherwise we can do more effective join algorithms
-        Set<TableSourceReference> outerTableSources = extractTableSources(outer);
+        Set<Integer> outerTableSources = extractTableSources(outer).stream()
+                .map(TableSourceReference::getId)
+                .collect(toSet());
 
         // CSOFF
         // Concat outer and left schema to detect outer references
@@ -296,7 +299,10 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // that is present in the outer plan
         context.outerReferences.removeIf(or ->
         {
-            Set<TableSourceReference> tableSources = SchemaUtils.getTableSources(or);
+            Set<Integer> tableSources = SchemaUtils.getTableSources(or)
+                    .stream()
+                    .map(TableSourceReference::getId)
+                    .collect(toSet());
             if (tableSources.isEmpty())
             {
                 // TODO: Find out when this happens
@@ -496,7 +502,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Empty schema => create an asterisk column with the table source
         if (Schema.EMPTY.equals(schema))
         {
-            originalSchema = schema = Schema.of(new CoreColumn(plan.getAlias(), ResolvedType.of(Type.Any), "", false, tableSource, CoreColumn.Type.ASTERISK));
+            originalSchema = schema = Schema.of(CoreColumn.asterisk(plan.getAlias(), tableSource));
         }
         else
         {
@@ -623,7 +629,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Create an asterisk column with the table source ref if no schema was provided.
         if (Schema.EMPTY.equals(schema))
         {
-            originalSchema = schema = Schema.of(new CoreColumn(plan.getAlias(), ResolvedType.of(Type.Any), "", false, tableSource, CoreColumn.Type.ASTERISK));
+            originalSchema = schema = Schema.of(CoreColumn.asterisk(plan.getAlias(), tableSource));
         }
         else
         {
@@ -982,6 +988,9 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             // Linked set because we need to add the table refs in the order they come
             // so expansion later on gets columns in correct order
             Set<TableSourceReference> tableSourceReferences = new LinkedHashSet<>();
+            // NOTE! We need a set of table source ref ids. here since the schemas
+            // might contain refs with parent connections and hence equals cannot be used.
+            Set<Integer> seenTableSourceReferenceIds = new HashSet<>();
             if (resolveSchema != null)
             {
                 if (alias != null)
@@ -1002,9 +1011,9 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                                 .getType()
                                 .getSchema();
                     }
-                    context.outerReferences
-                            .add(new CoreColumn(alias, ResolvedType.table(schema), "", false, SchemaUtils.getTableSource(schema), SchemaUtils.isAsterisk(schema) ? CoreColumn.Type.ASTERISK
-                                    : CoreColumn.Type.REGULAR));
+
+                    TableSourceReference tableSource = SchemaUtils.getTableSource(schema);
+                    context.outerReferences.add(CoreColumn.asterisk(alias, ResolvedType.table(schema), tableSource));
                 }
                 int size = resolveSchema.getSize();
                 for (int i = 0; i < size; i++)
@@ -1018,7 +1027,8 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                         continue;
                     }
                     TableSourceReference tableSource = SchemaUtils.getTableSource(column);
-                    if (tableSource != null)
+                    if (tableSource != null
+                            && seenTableSourceReferenceIds.add(tableSource.getId()))
                     {
                         tableSourceReferences.add(tableSource);
                     }
@@ -1493,14 +1503,23 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             {
                 CoreColumn.Type columnType = SchemaUtils.getColumnType(match);
 
+                ColumnReference cr = match instanceof CoreColumn cc ? cc.getColumnReference()
+                        : null;
+                if (cr == null)
+                {
+                    cr = new ColumnReference(resolvedColumnName, tableRef);
+                }
+
                 // Switch asterisk to regular upon match
                 if (columnType == CoreColumn.Type.ASTERISK)
                 {
                     columnType = CoreColumn.Type.REGULAR;
+                    // Always create a new column reference when going from asterisk to regular
+                    cr = new ColumnReference(resolvedColumnName, tableRef);
                 }
 
-                match = new CoreColumn(resolvedColumnName, match.getType(), "", false, tableRef, columnType);
-                builder.withColumnReference(new ColumnReference(resolvedColumnName, tableRef));
+                match = new CoreColumn(resolvedColumnName, match.getType(), "", false, cr, columnType);
+                builder.withColumnReference(cr);
             }
 
             // Add column to outer references and set outer reference to column builder

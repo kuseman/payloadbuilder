@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
-import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
@@ -166,17 +165,9 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
                 if (ce.expression() instanceof ColumnExpression cexp
                         && cexp.isPopulated())
                 {
-                    Schema schema = null;
                     if (ce.expression()
                             .getType()
                             .getType() == Column.Type.Table)
-                    {
-                        schema = ce.expression()
-                                .getType()
-                                .getSchema();
-                    }
-
-                    if (schema != null)
                     {
                         for (Column col : ce.expression()
                                 .getType()
@@ -187,12 +178,11 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
                             {
                                 // Mark this table source as an asterisk projection
                                 context.columnsByAlias.put(tableSource, Ctx.ASTERISK_PROJECTION);
-                                continue;
+                                break;
                             }
                             appendColumn(tableSource, col.getName(), context);
                         }
                     }
-
                     continue;
                 }
 

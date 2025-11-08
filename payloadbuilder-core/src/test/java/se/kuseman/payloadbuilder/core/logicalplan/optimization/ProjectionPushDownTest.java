@@ -38,9 +38,9 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
 {
     private final ColumnResolver columnOptimizer = new ColumnResolver();
     private final ProjectionPushDown projectionPushDown = new ProjectionPushDown();
-    private final Schema schema = Schema.of(ast("t", Type.Any, table));
-    private final Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
-    private final Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+    private final Schema schema = Schema.of(ast("t", table));
+    private final Schema schemaA = Schema.of(ast("a", tableA));
+    private final Schema schemaB = Schema.of(ast("b", tableB));
 
     @Test
     public void test_projection_on_one_table_from_join()

@@ -16,6 +16,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn.Type;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
@@ -58,35 +59,13 @@ public final class SchemaUtils
     public static Column getPopulatedColumn(String name, Schema populatedSchema)
     {
         TableSourceReference tableRef = getTableSource(populatedSchema);
-        return new CoreColumn(name, ResolvedType.table(populatedSchema), "", false, tableRef, CoreColumn.Type.POPULATED);
-    }
-
-    /** Creates a new column from provide column with a new type. */
-    public static Column changeTableSource(Column column, TableSourceReference tableSourceReference)
-    {
-        if (column instanceof CoreColumn cc)
+        ColumnReference cr = null;
+        if (tableRef != null)
         {
-            return new CoreColumn(cc, cc.getType(), tableSourceReference);
+            cr = new ColumnReference(name, tableRef);
         }
 
-        return CoreColumn.of(column.getName(), column.getType(), tableSourceReference);
-    }
-
-    /** Creates a new column from provide column with a new type. */
-    public static Column changeType(Column column, ResolvedType type)
-    {
-        return changeType(column, type, getTableSource(column));
-    }
-
-    /** Creates a new column from provide column with a new type. */
-    public static Column changeType(Column column, ResolvedType type, TableSourceReference tableSourceReference)
-    {
-        if (column instanceof CoreColumn cc)
-        {
-            return new CoreColumn(cc, type, tableSourceReference);
-        }
-
-        return CoreColumn.of(column.getName(), type, tableSourceReference);
+        return new CoreColumn(name, ResolvedType.table(populatedSchema), "", false, cr, CoreColumn.Type.POPULATED);
     }
 
     /** Return a new schema which concats to other schemas */
@@ -172,11 +151,8 @@ public final class SchemaUtils
     /** Return column type of provided column */
     public static CoreColumn.Type getColumnType(Column column)
     {
-        if (column instanceof CoreColumn cc)
-        {
-            return cc.getColumnType();
-        }
-        return CoreColumn.Type.REGULAR;
+        return column instanceof CoreColumn cc ? cc.getColumnType()
+                : CoreColumn.Type.REGULAR;
     }
 
     /** Returns true if provided column is populated */
@@ -196,11 +172,8 @@ public final class SchemaUtils
     /** Return {@link TableSourceReference} from provided column if it'a an instanceof {@link CoreColumn} otherwise null */
     public static TableSourceReference getTableSource(Column column)
     {
-        if (column instanceof CoreColumn cc)
-        {
-            return cc.getTableSourceReference();
-        }
-        return null;
+        return column instanceof CoreColumn cc ? cc.getTableSourceReference()
+                : null;
     }
 
     /** Return table source reference from provided schema. If multiple table sources found null is returned. */
@@ -313,19 +286,15 @@ public final class SchemaUtils
             type = aggregate ? ((IAggregateExpression) expression).getAggregateType()
                     : expression.getType();
         }
-        TableSourceReference tableSourceReference = null;
         CoreColumn.Type columnType = getColumnType(expression);
-
         ColumnReference cr = getColumnReference(expression);
-        if (cr != null)
+        if (cr == null
+                && parentTableSource != null)
         {
-            tableSourceReference = cr.tableSourceReference();
+            cr = new ColumnReference(columnType == Type.ASTERISK ? "*"
+                    : name, parentTableSource);
         }
-        if (tableSourceReference == null)
-        {
-            tableSourceReference = parentTableSource;
-        }
-        return new CoreColumn(name, type, outputName, expression.isInternal(), tableSourceReference, columnType);
+        return new CoreColumn(name, type, outputName, expression.isInternal(), cr, columnType);
     }
 
     /** Extract a {@link ColumnExpression} from provided expression. */
