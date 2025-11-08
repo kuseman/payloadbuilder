@@ -60,6 +60,7 @@ public class TableScanTest extends APhysicalPlanTest
         TupleVector vector = PlanUtils.concat(context, plan.execute(context));
 
         Assertions.assertThat(vector.getSchema())
+                .usingRecursiveComparison()
                 .isEqualTo(Schema.of(col("col", ResolvedType.of(Type.Int), table)));
 
         assertEquals(Schema.of(col("col", ResolvedType.of(Type.Int), table)), vector.getSchema());
@@ -70,7 +71,7 @@ public class TableScanTest extends APhysicalPlanTest
     {
         MutableBoolean closed = new MutableBoolean(false);
         // Asterisk schema
-        Schema schema = Schema.of(ast("t", ResolvedType.of(Type.Int), table));
+        Schema schema = Schema.of(ast("t", table));
         IPhysicalPlan plan = scan(
                 schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(ValueVector.literalInt(100, 100))), TupleVector.of(schema, asList(ValueVector.literalInt(100, 100)))), table,
                 schema);

@@ -12,10 +12,8 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 /** Extension of {@link Column} that attaches different properties used during planning and execution */
 public class CoreColumn extends Column
 {
-    /**
-     * Set if this column references a table source. Used when resolving asterisk schemas etc. To connect a column to a specific table source.
-     */
-    private final TableSourceReference tableSourceReference;
+    /** Column reference if this column points to one. */
+    private final ColumnReference columnReference;
 
     /** Type of column */
     private final Type columnType;
@@ -47,29 +45,29 @@ public class CoreColumn extends Column
         this(name, type, outputName, internal, null, Type.REGULAR);
     }
 
-    /** Copy ctor. New type of column */
-    public CoreColumn(CoreColumn source, ResolvedType type, TableSourceReference tableSource)
-    {
-        this(source.getName(), type, source.outputName, source.internal, tableSource, source.columnType);
-    }
-
-    public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, TableSourceReference tableSourceReference, Type columnType)
+    public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, ColumnReference columnReference, Type columnType)
     {
         super(name, type);
         this.outputName = Objects.toString(outputName, "");
         this.internal = internal;
-        this.tableSourceReference = tableSourceReference;
+        this.columnReference = columnReference;
         this.columnType = requireNonNull(columnType, "columnType");
     }
 
-    public TableSourceReference getTableSourceReference()
+    public ColumnReference getColumnReference()
     {
-        return tableSourceReference;
+        return columnReference;
     }
 
     public Type getColumnType()
     {
         return columnType;
+    }
+
+    public TableSourceReference getTableSourceReference()
+    {
+        return columnReference != null ? columnReference.tableSourceReference()
+                : null;
     }
 
     /** Return the output name of this column */
@@ -106,7 +104,7 @@ public class CoreColumn extends Column
             return super.equals(that)
                     && Objects.equals(outputName, that.outputName)
                     && internal == that.internal
-                    && Objects.equals(tableSourceReference, that.tableSourceReference)
+                    && Objects.equals(columnReference, that.columnReference)
                     && columnType == that.columnType;
         }
         return false;
@@ -125,13 +123,91 @@ public class CoreColumn extends Column
     /** Construct a {@link CoreColumn} from name and type */
     public static CoreColumn of(String name, ResolvedType type)
     {
-        return new CoreColumn(name, type, "", false, null, Type.REGULAR);
+        return of(name, type, null);
     }
 
-    /** Return a {@link CoreColumn} with provided name and type and reference */
-    public static CoreColumn of(String name, ResolvedType type, TableSourceReference tableSource)
+    /** Construct a {@link CoreColumn} from name and type */
+    public static CoreColumn of(String name, ResolvedType type, TableSourceReference tableSourceReference)
     {
-        return new CoreColumn(name, type, "", false, tableSource, Type.REGULAR);
+        return of(name, type, tableSourceReference, Type.REGULAR);
+    }
+
+    /** Construct a {@link CoreColumn} from name and type */
+    public static CoreColumn of(String name, ResolvedType type, TableSourceReference tableSourceReference, Type columnType)
+    {
+        ColumnReference cr = null;
+        if (tableSourceReference != null)
+        {
+            cr = new ColumnReference(name, tableSourceReference);
+        }
+        return new CoreColumn(name, type, "", false, cr, columnType);
+    }
+
+    /** Convert provided column to a {@link CoreColumn} and change properties. */
+    public static CoreColumn changeProperties(Column column, TableSourceReference tableSourceReference)
+    {
+        return changeProperties(column, column.getType(), tableSourceReference);
+    }
+
+    /** Convert provided column to a {@link CoreColumn} and change properties. */
+    public static CoreColumn changeProperties(Column column, ResolvedType type)
+    {
+        return changeProperties(column, type, null);
+    }
+
+    /** Convert provided column to a {@link CoreColumn} and change properties. */
+    public static CoreColumn changeProperties(Column column, ResolvedType type, TableSourceReference tableSourceReference)
+    {
+        boolean internal = false;
+        String outputName = "";
+        Type columnType = Type.REGULAR;
+        String columnReferenceName = column.getName();
+        TableSourceReference columnTableSourceReference = null;
+        if (column instanceof CoreColumn cc)
+        {
+            internal = cc.internal;
+            outputName = cc.outputName;
+            columnType = cc.columnType;
+            if (cc.columnReference != null)
+            {
+                columnReferenceName = cc.columnReference.columnName();
+                columnTableSourceReference = cc.columnReference.tableSourceReference();
+            }
+        }
+        ColumnReference cr = null;
+        // Use the columns table source reference if input is null
+        if (tableSourceReference == null)
+        {
+            tableSourceReference = columnTableSourceReference;
+        }
+        // Link the columns table source reference with the input
+        else if (columnTableSourceReference != null)
+        {
+            tableSourceReference = tableSourceReference.withParent(columnTableSourceReference);
+        }
+
+        if (tableSourceReference != null)
+        {
+            cr = new ColumnReference(columnReferenceName, tableSourceReference);
+        }
+        return new CoreColumn(column.getName(), type, outputName, internal, cr, columnType);
+    }
+
+    /** Construct an asterisk column for provided alias and table source. */
+    public static CoreColumn asterisk(String alias, TableSourceReference tableSourceRefernece)
+    {
+        return asterisk(alias, ResolvedType.ANY, tableSourceRefernece);
+    }
+
+    /** Construct an asterisk column for provided alias and table source. */
+    public static CoreColumn asterisk(String alias, ResolvedType type, TableSourceReference tableSourceRefernece)
+    {
+        ColumnReference cr = null;
+        if (tableSourceRefernece != null)
+        {
+            cr = new ColumnReference("*", tableSourceRefernece);
+        }
+        return new CoreColumn(alias, type, "", false, cr, Type.ASTERISK);
     }
 
     /** Reference column type */

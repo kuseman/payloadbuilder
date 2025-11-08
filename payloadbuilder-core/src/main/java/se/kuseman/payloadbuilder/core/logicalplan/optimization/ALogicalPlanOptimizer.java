@@ -584,11 +584,8 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
 
         private void add(IExpression expression, ColumnReference colRef, String column, Map<TableSourceReference, Set<ColumnReferenceExtractorResult>> context)
         {
-            TableSourceReference tableRef = null;
-            if (colRef != null)
-            {
-                tableRef = colRef.tableSourceReference();
-            }
+            TableSourceReference tableRef = colRef != null ? colRef.tableSourceReference()
+                    : null;
             if (tableRef != null)
             {
                 context.computeIfAbsent(tableRef, k -> new HashSet<>())

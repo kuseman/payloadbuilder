@@ -17,7 +17,6 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
@@ -92,7 +91,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select concat('hello', 123)");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.String), "concat('hello', 123)", false, null, CoreColumn.Type.REGULAR));
+        Schema expectedSchema = Schema.of(col("", ResolvedType.of(Type.String), "concat('hello', 123)", null, false, ""));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
@@ -102,7 +101,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select sum(col2) from \"table\" group by col");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), "sum(col2)", false, null, CoreColumn.Type.REGULAR));
+        Schema expectedSchema = Schema.of(col("", ResolvedType.of(Type.Any), "sum(col2)", null, false, ""));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
@@ -112,7 +111,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select sum(sum(col2)) from \"table\" group by col");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), "sum(sum(col2))", false, null, CoreColumn.Type.REGULAR));
+        Schema expectedSchema = Schema.of(col("", ResolvedType.of(Type.Any), "sum(sum(col2))", null, false, ""));
         assertEquals(expectedSchema, actual.getSchema());
     }
 

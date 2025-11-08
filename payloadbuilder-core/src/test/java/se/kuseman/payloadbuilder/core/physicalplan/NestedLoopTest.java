@@ -413,6 +413,13 @@ public class NestedLoopTest extends AJoinTest
                         new Projection(
                             3,
                             scan(dsInner, tableB, innerSchemaLess),
+                            Schema.of(
+                                    col("oCol1", ResolvedType.of(Type.Any)),
+                                    col("oCol2", ResolvedType.of(Type.Any)),
+                                    col("col3", ResolvedType.of(Type.Any)),
+                                    col("col4", ResolvedType.of(Type.Any)),
+                                    col("oCalc", ResolvedType.of(Type.Any))
+                            ),
                             asList(
                               new AliasExpression(col1, "oCol1"),
                               new AliasExpression(col2, "oCol2"),

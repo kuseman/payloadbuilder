@@ -8,12 +8,10 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Option;
-import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -160,7 +158,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
         // No schema returned, create an asterisk column with table source ref.
         if (Schema.EMPTY.equals(schema))
         {
-            schema = Schema.of(new CoreColumn(plan.getAlias(), ResolvedType.of(Type.Any), "", false, plan.getTableSource(), CoreColumn.Type.ASTERISK));
+            schema = Schema.of(CoreColumn.asterisk(plan.getAlias(), plan.getTableSource()));
         }
         // .. else recreate the schema and tag the table source to all columns
         else
@@ -217,7 +215,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
     {
         return new Schema(schema.getColumns()
                 .stream()
-                .map(c -> SchemaUtils.changeTableSource(c, tableSource))
+                .map(c -> CoreColumn.changeProperties(c, tableSource))
                 .collect(toList()));
     }
 

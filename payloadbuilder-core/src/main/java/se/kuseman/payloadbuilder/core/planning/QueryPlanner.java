@@ -20,6 +20,7 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -34,6 +35,7 @@ import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
@@ -92,6 +94,8 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         TableSourceReference parentTableSource = plan.getParentTableSource();
         List<IExpression> expressions = plan.getExpressions();
+        Schema schema = SchemaUtils.getSchema(parentTableSource, expressions, false);
+
         if (input instanceof se.kuseman.payloadbuilder.core.physicalplan.Projection p)
         {
             expressions = ProjectionMerger.replace(plan.getExpressions(), p.getExpressions());
@@ -103,9 +107,10 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         {
             expressions = ProjectionMerger.replace(plan.getExpressions(), p.getExpressions());
             input = p.getInput();
+            parentTableSource = p.getParentTableSource();
         }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, expressions, parentTableSource));
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, schema, expressions, parentTableSource));
     }
 
     @Override

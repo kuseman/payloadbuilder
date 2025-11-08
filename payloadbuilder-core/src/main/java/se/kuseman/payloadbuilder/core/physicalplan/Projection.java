@@ -36,17 +36,22 @@ public class Projection implements IPhysicalPlan
     private final boolean hasAsteriskSchema;
     private final TableSourceReference parentTableSource;
 
-    public Projection(int nodeId, IPhysicalPlan input, List<IExpression> expressions, TableSourceReference parentTableSource)
+    public Projection(int nodeId, IPhysicalPlan input, Schema schema, List<IExpression> expressions, TableSourceReference parentTableSource)
     {
         this.nodeId = nodeId;
         this.input = requireNonNull(input, "input");
         this.expressions = requireNonNull(expressions, "expressions");
-        this.schema = SchemaUtils.getSchema(parentTableSource, expressions, false);
+        this.schema = requireNonNull(schema, "schema");
         this.hasAsteriskProjection = expressions.stream()
                 .anyMatch(e -> e instanceof AsteriskExpression);
         this.hasAsteriskSchema = hasAsteriskProjection
                 || SchemaUtils.isAsterisk(schema);
         this.parentTableSource = parentTableSource;
+
+        if (expressions.size() != schema.getSize())
+        {
+            throw new IllegalArgumentException("Schema size doesn't match epxressions size");
+        }
     }
 
     public IPhysicalPlan getInput()

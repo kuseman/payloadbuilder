@@ -15,7 +15,6 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
@@ -61,21 +60,21 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
     {
         TableSourceReference sTableD = sTableD(id);
         return Schema.of(
-              CoreColumn.of("col1", ResolvedType.of(Type.Double), sTableD),
-              CoreColumn.of("col6", ResolvedType.of(Type.String), sTableD));
+              col("col1", ResolvedType.of(Type.Double), sTableD),
+              col("col6", ResolvedType.of(Type.String), sTableD));
     }
     
     protected Schema schemaSTableE(int id)
     {
         TableSourceReference sTableE = sTableE(id);
         return Schema.of(
-              CoreColumn.of("col1", ResolvedType.of(Type.Double), sTableE),
-              CoreColumn.of("col3", ResolvedType.table(
+              col("col1", ResolvedType.of(Type.Double), sTableE),
+              col("col3", ResolvedType.table(
                       Schema.of(
                               Column.of("nCol1", Type.Int),
                               Column.of("nCol2", Type.String)
                               )), sTableE),
-              CoreColumn.of("col6", ResolvedType.of(Type.String), sTableE));
+              col("col6", ResolvedType.of(Type.String), sTableE));
     }
     //@formatter:on
 

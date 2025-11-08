@@ -16,6 +16,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -35,6 +36,16 @@ import se.kuseman.payloadbuilder.core.parser.Location;
 /** Test of {@link Projection} */
 public class ProjectionTest extends APhysicalPlanTest
 {
+    @Test(
+            expected = IllegalArgumentException.class)
+    public void test_illegal_schema_expression_sizes()
+    {
+        IExpression col1 = ce("col1");
+        new Projection(0, scan(schemaDS(() ->
+        {
+        }, new TupleVector[0]), table, Schema.EMPTY), Schema.EMPTY, List.of(col1), table);
+    }
+
     @Test
     public void test_schema_full()
     {
@@ -46,7 +57,9 @@ public class ProjectionTest extends APhysicalPlanTest
         IExpression col3 = ce("col3");
 
         MutableBoolean closed = new MutableBoolean(false);
-        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY),
+        IPhysicalPlan plan = new Projection(
+                1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY), Schema.of(new CoreColumn("col1", ResolvedType.of(Type.Any), "", false),
+                        new CoreColumn("", ResolvedType.of(Type.Boolean), "col1 >= col3", false), new CoreColumn("col3", ResolvedType.of(Type.Any), "", false)),
                 asList(col1, new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, col1, col3), col3), null);
 
         //@formatter:off
@@ -148,7 +161,9 @@ public class ProjectionTest extends APhysicalPlanTest
             }
         };
 
-        IPhysicalPlan plan = new Projection(1, input, asList(aastExp, bcol3Exp, calcExp), null);
+        IPhysicalPlan plan = new Projection(1, input,
+                Schema.of(ast("", "a.*", tableA), col("col3", ResolvedType.of(Type.Any), tableB), new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false)),
+                asList(aastExp, bcol3Exp, calcExp), null);
 
         // Asterisks => empty schema
         //@formatter:off
@@ -156,7 +171,7 @@ public class ProjectionTest extends APhysicalPlanTest
             .usingRecursiveComparison()
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Any), "a.*", false, tableA, CoreColumn.Type.ASTERISK),
+                ast("", "a.*", tableA),
                 col("col3", ResolvedType.of(Type.Any), tableB),
                 new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false)));
         //@formatter:on
@@ -215,8 +230,11 @@ public class ProjectionTest extends APhysicalPlanTest
             }
         };
 
+        // formatter:off
         MutableBoolean closed = new MutableBoolean(false);
-        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY), asList(col1, col3, ocol4), null);
+        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY),
+                Schema.of(Column.of("col1", Type.Any), Column.of("col3", Type.Any), Column.of("col4", Type.Any)), asList(col1, col3, ocol4), null);
+        // formatter:on
 
         Schema outerSchema = schema("col4");
 

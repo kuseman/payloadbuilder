@@ -20,7 +20,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.JsonOutputWriter;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.execution.OutputWriterUtils;
@@ -53,7 +52,7 @@ public class OperatorFunctionScanTest extends APhysicalPlanTest
     @Test
     public void test_object_array_1()
     {
-        Schema schema = Schema.of(col("col1", ResolvedType.of(Type.Any), table), CoreColumn.of("col2", ResolvedType.of(Type.Any), table), col("col1 >= col2", ResolvedType.of(Type.Boolean), table));
+        Schema schema = Schema.of(col("col1", ResolvedType.of(Type.Any), table), col("col2", ResolvedType.of(Type.Any), table), col("col1 >= col2", ResolvedType.of(Type.Boolean), table));
 
         assertEquals("[{\"col1\":1,\"col2\":4,\"col1 >= col2\":false},{\"col1\":2,\"col2\":5,\"col1 >= col2\":false},{\"col1\":3,\"col2\":6,\"col1 >= col2\":false}]", toJson(getValue("OBJECT_ARRAY",
                 schema, TupleVector.of(schema, asList(vv(ResolvedType.of(Type.Any), 1, 2, 3), vv(ResolvedType.of(Type.Any), 4, 5, 6), vv(ResolvedType.of(Type.Boolean), false, false, false))))));

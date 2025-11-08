@@ -11,7 +11,6 @@ import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
@@ -29,9 +28,9 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
 {
     private final ColumnResolver columnOptimizer = new ColumnResolver();
     private final PredicatePushDown predicatePushDown = new PredicatePushDown();
-    private final Schema schema = Schema.of(ast("t", Type.Any, table));
-    private final Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
-    private final Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+    private final Schema schema = Schema.of(ast("t", table));
+    private final Schema schemaA = Schema.of(ast("a", tableA));
+    private final Schema schemaB = Schema.of(ast("b", tableB));
 
     @Test
     public void test_table_and_no_filter()
@@ -51,7 +50,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     public void test_function_and_no_filter()
     {
         TableSourceReference opencsv = new TableSourceReference(0, TableSourceReference.Type.FUNCTION, "sys", QualifiedName.of("opencsv"), "t");
-        Schema schema = Schema.of(ast("t", Type.Any, opencsv));
+        Schema schema = Schema.of(ast("t", opencsv));
 
         ILogicalPlan plan = new TableFunctionScan(opencsv, schema, asList(), asList(), null);
 
@@ -94,7 +93,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     public void test_function_scan_and_surrounding_filter()
     {
         TableSourceReference opencsv = new TableSourceReference(0, TableSourceReference.Type.FUNCTION, "sys", QualifiedName.of("opencsv"), "t");
-        Schema schema = Schema.of(ast("t", Type.Any, opencsv));
+        Schema schema = Schema.of(ast("t", opencsv));
 
         //@formatter:off
         ILogicalPlan plan = new Filter(
@@ -159,8 +158,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
         TableSourceReference tableB = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", of("tableB"), "b");
         TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", of("x"), "x");
 
-        Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
-        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+        Schema schemaA = Schema.of(ast("a", tableA));
+        Schema schemaB = Schema.of(ast("b", tableB));
 
         //@formatter:off
         ILogicalPlan expected = new Projection(
