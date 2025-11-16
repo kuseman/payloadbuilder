@@ -2,7 +2,10 @@ package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.unmodifiableMap;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -13,6 +16,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,6 +73,10 @@ public class JdbcCatalog extends Catalog
     public static final String DATABASE = "database";
     static final QualifiedName PROJECTION = QualifiedName.of("projection");
     static final QualifiedName TABLE_HINTS = QualifiedName.of("tableHints");
+    /** Prefix value for column options. */
+    static final String COLUMN = "column";
+    /** Suffix value for plbtype. When overriding PLB's choice. */
+    static final String PLBTYPE = "plbtype";
 
     private final Map<String, DatasourceHolder> dataSourceByURL = new ConcurrentHashMap<>();
     private final ScheduledFuture<?> houseKeepingFuture;
@@ -499,5 +508,52 @@ public class JdbcCatalog extends Catalog
 
         dataSourceByURL.values()
                 .forEach(ds -> ds.close());
+    }
+
+    /**
+     * A colunm option used in datasource/datasink to modify PLB's choice when reading/writing data.
+     *
+     * <pre>
+     * Is specified in table options on the format: column."some column".&lt;suffix&gt; = 'somevalue'
+     * </pre>
+     */
+    record ColumnOption(String column, Map<String, IExpression> values)
+    {
+        ColumnOption
+        {
+            requireNonNull(column);
+            values = unmodifiableMap(requireNonNull(values));
+        }
+
+        /** Extract a list of {@link ColumnOption} from list of options. */
+        static Map<String, ColumnOption> extract(List<Option> options)
+        {
+            Map<String, Map<String, IExpression>> columnOptions = new HashMap<>();
+
+            for (Option option : options)
+            {
+                if (!(option.getOption()
+                        .size() == 3
+                        && JdbcCatalog.COLUMN.equalsIgnoreCase(option.getOption()
+                                .getFirst())))
+                {
+                    continue;
+                }
+
+                String column = option.getOption()
+                        .getParts()
+                        .get(1);
+                String suffix = option.getOption()
+                        .getParts()
+                        .get(2);
+
+                columnOptions.computeIfAbsent(column.toLowerCase(), k -> new HashMap<>())
+                        .put(suffix, option.getValueExpression());
+            }
+            return columnOptions.entrySet()
+                    .stream()
+                    .map(e -> Pair.of(e.getKey(), new ColumnOption(e.getKey(), e.getValue())))
+                    .collect(toMap(p -> p.getKey(), p -> p.getValue()));
+        }
     }
 }

@@ -9,6 +9,9 @@ import org.testcontainers.utility.DockerImageName;
 
 import com.mysql.cj.jdbc.MysqlDataSource;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+
 /** Test of MySql8.x */
 public class MySql8xTest extends BaseJDBCTest
 {
@@ -21,6 +24,45 @@ public class MySql8xTest extends BaseJDBCTest
     public static void tearDownClass()
     {
         Mysql.stop();
+    }
+
+    @Override
+    protected String getColumnDeclaration(Column column)
+    {
+        Type type = column.getType()
+                .getType();
+        if (type == Type.Float)
+        {
+            return "FLOAT";
+        }
+        else if (type == Type.Double)
+        {
+            return "DOUBLE";
+        }
+        else if (type == Type.DateTime)
+        {
+            return "DATETIME";
+        }
+        return super.getColumnDeclaration(column);
+    }
+
+    @Override
+    protected Column getColumn(Type type, String name, int precision, int scale)
+    {
+        if (type == Type.Float)
+        {
+            precision = 12;
+        }
+        else if (type == Type.Double)
+        {
+            precision = 22;
+        }
+        else if (type == Type.DateTime)
+        {
+            precision = 19;
+            scale = 0;
+        }
+        return super.getColumn(type, name, precision, scale);
     }
 
     static class Mysql

@@ -11,7 +11,7 @@ import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 import se.kuseman.payloadbuilder.catalog.jdbc.SqlServer2017Test.SqlWaitStrategy;
 
 /** Test of SqlServer 2022 */
-public class SqlServer2022Test extends BaseJDBCTest
+public class SqlServer2022Test extends ASqlServerTest
 {
     public SqlServer2022Test()
     {

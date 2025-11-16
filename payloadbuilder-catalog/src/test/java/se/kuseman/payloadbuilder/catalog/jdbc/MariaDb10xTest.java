@@ -10,6 +10,9 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.HostPortWaitStrategy;
 import org.testcontainers.utility.DockerImageName;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+
 /** Test of MariaDb10.x */
 public class MariaDb10xTest extends BaseJDBCTest
 {
@@ -22,6 +25,55 @@ public class MariaDb10xTest extends BaseJDBCTest
     public static void tearDownClass()
     {
         MariaDb.stop();
+    }
+
+    @Override
+    protected String getColumnDeclaration(Column column)
+    {
+        Type type = column.getType()
+                .getType();
+        if (type == Type.Float)
+        {
+            return "FLOAT";
+        }
+        else if (type == Type.Double)
+        {
+            return "DOUBLE";
+        }
+        else if (type == Type.DateTime)
+        {
+            return "DATETIME";
+        }
+        return super.getColumnDeclaration(column);
+    }
+
+    @Override
+    protected Column getColumn(Type type, String name, int precision, int scale)
+    {
+        if (type == Type.Int)
+        {
+            precision = 11;
+        }
+        else if (type == Type.Long)
+        {
+            precision = 20;
+        }
+        else if (type == Type.Float)
+        {
+            scale = 31;
+            precision = 12;
+        }
+        else if (type == Type.Double)
+        {
+            scale = 31;
+            precision = 22;
+        }
+        else if (type == Type.DateTime)
+        {
+            precision = 19;
+            scale = 0;
+        }
+        return super.getColumn(type, name, precision, scale);
     }
 
     static class MariaDb
