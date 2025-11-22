@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>se.kuseman</groupId>
     <artifactId>payloadbuilder</artifactId>
-    <version>1.9.8-SNAPSHOT</version>
+    <version>1.9.8</version>
     <packaging>pom</packaging>
     <name>Payloadbuilder</name>
     <description>SQL Query engine</description>
@@ -35,7 +35,7 @@
         <url>https://github.com/kuseman/payloadbuilder</url>
         <connection>scm:git:git@github.com:kuseman/payloadbuilder.git</connection>
         <developerConnection>scm:git:git@github.com:kuseman/payloadbuilder.git</developerConnection>
-        <tag>HEAD</tag>
+        <tag>v1.9.8</tag>
     </scm>
 
     <licenses>
