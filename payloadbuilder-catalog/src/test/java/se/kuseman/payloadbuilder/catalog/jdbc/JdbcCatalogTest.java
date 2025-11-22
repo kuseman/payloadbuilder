@@ -1,12 +1,12 @@
 package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import static java.util.Collections.emptyList;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -19,10 +19,10 @@ import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 
 /** Test of {@link JdbcCatalog}. */
-public class JdbcCatalogTest
+class JdbcCatalogTest
 {
     @Test
-    public void test_tableSchema()
+    void test_tableSchema()
     {
         JdbcCatalog c = new JdbcCatalog();
 

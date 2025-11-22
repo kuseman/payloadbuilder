@@ -2,10 +2,10 @@ package se.kuseman.payloadbuilder.catalog.es;
 
 import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.joining;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
@@ -20,8 +20,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -44,21 +44,21 @@ import se.kuseman.payloadbuilder.test.ExpressionTestUtils;
 import se.kuseman.payloadbuilder.test.IPredicateMock;
 
 /** Test of {@link ElasticQueryBuilder}. */
-public class ElasticQueryBuilderTest
+class ElasticQueryBuilderTest
 {
     private static final QueryParser PARSER = new QueryParser();
     private QuerySession session;
     private ExecutionContext context;
 
-    @Before
-    public void setup()
+    @BeforeEach
+    void setup()
     {
         session = new QuerySession(new CatalogRegistry());
         context = new ExecutionContext(session);
     }
 
     @Test
-    public void test_single_property_is_identified() throws JsonMappingException, JsonProcessingException
+    void test_single_property_is_identified() throws JsonMappingException, JsonProcessingException
     {
         //@formatter:off
         List<IPredicate> predicates = new ArrayList<>(List.of(
@@ -89,7 +89,7 @@ public class ElasticQueryBuilderTest
     }
 
     @Test
-    public void test_collect_1x_2x_strategy() throws JsonMappingException, JsonProcessingException
+    void test_collect_1x_2x_strategy() throws JsonMappingException, JsonProcessingException
     {
         // Verify special constructs like existence of filter in bool clause etc.
         //@formatter:off
@@ -192,7 +192,7 @@ public class ElasticQueryBuilderTest
     }
 
     @Test
-    public void test_collect_not_supported()
+    void test_collect_not_supported()
     {
         Map<QualifiedName, MappedProperty> properties = emptyMap();
         List<IPredicate> predicates;
@@ -295,7 +295,7 @@ public class ElasticQueryBuilderTest
     }
 
     @Test
-    public void test_collect() throws JsonMappingException, JsonProcessingException
+    void test_collect() throws JsonMappingException, JsonProcessingException
     {
         //@formatter:off
         Map<QualifiedName, MappedProperty> properties = Map.of(
@@ -361,9 +361,9 @@ public class ElasticQueryBuilderTest
         List<IPropertyPredicate> predicatesResult = ElasticQueryBuilder.collectPredicates(context.getSession(), predicates, "es", properties);
 
         // All predicates should be consumed
-        assertTrue("Predicat indices not consumed: " + predicates.stream()
+        assertTrue(predicates.isEmpty(), "Predicat indices not consumed: " + predicates.stream()
                 .map(p -> String.valueOf(copyPredicates.indexOf(p)))
-                .collect(joining(",")), predicates.isEmpty());
+                .collect(joining(",")));
 
         StringBuilder filter = new StringBuilder();
         StringBuilder filterNot = new StringBuilder();
@@ -824,7 +824,7 @@ public class ElasticQueryBuilderTest
     }
 
     @Test
-    public void test_literal_or_variable_predicate()
+    void test_literal_or_variable_predicate()
     {
         assertTrue(ElasticQueryBuilder.PredicateCheckerVisitor.IS_LITERAL_OR_VARIABLE.test(e("null")));
         assertTrue(ElasticQueryBuilder.PredicateCheckerVisitor.IS_LITERAL_OR_VARIABLE.test(e("1")));

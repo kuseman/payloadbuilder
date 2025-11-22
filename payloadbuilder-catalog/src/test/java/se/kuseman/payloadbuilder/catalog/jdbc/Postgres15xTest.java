@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 
 import java.sql.Connection;
@@ -9,8 +10,8 @@ import java.sql.SQLException;
 
 import javax.sql.DataSource;
 
-import org.junit.AfterClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.HostPortWaitStrategy;
@@ -29,15 +30,15 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of Postgres15.x */
-public class Postgres15xTest extends BaseJDBCTest
+class Postgres15xTest extends BaseJDBCTest
 {
-    public Postgres15xTest()
+    Postgres15xTest()
     {
         super(Postgres.getDatasource(), Postgres.getUrl(), "org.postgresql.Driver", "root", Postgres.PASSWORD);
     }
 
-    @AfterClass
-    public static void tearDownClass()
+    @AfterAll
+    static void tearDownClass()
     {
         Postgres.stop();
     }
@@ -69,7 +70,7 @@ public class Postgres15xTest extends BaseJDBCTest
     }
 
     @Test
-    public void test_special_types() throws SQLException
+    void test_special_types() throws SQLException
     {
         try (Connection con = datasource.getConnection())
         {

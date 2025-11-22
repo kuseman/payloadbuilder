@@ -6,7 +6,7 @@ import java.time.ZonedDateTime;
 
 import javax.sql.DataSource;
 
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
 import org.mariadb.jdbc.MariaDbDataSource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.HostPortWaitStrategy;
@@ -16,15 +16,15 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 
 /** Test of MariaDb10.x */
-public class MariaDb10xTest extends BaseJDBCTest
+class MariaDb10xTest extends BaseJDBCTest
 {
-    public MariaDb10xTest()
+    MariaDb10xTest()
     {
         super(MariaDb.getDatasource(), MariaDb.getUrl(), "org.mariadb.jdbc.Driver", "root", MariaDb.PASSWORD);
     }
 
-    @AfterClass
-    public static void tearDownClass()
+    @AfterAll
+    static void tearDownClass()
     {
         MariaDb.stop();
     }

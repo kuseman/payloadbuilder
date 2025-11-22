@@ -2,8 +2,7 @@ package se.kuseman.payloadbuilder.core.execution.vector;
 
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -14,10 +13,10 @@ import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator.Allocator
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link MutableBooleanVector} */
-public class MutableBooleanVectorTest extends Assert
+class MutableBooleanVectorTest
 {
     @Test
-    public void test_put()
+    void test_put()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Boolean), 2);
@@ -31,7 +30,7 @@ public class MutableBooleanVectorTest extends Assert
     }
 
     @Test
-    public void test_put_1()
+    void test_put_1()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Boolean), 2);
@@ -43,7 +42,7 @@ public class MutableBooleanVectorTest extends Assert
     }
 
     @Test
-    public void test_copy()
+    void test_copy()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Boolean), 2);

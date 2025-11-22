@@ -1,21 +1,25 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 
 /** Test of {@link UTF8String} */
-public class UTF8StringTest extends Assert
+class UTF8StringTest
 {
     @Test
-    public void test_get_bytes()
+    void test_get_bytes()
     {
         byte[] bytes = "hello world".getBytes(StandardCharsets.UTF_8);
         UTF8String str = UTF8String.utf8(bytes, 0, 5);
@@ -30,7 +34,7 @@ public class UTF8StringTest extends Assert
     }
 
     @Test
-    public void test_get_bytes_supplied_array()
+    void test_get_bytes_supplied_array()
     {
         byte[] bytes = "hello world".getBytes(StandardCharsets.UTF_8);
         UTF8String str = UTF8String.utf8(bytes, 0, 5);
@@ -47,7 +51,7 @@ public class UTF8StringTest extends Assert
     }
 
     @Test
-    public void test_concat_builder()
+    void test_concat_builder()
     {
         List<UTF8String> strings = new ArrayList<>();
         assertEquals("", UTF8String.concat(UTF8String.from(","), strings)
@@ -67,7 +71,7 @@ public class UTF8StringTest extends Assert
     }
 
     @Test
-    public void test_concat_bytes()
+    void test_concat_bytes()
     {
         List<UTF8String> strings = new ArrayList<>();
         assertEquals("", UTF8String.concat(UTF8String.from(","), strings)
@@ -87,7 +91,7 @@ public class UTF8StringTest extends Assert
     }
 
     @Test
-    public void test_concat_latin_bytes()
+    void test_concat_latin_bytes()
     {
         List<UTF8String> strings = new ArrayList<>();
         strings.add(UTF8String.latin(("someCharStringText").getBytes(StandardCharsets.ISO_8859_1)));
@@ -99,7 +103,7 @@ public class UTF8StringTest extends Assert
     }
 
     @Test
-    public void test_compare()
+    void test_compare()
     {
         int size = 100_00;
         List<String> strings = new ArrayList<>(size);
@@ -123,7 +127,7 @@ public class UTF8StringTest extends Assert
     }
 
     @Test
-    public void test_compareTo()
+    void test_compareTo()
     {
         UTF8String utf1 = UTF8String.from("hello");
         UTF8String utf2 = UTF8String.from("world");
@@ -138,7 +142,7 @@ public class UTF8StringTest extends Assert
     }
 
     @Test
-    public void test_latin1_convertsion()
+    void test_latin1_convertsion()
     {
         for (int i = 0; i < 100_000; i++)
         {

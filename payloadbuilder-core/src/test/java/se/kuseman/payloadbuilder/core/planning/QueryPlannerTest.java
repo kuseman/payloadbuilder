@@ -5,6 +5,9 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static org.apache.commons.lang3.ObjectUtils.getIfNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
@@ -19,8 +22,8 @@ import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Triple;
 import org.assertj.core.api.Assertions;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
@@ -93,16 +96,16 @@ import se.kuseman.payloadbuilder.core.utils.CollectionUtils;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link QueryPlanner} */
-public class QueryPlannerTest extends APhysicalPlanTest
+class QueryPlannerTest extends APhysicalPlanTest
 {
-    @Before
-    public void setup()
+    @BeforeEach
+    void setup()
     {
         session.setDefaultCatalogAlias("t");
     }
 
     @Test
-    public void test_sub_query_filter_elimination()
+    void test_sub_query_filter_elimination()
     {
         // Verify that the nested filters are merged when the subquery are eliminated
         //@formatter:off
@@ -150,7 +153,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_sub_query_filter_elimination_analyze()
+    void test_sub_query_filter_elimination_analyze()
     {
         // Verify that the nested filters are merged when the subquery are eliminated
         //@formatter:off
@@ -207,7 +210,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_nested_sub_query_projection_elimination()
+    void test_nested_sub_query_projection_elimination()
     {
         // Verify that the nested projections are merged when the subquery are eliminated
         //@formatter:off
@@ -266,7 +269,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_sub_query_projection_elimination()
+    void test_sub_query_projection_elimination()
     {
         // Verify that the nested projections are merged when the subquery are eliminated
         //@formatter:off
@@ -320,7 +323,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_sub_query_projection_elimination_analyze()
+    void test_sub_query_projection_elimination_analyze()
     {
         // Verify that the nested projections are merged when the subquery are eliminated
         //@formatter:off
@@ -384,7 +387,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_sub_query_projection_elimination_2()
+    void test_sub_query_projection_elimination_2()
     {
         // Verify ordinals when eliminating projections/subqueries
         // The x.col before sub query elimination contains
@@ -436,7 +439,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_using_same_table_ref_different_places()
+    void test_using_same_table_ref_different_places()
     {
         // t.value and f.value both refers range(1,0) without alias
         // make sure analyzer still can see a equi
@@ -496,7 +499,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_using_same_table_ref_different_places_2()
+    void test_using_same_table_ref_different_places_2()
     {
         //@formatter:off
         String query = """
@@ -563,7 +566,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_using_same_table_ref_different_places_3()
+    void test_using_same_table_ref_different_places_3()
     {
         //@formatter:off
         String query = """
@@ -638,7 +641,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_using_same_table_ref_different_places_non_equi()
+    void test_using_same_table_ref_different_places_non_equi()
     {
         //@formatter:off
         String query = """
@@ -696,7 +699,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_outer_apply_non_correlated()
+    void test_outer_apply_non_correlated()
     {
         //@formatter:off
         String query = ""
@@ -745,7 +748,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_outer_apply_correlated()
+    void test_outer_apply_correlated()
     {
         //@formatter:off
         String query = ""
@@ -796,7 +799,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_cross_apply_correlated()
+    void test_cross_apply_correlated()
     {
         //@formatter:off
         String query = ""
@@ -847,7 +850,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_cross_join()
+    void test_cross_join()
     {
         //@formatter:off
         String query = ""
@@ -910,7 +913,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_cross_join_force_no_cache_option()
+    void test_cross_join_force_no_cache_option()
     {
         //@formatter:off
         String query = ""
@@ -972,7 +975,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_top()
+    void test_top()
     {
         //@formatter:off
         String query = ""
@@ -1010,7 +1013,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_temp_table()
+    void test_temp_table()
     {
         //@formatter:off
         String query = "select 1 col1 into #tableA "
@@ -1073,7 +1076,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_table_function()
+    void test_table_function()
     {
         //@formatter:off
         String query = ""
@@ -1107,7 +1110,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_order_by()
+    void test_order_by()
     {
         //@formatter:off
         String query = ""
@@ -1148,7 +1151,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_order_by_no_push_down_when_multiple_table_sources_are_sorted()
+    void test_order_by_no_push_down_when_multiple_table_sources_are_sorted()
     {
         //@formatter:off
         String query = ""
@@ -1216,7 +1219,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_order_by_no_push_down_when_not_top_table_source_are_sorted()
+    void test_order_by_no_push_down_when_not_top_table_source_are_sorted()
     {
         //@formatter:off
         String query = ""
@@ -1283,7 +1286,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_order_by_with_catalog_support()
+    void test_order_by_with_catalog_support()
     {
         //@formatter:off
         String query = ""
@@ -1333,7 +1336,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_order_by_with_catalog_support_not_consuming_all_items()
+    void test_order_by_with_catalog_support_not_consuming_all_items()
     {
         //@formatter:off
         String query = ""
@@ -1366,13 +1369,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
         }
         catch (CompileException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Sort items must be totally consumed or left as is."));
+            assertTrue(e.getMessage()
+                    .contains("Sort items must be totally consumed or left as is."), e.getMessage());
         }
     }
 
     @Test
-    public void test_sub_query_expression()
+    void test_sub_query_expression()
     {
         //@formatter:off
         String query = ""
@@ -1440,7 +1443,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_sub_query_expression_with_switched_inputs_with_for()
+    void test_sub_query_expression_with_switched_inputs_with_for()
     {
         //@formatter:off
         String query = ""
@@ -1534,7 +1537,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_join()
+    void test_indexed_join()
     {
         //@formatter:off
         String query = ""
@@ -1608,7 +1611,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_force_no_index_join()
+    void test_force_no_index_join()
     {
         //@formatter:off
         String query = ""
@@ -1678,7 +1681,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_that_not_in_expression_isnt_used_as_indexed_predicate_push_down()
+    void test_that_not_in_expression_isnt_used_as_indexed_predicate_push_down()
     {
         //@formatter:off
         String query = ""
@@ -1731,7 +1734,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_that_not_equal_isnt_used_as_indexed_predicate_push_down()
+    void test_that_not_equal_isnt_used_as_indexed_predicate_push_down()
     {
         //@formatter:off
         String query = ""
@@ -1784,7 +1787,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_predicate_push_down_with_in_expression()
+    void test_indexed_predicate_push_down_with_in_expression()
     {
         //@formatter:off
         String query = ""
@@ -1841,7 +1844,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_predicate_push_down_with_in_expression_wildcard_index()
+    void test_indexed_predicate_push_down_with_in_expression_wildcard_index()
     {
         //@formatter:off
         String query = ""
@@ -1898,7 +1901,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_predicate_push_down_with_in_expression_all_index()
+    void test_indexed_predicate_push_down_with_in_expression_all_index()
     {
         //@formatter:off
         String query = ""
@@ -1955,7 +1958,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_predicate_push_down_with_equal_expression()
+    void test_indexed_predicate_push_down_with_equal_expression()
     {
         //@formatter:off
         String query = ""
@@ -2018,7 +2021,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_predicate_push_down_with_equal_expression_multi_column_index()
+    void test_indexed_predicate_push_down_with_equal_expression_multi_column_index()
     {
         //@formatter:off
         String query = ""
@@ -2080,7 +2083,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_join_with_force_nested_loop()
+    void test_indexed_join_with_force_nested_loop()
     {
         //@formatter:off
         String query = ""
@@ -2152,7 +2155,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_join_with_all_type()
+    void test_indexed_join_with_all_type()
     {
         //@formatter:off
         String query = ""
@@ -2228,7 +2231,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_join_with_wildcard_type()
+    void test_indexed_join_with_wildcard_type()
     {
         //@formatter:off
         String query = ""
@@ -2306,7 +2309,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_join_with_index_all_type_and_not_all_columns_present()
+    void test_join_with_index_all_type_and_not_all_columns_present()
     {
         //@formatter:off
         String query = ""
@@ -2375,7 +2378,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_join_with_sub_query_with_join()
+    void test_indexed_join_with_sub_query_with_join()
     {
         //@formatter:off
         String query = ""
@@ -2498,7 +2501,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_indexed_join_multiple_columns_any_in_order()
+    void test_indexed_join_multiple_columns_any_in_order()
     {
         //@formatter:off
         String query = ""
@@ -2573,7 +2576,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_predicate_pushdown()
+    void test_predicate_pushdown()
     {
         //@formatter:off
         String query = ""
@@ -2641,7 +2644,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_predicate_pushdown_inverted_in_expression()
+    void test_predicate_pushdown_inverted_in_expression()
     {
         //@formatter:off
         String query = ""
@@ -2682,7 +2685,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_predicate_pushdown_inverted_in_expression_multiple_args()
+    void test_predicate_pushdown_inverted_in_expression_multiple_args()
     {
         //@formatter:off
         String query = ""
@@ -2723,7 +2726,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_predicate_pushdown_inverted_in_expression_with_not()
+    void test_predicate_pushdown_inverted_in_expression_with_not()
     {
         //@formatter:off
         String query = ""
@@ -2764,7 +2767,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_predicate_pushdown_2()
+    void test_predicate_pushdown_2()
     {
         //@formatter:off
         String query = ""
@@ -2831,7 +2834,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_predicate_pushdown_with_analyze()
+    void test_predicate_pushdown_with_analyze()
     {
         //@formatter:off
         String query = ""
@@ -2909,7 +2912,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_predicate_pushdown_all_filters_consumed()
+    void test_predicate_pushdown_all_filters_consumed()
     {
         //@formatter:off
         String query = ""

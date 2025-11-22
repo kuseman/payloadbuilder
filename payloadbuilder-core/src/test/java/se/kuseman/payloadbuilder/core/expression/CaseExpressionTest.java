@@ -1,10 +1,13 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -18,10 +21,10 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link CaseExpression} */
-public class CaseExpressionTest extends APhysicalPlanTest
+class CaseExpressionTest extends APhysicalPlanTest
 {
     @Test
-    public void test_type()
+    void test_type()
     {
         assertEquals(ResolvedType.of(Type.Int), e("case when 1 > 0 then 'hello' when 2 > 0 then 10 end").getType());
         assertEquals(ResolvedType.of(Type.String), e("case when 1 > 0 then 'hello' end").getType());
@@ -30,7 +33,7 @@ public class CaseExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_where_not_all_rows_can_be_evaluated_agaisnt_else()
+    void test_where_not_all_rows_can_be_evaluated_agaisnt_else()
     {
         // Test that verifies expressions like this:
         // CASE WHEN value = '' THEN null ELSE CAST(value AS DATETIME) END
@@ -58,7 +61,7 @@ public class CaseExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test()
+    void test()
     {
         CaseExpression e;
         ValueVector actual;
@@ -108,8 +111,8 @@ public class CaseExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException exp)
         {
-            assertTrue(exp.getMessage(), exp.getMessage()
-                    .contains("Cannot cast 'one' to Float"));
+            assertTrue(exp.getMessage()
+                    .contains("Cannot cast 'one' to Float"), exp.getMessage());
         }
 
         // Different value vectors for different rows

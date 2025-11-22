@@ -1,5 +1,8 @@
 package se.kuseman.payloadbuilder.core.cache;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,17 +11,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import org.apache.commons.lang3.ThreadUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.core.cache.AInMemoryCache.CacheImpl;
 
 /** Test of {@link InMemoryGenericCache} */
-public class InMemoryGenericCacheTest extends Assert
+class InMemoryGenericCacheTest
 {
     @Test
-    public void test_perf() throws InterruptedException
+    void test_perf() throws InterruptedException
     {
         InMemoryGenericCache cache = new InMemoryGenericCache("cache", false, false);
         CacheImpl<Object> cacheImpl = cache.getCacheOrCreate(QualifiedName.of("cache"));
@@ -84,7 +86,7 @@ public class InMemoryGenericCacheTest extends Assert
     }
 
     @Test
-    public void test_always_load_async() throws InterruptedException
+    void test_always_load_async() throws InterruptedException
     {
         InMemoryGenericCache cache = new InMemoryGenericCache("cache", false, true);
         CacheImpl<Object> cacheImpl = cache.getCacheOrCreate(QualifiedName.of("cache"));

@@ -1,6 +1,10 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -12,8 +16,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.time.DurationFormatUtils;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
@@ -27,10 +31,10 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
 
 /** Test of {@link Sort} */
-public class SortTest extends APhysicalPlanTest
+class SortTest extends APhysicalPlanTest
 {
     @Test
-    public void test_no_rows()
+    void test_no_rows()
     {
         IPhysicalPlan sort = new Sort(1, scan(schemaLessDS(() ->
         {
@@ -40,7 +44,7 @@ public class SortTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_nulls_undefined_schema_less()
+    void test_nulls_undefined_schema_less()
     {
         Schema schema = schema(new Type[] { Type.Int, Type.Any }, "col1", "col2");
 
@@ -78,7 +82,7 @@ public class SortTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_nulls_first_schema_less()
+    void test_nulls_first_schema_less()
     {
         Schema schema = schema(new Type[] { Type.Long, Type.Any }, "col1", "col2");
 
@@ -104,7 +108,7 @@ public class SortTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_nulls_last_schema_less()
+    void test_nulls_last_schema_less()
     {
         Schema schema = schema(new Type[] { Type.Float, Type.Any }, "col1", "col2");
 
@@ -131,7 +135,7 @@ public class SortTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_multiple_vectors_schema_less()
+    void test_multiple_vectors_schema_less()
     {
         Schema schema = schema(new Type[] { Type.Double, Type.Any }, "col1", "col2");
         MutableBoolean closed = new MutableBoolean();
@@ -159,7 +163,7 @@ public class SortTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_boolean()
+    void test_boolean()
     {
         Schema schema = schema(new Type[] { Type.Boolean, Type.Any }, "col1", "col2");
         MutableBoolean closed = new MutableBoolean();
@@ -183,7 +187,7 @@ public class SortTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_string()
+    void test_string()
     {
         Schema schema = schema(new Type[] { Type.String, Type.Any }, "col1", "col2");
         MutableBoolean closed = new MutableBoolean();
@@ -211,7 +215,7 @@ public class SortTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_ordinal()
+    void test_ordinal()
     {
         Schema schema = schema(new Type[] { Type.String, Type.Any }, "col1", "col2");
         MutableBoolean closed = new MutableBoolean();
@@ -239,7 +243,7 @@ public class SortTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_ordinal_out_of_range()
+    void test_ordinal_out_of_range()
     {
         Schema schema = schema(new Type[] { Type.String, Type.Any }, "col1", "col2");
 
@@ -258,13 +262,13 @@ public class SortTest extends APhysicalPlanTest
         }
         catch (QueryException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("ORDER BY position is out of range"));
+            assertTrue(e.getMessage()
+                    .contains("ORDER BY position is out of range"), e.getMessage());
         }
     }
 
     @Test
-    public void test_ordinal_out_of_range_2()
+    void test_ordinal_out_of_range_2()
     {
         Schema schema = schema(new Type[] { Type.String, Type.Any }, "col1", "col2");
 
@@ -283,14 +287,14 @@ public class SortTest extends APhysicalPlanTest
         }
         catch (QueryException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("ORDER BY position is out of range"));
+            assertTrue(e.getMessage()
+                    .contains("ORDER BY position is out of range"), e.getMessage());
         }
     }
 
-    @Ignore
+    @Disabled
     @Test
-    public void test_measure()
+    void test_measure()
     {
         Random r = new Random(System.nanoTime());
         int size = 5_000_000;

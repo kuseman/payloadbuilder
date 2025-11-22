@@ -1,13 +1,15 @@
 package se.kuseman.payloadbuilder.bytes;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 /** Test of {@link PayloadReader} */
-public class PayloadReaderTest extends Assert
+class PayloadReaderTest
 {
     @Test
-    public void test_isSupported()
+    void test_isSupported()
     {
         assertFalse(PayloadReader.isSupportedPayload(null));
         assertFalse(PayloadReader.isSupportedPayload(new byte[0]));

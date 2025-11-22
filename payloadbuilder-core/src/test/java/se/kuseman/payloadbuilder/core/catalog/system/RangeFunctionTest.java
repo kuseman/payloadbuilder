@@ -2,10 +2,11 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -22,13 +23,13 @@ import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test {@link RangeFunction} */
-public class RangeFunctionTest extends APhysicalPlanTest
+class RangeFunctionTest extends APhysicalPlanTest
 {
     private final TableFunctionInfo f = SystemCatalog.get()
             .getTableFunction("range");
 
     @Test
-    public void test()
+    void test()
     {
         Schema schema = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
         TupleIterator it = f.execute(context, "", asList(intLit(1), intLit(10)), new FunctionData(0, emptyList()));
@@ -47,7 +48,7 @@ public class RangeFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_batch_size()
+    void test_batch_size()
     {
         Schema schema = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
         context.setVariable("batch", ValueVector.literalInt(3, 1));

@@ -1,13 +1,14 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -23,13 +24,13 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link AggregateMinMaxFunction} */
-public class AggregateMaxFunctionTest extends APhysicalPlanTest
+class AggregateMaxFunctionTest extends APhysicalPlanTest
 {
     private ScalarFunctionInfo function = SystemCatalog.get()
             .getScalarFunction("max");
 
     @Test
-    public void test_object()
+    void test_object()
     {
         IExpression col1 = ce("col1", ResolvedType.of(Type.Any));
 
@@ -61,7 +62,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_int()
+    void test_int()
     {
         IExpression col1 = ce("col1", ResolvedType.of(Type.Int));
 
@@ -88,7 +89,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_long()
+    void test_long()
     {
         IExpression col1 = ce("col1", ResolvedType.of(Type.Long));
 
@@ -115,7 +116,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_float()
+    void test_float()
     {
         IExpression col1 = ce("col1", ResolvedType.of(Type.Float));
 
@@ -144,7 +145,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_double()
+    void test_double()
     {
         IExpression col1 = ce("col1", ResolvedType.of(Type.Double));
 
@@ -173,7 +174,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_double_multi_vectors()
+    void test_double_multi_vectors()
     {
         IExpression col1 = ce("col1", ResolvedType.of(Type.Double));
 
@@ -209,7 +210,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_double_scalar()
+    void test_double_scalar()
     {
         IExpression col1 = ce("col1", ResolvedType.of(Type.Double));
 
@@ -226,7 +227,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_double_scalar_value_vector()
+    void test_double_scalar_value_vector()
     {
         IExpression col1 = ce("col1", ResolvedType.array(ResolvedType.of(Type.Double)));
 

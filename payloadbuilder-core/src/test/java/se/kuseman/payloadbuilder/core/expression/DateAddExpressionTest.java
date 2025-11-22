@@ -3,7 +3,7 @@ package se.kuseman.payloadbuilder.core.expression;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -14,10 +14,10 @@ import se.kuseman.payloadbuilder.api.expression.IDatePartExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link DateAddExpression} */
-public class DateAddExpressionTest extends APhysicalPlanTest
+class DateAddExpressionTest extends APhysicalPlanTest
 {
     @Test
-    public void test() throws Exception
+    void test() throws Exception
     {
         DateAddExpression e;
         ValueVector actual;

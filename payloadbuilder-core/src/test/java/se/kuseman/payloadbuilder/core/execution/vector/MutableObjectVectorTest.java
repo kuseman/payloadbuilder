@@ -1,9 +1,12 @@
 package se.kuseman.payloadbuilder.core.execution.vector;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -15,10 +18,10 @@ import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator.Allocator
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link MutableObjectVector} */
-public class MutableObjectVectorTest extends Assert
+class MutableObjectVectorTest
 {
     @Test
-    public void test_fail_when_storing_wrong_type()
+    void test_fail_when_storing_wrong_type()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.String), 2);
@@ -33,13 +36,13 @@ public class MutableObjectVectorTest extends Assert
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Check implementation of MutableValueVector: class se.kuseman.payloadbuilder.core.execution.vector.MutableObjectVector for setInt"));
+            assertTrue(e.getMessage()
+                    .contains("Check implementation of MutableValueVector: class se.kuseman.payloadbuilder.core.execution.vector.MutableObjectVector for setInt"), e.getMessage());
         }
     }
 
     @Test
-    public void test_literal_creation()
+    void test_literal_creation()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Any), 2);
@@ -78,7 +81,7 @@ public class MutableObjectVectorTest extends Assert
     }
 
     @Test
-    public void test_put()
+    void test_put()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Any), 2);
@@ -93,7 +96,7 @@ public class MutableObjectVectorTest extends Assert
     }
 
     @Test
-    public void test_put_1()
+    void test_put_1()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Any), 2);
@@ -105,7 +108,7 @@ public class MutableObjectVectorTest extends Assert
     }
 
     @Test
-    public void test_strings_are_converted_to_utf8_strings()
+    void test_strings_are_converted_to_utf8_strings()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Any), 2);
@@ -121,7 +124,7 @@ public class MutableObjectVectorTest extends Assert
     }
 
     @Test
-    public void test_copy()
+    void test_copy()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Any), 2);

@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
@@ -8,7 +9,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Map;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -28,10 +29,10 @@ import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test if {@link InsertInto} */
-public class InsertIntoTest extends APhysicalPlanTest
+class InsertIntoTest extends APhysicalPlanTest
 {
     @Test
-    public void test_that_input_is_closed()
+    void test_that_input_is_closed()
     {
         TableSourceReference table = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t");
 

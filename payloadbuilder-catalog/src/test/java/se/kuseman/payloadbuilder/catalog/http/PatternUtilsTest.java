@@ -2,7 +2,7 @@ package se.kuseman.payloadbuilder.catalog.http;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hc.core5.http.ContentType;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -25,10 +25,10 @@ import se.kuseman.payloadbuilder.test.ExpressionTestUtils;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test {@link PatternUtils}. */
-public class PatternUtilsTest
+class PatternUtilsTest
 {
     @Test
-    public void test_createValues_describe_mode()
+    void test_createValues_describe_mode()
     {
         IExecutionContext executionContext = Mockito.mock(IExecutionContext.class);
         assertEquals(emptyMap(), PatternUtils.createValues(executionContext, null, emptyList(), true));
@@ -56,7 +56,7 @@ public class PatternUtilsTest
     }
 
     @Test
-    public void test_createValues()
+    void test_createValues()
     {
         IExecutionContext executionContext = Mockito.mock(IExecutionContext.class);
         assertEquals(emptyMap(), PatternUtils.createValues(executionContext, null, emptyList(), false));
@@ -122,7 +122,7 @@ public class PatternUtilsTest
     }
 
     @Test
-    public void test_extractFields_and_process()
+    void test_extractFields_and_process()
     {
         IExecutionContext executionContext = Mockito.mock(IExecutionContext.class);
         ISeekPredicate seekPredicate = Mockito.mock(ISeekPredicate.class);
@@ -251,7 +251,7 @@ public class PatternUtilsTest
     }
 
     @Test
-    public void test_extractFields()
+    void test_extractFields()
     {
         assertEquals(List.of("id"), PatternUtils.extractFields("{{id}}"));
         // Verify we pick up parent scope fields from within seek values
@@ -316,7 +316,7 @@ public class PatternUtilsTest
     }
 
     @Test
-    public void test_helpers()
+    void test_helpers()
     {
         Map<String, Object> map = new HashMap<>();
         map.put("list", null);
@@ -349,7 +349,7 @@ public class PatternUtilsTest
     }
 
     @Test
-    public void test_iterHasNext()
+    void test_iterHasNext()
     {
         Map<String, Object> map = new HashMap<>();
         map.put("field1", null);
@@ -426,7 +426,7 @@ public class PatternUtilsTest
 
     /** Verify that the old placeholder pattern still works that was used before introduction of mustache. */
     @Test
-    public void test_replaceBodyPattern_old_iterable_style()
+    void test_replaceBodyPattern_old_iterable_style()
     {
         assertEquals("[\"\\\"hello\",2,3]", PatternUtils.replacePattern("[{{field1}}]", ContentType.APPLICATION_JSON, Map.of("field1", List.of("\"hello", 2, 3))));
         // UTF8 String
@@ -437,7 +437,7 @@ public class PatternUtilsTest
     }
 
     @Test
-    public void test_replaceBodyPattern_urlencode()
+    void test_replaceBodyPattern_urlencode()
     {
         assertEquals("id=%22hello,2,3",
                 PatternUtils.replacePattern("id={{#field1}}{{.}}{{#iterHasNext}},{{/iterHasNext}}{{/field1}}", PatternUtils.URL_ENCODED_CONTENT_TYPE, Map.of("field1", List.of("\"hello", 2, 3))));
@@ -448,14 +448,14 @@ public class PatternUtilsTest
     }
 
     @Test
-    public void test_replaceBodyPattern_default_content_type()
+    void test_replaceBodyPattern_default_content_type()
     {
         assertEquals("<fields><field>\"hello</field><field>2</field><field>3</field></fields>",
                 PatternUtils.replacePattern("<fields>{{#field1}}<field>{{.}}</field>{{/field1}}</fields>", ContentType.TEXT_XML, Map.of("field1", List.of("\"hello", 2, 3))));
     }
 
     @Test
-    public void test_replaceBodyPattern_json()
+    void test_replaceBodyPattern_json()
     {
         assertEquals("[\"\\\"hello\";\"2\";\"3\"]",
                 PatternUtils.replacePattern("[{{#field1}}\"{{.}}\"{{#iterHasNext}};{{/iterHasNext}}{{/field1}}]", ContentType.APPLICATION_JSON, Map.of("field1", List.of("\"hello", 2, 3))));

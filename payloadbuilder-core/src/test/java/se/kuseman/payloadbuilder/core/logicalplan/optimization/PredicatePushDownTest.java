@@ -2,13 +2,14 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.api.QualifiedName.of;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.Set;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -25,7 +26,7 @@ import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Test of {@link PredicatePushDown} */
-public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
+class PredicatePushDownTest extends ALogicalPlanOptimizerTest
 {
     private final ColumnResolver columnOptimizer = new ColumnResolver();
     private final PredicatePushDown predicatePushDown = new PredicatePushDown();
@@ -34,7 +35,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     private final Schema schemaB = Schema.of(ast("b", tableB));
 
     @Test
-    public void test_table_and_no_filter()
+    void test_table_and_no_filter()
     {
         ILogicalPlan plan = tableScan(schema, table);
 
@@ -48,7 +49,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_function_and_no_filter()
+    void test_function_and_no_filter()
     {
         TableSourceReference opencsv = new TableSourceReference(0, TableSourceReference.Type.FUNCTION, "sys", QualifiedName.of("opencsv"), "t");
         Schema schema = Schema.of(ast("t", opencsv));
@@ -65,7 +66,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_table_and_surrounding_filter()
+    void test_table_and_surrounding_filter()
     {
         //@formatter:off
         ILogicalPlan plan = new Filter(
@@ -91,7 +92,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_function_scan_and_surrounding_filter()
+    void test_function_scan_and_surrounding_filter()
     {
         TableSourceReference opencsv = new TableSourceReference(0, TableSourceReference.Type.FUNCTION, "sys", QualifiedName.of("opencsv"), "t");
         Schema schema = Schema.of(ast("t", opencsv));
@@ -128,7 +129,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
      * Test for a regression found were filters inside sub queries didn't get any pushed down predicates because of scope issues when going down one level due to subquery.
      */
     @Test
-    public void test_filter_inside_subquery()
+    void test_filter_inside_subquery()
     {
         //@formatter:off
         /*
@@ -203,7 +204,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_join_and_surrounding_filter()
+    void test_join_and_surrounding_filter()
     {
         //@formatter:off
         ILogicalPlan plan = 
@@ -253,7 +254,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_join_and_surrounding_filter_2()
+    void test_join_and_surrounding_filter_2()
     {
         //@formatter:off
         ILogicalPlan plan = 
@@ -300,7 +301,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_cross_join_with_where()
+    void test_cross_join_with_where()
     {
         //@formatter:off
         ILogicalPlan plan = 
@@ -348,7 +349,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_join_with_filter_and_surrounding_filter()
+    void test_join_with_filter_and_surrounding_filter()
     {
         //@formatter:off
         ILogicalPlan plan = 
@@ -399,7 +400,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_left_join_with_is_null_surrounding_filter()
+    void test_left_join_with_is_null_surrounding_filter()
     {
         //@formatter:off
         ILogicalPlan plan = 
@@ -457,7 +458,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_left_join_with_is_not_null_surrounding_filter()
+    void test_left_join_with_is_not_null_surrounding_filter()
     {
         //@formatter:off
         ILogicalPlan plan = 
@@ -511,7 +512,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_left_with_is_null_surrounding_filter()
+    void test_left_with_is_null_surrounding_filter()
     {
         //@formatter:off
         ILogicalPlan plan = 
@@ -566,7 +567,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_left_with_is_not_null_surrounding_filter()
+    void test_left_with_is_not_null_surrounding_filter()
     {
         //@formatter:off
         ILogicalPlan plan = 

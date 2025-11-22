@@ -1,6 +1,9 @@
 package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 
 import java.io.StringWriter;
@@ -11,7 +14,7 @@ import java.util.List;
 
 import javax.sql.DataSource;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -39,7 +42,7 @@ abstract class ASqlServerTest extends BaseJDBCTest
     }
 
     @Test
-    public void test_qualified_tables() throws SQLException
+    void test_qualified_tables() throws SQLException
     {
         try (Connection con = datasource.getConnection())
         {
@@ -75,8 +78,8 @@ abstract class ASqlServerTest extends BaseJDBCTest
                 INSERT INTO test.test_table VALUES (?, ?)
                 """), new LiteralArrayExpression(VectorTestUtils.vv(Type.Any, 30, "some third value"))), new FunctionData(0, emptyList()));
         assertFalse(it.hasNext());
-        assertTrue(sw.toString(), sw.toString()
-                .contains("1 row(s) affected"));
+        assertTrue(sw.toString()
+                .contains("1 row(s) affected"), sw.toString());
 
         context = mockExecutionContext();
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, tableName, new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, emptyList()));

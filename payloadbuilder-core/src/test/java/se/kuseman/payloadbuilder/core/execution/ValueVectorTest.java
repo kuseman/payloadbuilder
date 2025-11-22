@@ -1,5 +1,11 @@
 package se.kuseman.payloadbuilder.core.execution;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -10,7 +16,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.TimeZone;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -26,16 +32,16 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link ValueVector} */
-public class ValueVectorTest extends APhysicalPlanTest
+class ValueVectorTest extends APhysicalPlanTest
 {
     @Test
-    public void test_toList()
+    void test_toList()
     {
         assertEquals(List.of(1, 2, 3), vv(Type.Int, 1, 2, 3).toList());
     }
 
     @Test
-    public void test_range()
+    void test_range()
     {
         assertThrows(IllegalArgumentException.class, () -> ValueVector.range(10, 5));
         VectorTestUtils.assertVectorsEquals(vv(Type.Int), ValueVector.range(0, 0));
@@ -44,7 +50,7 @@ public class ValueVectorTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_table_implicit_casts()
+    void test_table_implicit_casts()
     {
         ValueVector vv;
 
@@ -61,8 +67,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 10 to Table"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 10 to Table"), e.getMessage());
         }
 
         try
@@ -74,8 +80,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast Array to Table"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast Array to Table"), e.getMessage());
         }
 
         try
@@ -107,8 +113,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("getTable not implemented on class se.kuseman.payloadbuilder.core.execution"));
+            assertTrue(e.getMessage()
+                    .contains("getTable not implemented on class se.kuseman.payloadbuilder.core.execution"), e.getMessage());
         }
 
         vv = ValueVector.literalArray(vv(Type.Int), 0);
@@ -119,7 +125,7 @@ public class ValueVectorTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_array_implicit_casts()
+    void test_array_implicit_casts()
     {
         ValueVector vv;
 
@@ -136,8 +142,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 10 to Array"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 10 to Array"), e.getMessage());
         }
 
         try
@@ -149,8 +155,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast Table to Array"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast Table to Array"), e.getMessage());
         }
 
         try
@@ -182,13 +188,13 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("getArray not implemented on class se.kuseman.payloadbuilder.core.execution"));
+            assertTrue(e.getMessage()
+                    .contains("getArray not implemented on class se.kuseman.payloadbuilder.core.execution"), e.getMessage());
         }
     }
 
     @Test
-    public void test_object_implicit_casts()
+    void test_object_implicit_casts()
     {
         ValueVector vv;
 
@@ -205,8 +211,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 10 to Object"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 10 to Object"), e.getMessage());
         }
 
         try
@@ -218,8 +224,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast Table to Object"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast Table to Object"), e.getMessage());
         }
 
         try
@@ -251,13 +257,13 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("getObject not implemented on class se.kuseman.payloadbuilder.core.execution"));
+            assertTrue(e.getMessage()
+                    .contains("getObject not implemented on class se.kuseman.payloadbuilder.core.execution"), e.getMessage());
         }
     }
 
     @Test
-    public void test_string_implicit_casts()
+    void test_string_implicit_casts()
     {
         ValueVector vv;
 
@@ -279,7 +285,7 @@ public class ValueVectorTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_int_implicit_casts()
+    void test_int_implicit_casts()
     {
         ValueVector vv;
 
@@ -322,8 +328,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 'nono' to Int"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 'nono' to Int"), e.getMessage());
         }
 
         try
@@ -334,13 +340,13 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast [se.kuseman.payloadbuilder.api.execution.ObjectVector"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast [se.kuseman.payloadbuilder.api.execution.ObjectVector"), e.getMessage());
         }
     }
 
     @Test
-    public void test_long_implicit_casts()
+    void test_long_implicit_casts()
     {
         ValueVector vv;
 
@@ -383,8 +389,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 'nono' to Long"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 'nono' to Long"), e.getMessage());
         }
 
         try
@@ -395,13 +401,13 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast type Object to Long"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast type Object to Long"), e.getMessage());
         }
     }
 
     @Test
-    public void test_decimal_implicit_casts()
+    void test_decimal_implicit_casts()
     {
         ValueVector vv;
 
@@ -433,8 +439,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast '1970-01-19T12:26:40Z' to Decimal"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast '1970-01-19T12:26:40Z' to Decimal"), e.getMessage());
         }
 
         try
@@ -445,13 +451,13 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 'nono' to Decimal"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 'nono' to Decimal"), e.getMessage());
         }
     }
 
     @Test
-    public void test_float_implicit_casts()
+    void test_float_implicit_casts()
     {
         ValueVector vv;
 
@@ -494,8 +500,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 'nono' to Float"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 'nono' to Float"), e.getMessage());
         }
 
         try
@@ -506,13 +512,13 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast type Object to Float"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast type Object to Float"), e.getMessage());
         }
     }
 
     @Test
-    public void test_double_implicit_casts()
+    void test_double_implicit_casts()
     {
         ValueVector vv;
 
@@ -555,8 +561,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 'nono' to Double"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 'nono' to Double"), e.getMessage());
         }
 
         try
@@ -567,13 +573,13 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast type Object to Double"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast type Object to Double"), e.getMessage());
         }
     }
 
     @Test
-    public void test_datetime_implicit_casts()
+    void test_datetime_implicit_casts()
     {
         TimeZone defaultTimezone = TimeZone.getDefault();
         try
@@ -606,7 +612,7 @@ public class ValueVectorTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_datetimeoffset_implicit_casts()
+    void test_datetimeoffset_implicit_casts()
     {
         TimeZone defaultTimezone = TimeZone.getDefault();
         try
@@ -638,7 +644,7 @@ public class ValueVectorTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_boolean_implicit_casts()
+    void test_boolean_implicit_casts()
     {
         ValueVector vv;
 
@@ -667,8 +673,8 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 'nono' to Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 'nono' to Boolean"), e.getMessage());
         }
 
         // Int
@@ -702,28 +708,27 @@ public class ValueVectorTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast Float to Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast Float to Boolean"), e.getMessage());
         }
     }
 
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_cardinality_non_boolean()
+    @Test
+    void test_cardinality_non_boolean()
     {
-        ValueVector.literalInt(5, 10)
-                .getCardinality();
+        assertThrows(IllegalArgumentException.class, () -> ValueVector.literalInt(5, 10)
+                .getCardinality());
     }
 
     @Test
-    public void test_cardinality()
+    void test_cardinality()
     {
         assertEquals(ValueVector.literalBoolean(true, 10)
                 .getCardinality(), 10);
     }
 
     @Test
-    public void test_literals()
+    void test_literals()
     {
         assertFalse(ValueVector.literalAny(1, "hello")
                 .hasNulls());

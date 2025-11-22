@@ -1,13 +1,14 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -32,13 +33,13 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
             .getScalarFunction("count");
 
     @Test
-    public void test_type()
+    void test_type()
     {
         assertEquals(ResolvedType.of(Type.Int), function.getType(asList(col1)));
     }
 
     @Test
-    public void test_aggregate()
+    void test_aggregate()
     {
         assertEquals(Arity.ONE, function.arity());
 
@@ -71,7 +72,7 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_aggregate_asterisk()
+    void test_aggregate_asterisk()
     {
         assertEquals(Arity.ONE, function.arity());
 
@@ -104,7 +105,7 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_aggregate_constant()
+    void test_aggregate_constant()
     {
         assertEquals(Arity.ONE, function.arity());
 
@@ -137,7 +138,7 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_scalar()
+    void test_scalar()
     {
         ValueVector one = VectorTestUtils.vv(Type.Any, 10, 20, null, -200D);
 
@@ -153,7 +154,7 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_scalar_value_vector()
+    void test_scalar_value_vector()
     {
         ValueVector one = VectorTestUtils.vv(Type.Any, 10, 20, -20F, -200D);
         ValueVector two = ValueVector.literalAny(4, 10_000_000);

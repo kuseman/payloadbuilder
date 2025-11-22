@@ -5,7 +5,7 @@ import static java.util.Collections.emptyMap;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -18,10 +18,10 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link NullPredicateExpression} */
-public class NullPrecidateExpressionTest extends APhysicalPlanTest
+class NullPrecidateExpressionTest extends APhysicalPlanTest
 {
     @Test
-    public void test()
+    void test()
     {
         TupleVector input = TupleVector.of(Schema.of(Column.of("col1", ResolvedType.of(Type.Int)), Column.of("col2", ResolvedType.of(Type.Any))),
                 asList(VectorTestUtils.vv(Type.Int, 1, 2, null), VectorTestUtils.vv(Type.Any, emptyMap(), emptyMap(), MapUtils.ofEntries(MapUtils.entry("key", "value")))));

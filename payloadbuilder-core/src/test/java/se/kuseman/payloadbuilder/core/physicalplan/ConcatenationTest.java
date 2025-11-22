@@ -1,11 +1,13 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -13,10 +15,10 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 
 /** Test of {@link Concatenation} */
-public class ConcatenationTest extends APhysicalPlanTest
+class ConcatenationTest extends APhysicalPlanTest
 {
     @Test
-    public void test()
+    void test()
     {
         MutableBoolean closed1 = new MutableBoolean();
         MutableBoolean closed2 = new MutableBoolean();

@@ -1,16 +1,17 @@
 package se.kuseman.payloadbuilder.core;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.io.StringWriter;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** Test of {@link PlainTextOutputWriter} */
-public class PlainTextOutputWriterTest extends Assert
+class PlainTextOutputWriterTest
 {
     @Test
-    public void test_delayed_headers()
+    void test_delayed_headers()
     {
         Pair<StringWriter, PlainTextOutputWriter> p = writer();
 
@@ -89,7 +90,7 @@ public class PlainTextOutputWriterTest extends Assert
     }
 
     @Test
-    public void test()
+    void test()
     {
         Pair<StringWriter, PlainTextOutputWriter> p = writer();
         p.getValue()

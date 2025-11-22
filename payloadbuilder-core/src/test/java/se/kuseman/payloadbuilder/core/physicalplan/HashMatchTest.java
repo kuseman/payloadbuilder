@@ -1,7 +1,11 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
-import static org.junit.Assume.assumeNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -11,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -29,7 +33,7 @@ import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 
 /** Test of {@link HashMatch} */
-public class HashMatchTest extends AJoinTest
+class HashMatchTest extends AJoinTest
 {
     @Override
     IPhysicalPlan createInnerJoin(IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> predicate, String populateAlias)
@@ -56,7 +60,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_join_integer_against_string_hash_outer()
+    void test_join_integer_against_string_hash_outer()
     {
         Schema outerSchema = Schema.of(Column.of("col1", Type.Int));
         Schema innerSchema = Schema.of(Column.of("col3", Type.String));
@@ -88,7 +92,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_join_string_against_integer_hash_outer()
+    void test_join_string_against_integer_hash_outer()
     {
         Schema outerSchema = Schema.of(Column.of("col1", Type.String));
         Schema innerSchema = Schema.of(Column.of("col3", Type.Int));
@@ -120,7 +124,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_join_integer_against_string_hash_inner()
+    void test_join_integer_against_string_hash_inner()
     {
         Schema outerSchema = Schema.of(Column.of("col1", Type.Int));
         Schema innerSchema = Schema.of(Column.of("col3", Type.String));
@@ -152,7 +156,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_join_string_against_integer__hash_inner()
+    void test_join_string_against_integer__hash_inner()
     {
         Schema outerSchema = Schema.of(Column.of("col1", Type.String));
         Schema innerSchema = Schema.of(Column.of("col3", Type.Int));
@@ -185,7 +189,7 @@ public class HashMatchTest extends AJoinTest
 
     /** Empty second batch to verify regression when we tried to execute the inner with an outer empty tuple vector that is not allowed. */
     @Test
-    public void test_indexed_inner_join_no_outer_rows_second_batch()
+    void test_indexed_inner_join_no_outer_rows_second_batch()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -223,7 +227,7 @@ public class HashMatchTest extends AJoinTest
 
     /** Verify that we don't return an empty Tuple Vector when we have full match of all outer rows. (Outer hash mode) */
     @Test
-    public void test_left_join_all_outer_matches_outer_hash()
+    void test_left_join_all_outer_matches_outer_hash()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -266,7 +270,7 @@ public class HashMatchTest extends AJoinTest
 
     /** Verify that we don't return an empty Tuple Vector when we have full match of all outer rows. (Inner hash mode) */
     @Test
-    public void test_left_join_all_outer_matches_inner_hash()
+    void test_left_join_all_outer_matches_inner_hash()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -308,7 +312,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_left_join_no_populate_schema_less_no_hashed_values()
+    void test_left_join_no_populate_schema_less_no_hashed_values()
     {
         List<TupleVector> outer = List.of(TupleVector.of(outerSchema, asList(vv(Type.Any, null, null, null, null), vv(Type.Any, null, 2, 3, 10))));
         List<TupleVector> inner = List.of(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1, 2, 3), vv(Type.Any, 1, 2, 2, 4))));
@@ -336,7 +340,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_left_join_no_populate_schema_less_a_few_hashed_values()
+    void test_left_join_no_populate_schema_less_a_few_hashed_values()
     {
         List<TupleVector> outer = List.of(TupleVector.of(outerSchema, asList(vv(Type.Any, null, null, 0, null), vv(Type.Any, null, 2, 3, 10))));
         List<TupleVector> inner = List.of(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1, 2, 3), vv(Type.Any, 1, 2, 2, 4))));
@@ -364,7 +368,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_left_join_no_populate_schema_less_no_hashed_values_multiple_vectors()
+    void test_left_join_no_populate_schema_less_no_hashed_values_multiple_vectors()
     {
         List<TupleVector> outer = List.of(TupleVector.of(outerSchema, asList(vv(Type.Any, null, null, null, null), vv(Type.Any, null, 2, 3, 10))),
                 TupleVector.of(outerSchema, asList(vv(Type.Any, null, null, null, null), vv(Type.Any, null, 20, 30, 101))), TupleVector.EMPTY,
@@ -394,7 +398,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_left_join_no_populate_schema_less_no_hashed_values_smaller_inner()
+    void test_left_join_no_populate_schema_less_no_hashed_values_smaller_inner()
     {
         List<TupleVector> outer = List.of(TupleVector.of(outerSchema, asList(vv(Type.Any, null, null, null, null), vv(Type.Any, null, 2, 3, 10))));
         List<TupleVector> inner = List.of(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1, 2), vv(Type.Any, 1, 2, 2))));
@@ -422,7 +426,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_join_populate_schema_less_smaller_inner()
+    void test_inner_join_populate_schema_less_smaller_inner()
     {
         List<TupleVector> outer = List.of(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 0, 1, null), vv(Type.Any, 1, 2, 3, 10))));
         List<TupleVector> inner = List.of(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 1, 2))));
@@ -480,7 +484,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_left_join_no_populate_schema_less_smaller_inner()
+    void test_left_join_no_populate_schema_less_smaller_inner()
     {
         /*
          * @fomatter:off
@@ -544,7 +548,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_left_join_no_populate_schema_less_multiple_outer_smaller_inner_all_nulls()
+    void test_left_join_no_populate_schema_less_multiple_outer_smaller_inner_all_nulls()
     {
         List<TupleVector> outer = List.of(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 0), vv(Type.Any, 1, 2))),
                 TupleVector.of(outerSchema, asList(vv(Type.Any, 1, 2, 3), vv(Type.Any, 3, 4, 5))));
@@ -586,7 +590,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_join_no_populate_schema_less_smaller_inner_same_hash_different_value()
+    void test_inner_join_no_populate_schema_less_smaller_inner_same_hash_different_value()
     {
         TestObject a = new TestObject(10, 10);
         TestObject b = new TestObject(20, 20);
@@ -653,7 +657,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_left_join_no_populate_schema_less_same_hash_different_value()
+    void test_left_join_no_populate_schema_less_same_hash_different_value()
     {
         TestObject a = new TestObject(10, 10);
         TestObject b = new TestObject(20, 20);
@@ -698,7 +702,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_join_populate_schema_less_same_hash_different_value()
+    void test_inner_join_populate_schema_less_same_hash_different_value()
     {
         TestObject a = new TestObject(10, 10);
         TestObject b = new TestObject(20, 20);
@@ -742,7 +746,7 @@ public class HashMatchTest extends AJoinTest
 
     @Override
     @Test
-    public void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors_no_matches_in_middle_and_last_batch()
+    void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors_no_matches_in_middle_and_last_batch()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -796,7 +800,7 @@ public class HashMatchTest extends AJoinTest
         });
 
         IPhysicalPlan plan = createIndexLeftJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null);
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
@@ -855,7 +859,7 @@ public class HashMatchTest extends AJoinTest
 
     @Override
     @Test
-    public void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors_no_matches_in_middle_and_first_batch()
+    void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors_no_matches_in_middle_and_first_batch()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -909,7 +913,7 @@ public class HashMatchTest extends AJoinTest
         });
 
         IPhysicalPlan plan = createIndexLeftJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null);
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
@@ -967,7 +971,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_left_join_populate_schema_less_same_hash_different_value_smaller_inner()
+    void test_left_join_populate_schema_less_same_hash_different_value_smaller_inner()
     {
         TestObject a = new TestObject(10, 10);
         TestObject b = new TestObject(20, 20);
@@ -1010,7 +1014,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_join_no_populate_multiple_outer_vectors_smaller_inner()
+    void test_inner_join_no_populate_multiple_outer_vectors_smaller_inner()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1046,7 +1050,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_join_no_populate_multiple_inner_vectors_smaller_outer()
+    void test_inner_join_no_populate_multiple_inner_vectors_smaller_outer()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1082,7 +1086,7 @@ public class HashMatchTest extends AJoinTest
     }
 
     @Test
-    public void test_left_join_no_populate_multiple_outer_vectors_smaller_inner()
+    void test_left_join_no_populate_multiple_outer_vectors_smaller_inner()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();

@@ -2,13 +2,16 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.api.QualifiedName.of;
 
 import java.util.List;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -17,7 +20,6 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
@@ -39,14 +41,14 @@ import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
 
 /** Test of {@link ComputedExpressionPushDown} */
-public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
+class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
 {
     private final ComputedExpressionPushDown optimizer = new ComputedExpressionPushDown();
     private final TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", of("table"), "t");
     private final TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", of("tableB"), "b");
 
     @Test
-    public void test_order_by_column_not_projected()
+    void test_order_by_column_not_projected()
     {
         // SQL standard specifies that an order by column reference points either to
         // a projected column or a table source. Normally the col2 is not present in the projections input
@@ -97,7 +99,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_order_by_and_projection_with_subscript()
+    void test_order_by_and_projection_with_subscript()
     {
         //@formatter:off
         String query = """
@@ -135,7 +137,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_expression_with_group_by()
+    void test_sort_expression_with_group_by()
     {
         //@formatter:off
         // Here we have a complex order by expression which contains columns from the aggregate
@@ -171,7 +173,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_on_non_aggregated_column_contained_in_aggregate_function_verify_push_down()
+    void test_sort_on_non_aggregated_column_contained_in_aggregate_function_verify_push_down()
     {
         //@formatter:off
         String query = "select col1, max(col2) "
@@ -221,7 +223,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_on_non_aggregated_column_contained_in_aggregate_function_verify_push_down_in_sub_query_expression()
+    void test_sort_on_non_aggregated_column_contained_in_aggregate_function_verify_push_down_in_sub_query_expression()
     {
         //@formatter:off
         String query = "select ( "
@@ -270,7 +272,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_double_nested_sub_query_expressions_with_order_bys()
+    void test_double_nested_sub_query_expressions_with_order_bys()
     {
         //@formatter:off
         String query = "select "
@@ -351,7 +353,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_on_aggregate_function_that_is_also_projected()
+    void test_sort_on_aggregate_function_that_is_also_projected()
     {
         //@formatter:off
         // Here we should change the aggregate projection to the pushed down alias only
@@ -403,7 +405,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_on_aggregate_function_that_is_also_projected_and_aliased()
+    void test_sort_on_aggregate_function_that_is_also_projected_and_aliased()
     {
         //@formatter:off
         // Here we should change the aggregate projection to the pushed down alias only
@@ -448,7 +450,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_on_non_aggregated_column()
+    void test_sort_on_non_aggregated_column()
     {
         //@formatter:off
         String query = "select col1, max(col2) "
@@ -496,7 +498,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_out_of_range()
+    void test_sort_by_ordinal_out_of_range()
     {
         //@formatter:off
         String query = "select col1, col2 "
@@ -510,15 +512,15 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
             optimize(context, plan);
             fail("Should fail with out of range");
         }
-        catch (QueryException e)
+        catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("ORDER BY position is out of range"));
+            assertTrue(e.getMessage()
+                    .contains("ORDER BY position is out of range"), e.getMessage());
         }
     }
 
     @Test
-    public void test_sort_by_ordinal_out_of_range_1()
+    void test_sort_by_ordinal_out_of_range_1()
     {
         //@formatter:off
         String query = "select col1, col2 "
@@ -532,15 +534,15 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
             optimize(context, plan);
             fail("Should fail with out of range");
         }
-        catch (QueryException e)
+        catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("ORDER BY position is out of range"));
+            assertTrue(e.getMessage()
+                    .contains("ORDER BY position is out of range"), e.getMessage());
         }
     }
 
     @Test
-    public void test_sort_by_ordinal_out_of_range_2()
+    void test_sort_by_ordinal_out_of_range_2()
     {
         //@formatter:off
         String query = "select *, col1, col2 "
@@ -554,15 +556,15 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
             optimize(context, plan);
             fail("Should fail with out of range");
         }
-        catch (QueryException e)
+        catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("ORDER BY position is out of range"));
+            assertTrue(e.getMessage()
+                    .contains("ORDER BY position is out of range"), e.getMessage());
         }
     }
 
     @Test
-    public void test_sort_by_ordinal_with_asterisk()
+    void test_sort_by_ordinal_with_asterisk()
     {
         //@formatter:off
         String query = "select * "
@@ -590,7 +592,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_with_asterisk_with_sub_query()
+    void test_sort_by_ordinal_with_asterisk_with_sub_query()
     {
         //@formatter:off
         String query = "select * "
@@ -629,7 +631,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_with_non_asterisk()
+    void test_sort_by_ordinal_with_non_asterisk()
     {
         //@formatter:off
         String query = "select col "
@@ -662,7 +664,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_with_aliased_column()
+    void test_sort_by_ordinal_with_aliased_column()
     {
         //@formatter:off
         String query = "select col fancyColumn "
@@ -695,7 +697,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_with_non_asterisk_with_subquery()
+    void test_sort_by_ordinal_with_non_asterisk_with_subquery()
     {
         //@formatter:off
         String query = "select * "
@@ -739,7 +741,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_on_computed_expression_with_non_asterisk()
+    void test_sort_by_ordinal_on_computed_expression_with_non_asterisk()
     {
         //@formatter:off
         String query = "select col + 10 "
@@ -771,7 +773,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_on_computed_alias_expression_with_non_asterisk()
+    void test_sort_by_ordinal_on_computed_alias_expression_with_non_asterisk()
     {
         //@formatter:off
         String query = "select col + 10 calc "
@@ -803,7 +805,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_on_computed_expression_with_asterisk()
+    void test_sort_by_ordinal_on_computed_expression_with_asterisk()
     {
         //@formatter:off
         String query = "select col + 10, * "
@@ -836,7 +838,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_with_mixed_asterisk_last()
+    void test_sort_by_ordinal_with_mixed_asterisk_last()
     {
         //@formatter:off
         String query = "select col, *"
@@ -868,7 +870,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_with_mixed_asterisk_first()
+    void test_sort_by_ordinal_with_mixed_asterisk_first()
     {
         //@formatter:off
         String query = "select *, col "
@@ -901,7 +903,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_ordinal_with_mixed_asterisk_first_2()
+    void test_sort_by_ordinal_with_mixed_asterisk_first_2()
     {
         //@formatter:off
         String query = "select *, col1, col "
@@ -934,7 +936,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_qualifier_asterisk()
+    void test_sort_by_qualifier_asterisk()
     {
         //@formatter:off
         String query = "select * "
@@ -961,7 +963,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_computed_expression_with_no_alias()
+    void test_sort_by_computed_expression_with_no_alias()
     {
         //@formatter:off
         String query = "select col1 + col2 "
@@ -993,7 +995,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_qualifier_non_asterisk()
+    void test_sort_by_qualifier_non_asterisk()
     {
         //@formatter:off
         String query = "select col "
@@ -1025,7 +1027,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_non_projected_column()
+    void test_sort_by_non_projected_column()
     {
         //@formatter:off
         String query = "select col "
@@ -1060,7 +1062,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_alias_qualifier_non_asterisk()
+    void test_sort_by_alias_qualifier_non_asterisk()
     {
         //@formatter:off
         String query = "select col newCol "
@@ -1092,7 +1094,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_alias_qualifier_non_asterisk_2()
+    void test_sort_by_alias_qualifier_non_asterisk_2()
     {
         //@formatter:off
         String query = "select col newCol "
@@ -1125,7 +1127,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_alias_qualifier_asterisk()
+    void test_sort_by_alias_qualifier_asterisk()
     {
         //@formatter:off
         String query = "select col newCol, * "
@@ -1157,7 +1159,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_alias_qualifier_asterisk_before()
+    void test_sort_by_alias_qualifier_asterisk_before()
     {
         //@formatter:off
         String query = "select *, col newCol "
@@ -1189,7 +1191,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_by_alias_qualifier_with_computed_expression()
+    void test_sort_by_alias_qualifier_with_computed_expression()
     {
         //@formatter:off
         String query = "select col + 10 newCol "
@@ -1221,7 +1223,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregate()
+    void test_aggregate()
     {
         //@formatter:off
         String query = "select count(1), t.col + max(col1) "
@@ -1255,7 +1257,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregate_aliased_column()
+    void test_aggregate_aliased_column()
     {
         //@formatter:off
         String query = "select count(1) cnt, col "
@@ -1285,7 +1287,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregate_with_having()
+    void test_aggregate_with_having()
     {
         //@formatter:off
         String query = "select count(1) "
@@ -1325,7 +1327,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregate_with_having_and_where_make_sure_they_dont_interfere()
+    void test_aggregate_with_having_and_where_make_sure_they_dont_interfere()
     {
         //@formatter:off
         String query = "select count(1) "
@@ -1369,7 +1371,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregate_with_having_and_order_by_complex_expression()
+    void test_aggregate_with_having_and_order_by_complex_expression()
     {
         //@formatter:off
         String query = "select count(1) "
@@ -1423,7 +1425,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregate_with_having_and_order_by_complex_expression_in_projection()
+    void test_aggregate_with_having_and_order_by_complex_expression_in_projection()
     {
         //@formatter:off
         String query = "select count(1), min(col3 * 2) "
@@ -1471,7 +1473,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregate_with_having_with_same_projection_expression()
+    void test_aggregate_with_having_with_same_projection_expression()
     {
         //@formatter:off
         String query = "select count(1) "
@@ -1510,7 +1512,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregate_with_having_and_sort_with_same_projection_expression_unaliased()
+    void test_aggregate_with_having_and_sort_with_same_projection_expression_unaliased()
     {
         //@formatter:off
         String query = "select count(1) "
@@ -1552,7 +1554,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregate_with_having_and_sort_with_same_projection_expression_aliased()
+    void test_aggregate_with_having_and_sort_with_same_projection_expression_aliased()
     {
         //@formatter:off
         String query = "select count(1) numberOfRecords "
@@ -1594,7 +1596,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_on_aggregate_aliased_projection_and_verify_pushed_down()
+    void test_sort_on_aggregate_aliased_projection_and_verify_pushed_down()
     {
         //@formatter:off
         String query = "select count(1) cnt, col "
@@ -1635,7 +1637,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_on_aggregate_column_that_is_not_projected_and_verify_pushed_down()
+    void test_sort_on_aggregate_column_that_is_not_projected_and_verify_pushed_down()
     {
         //@formatter:off
         String query = "select count(1) cnt "
@@ -1671,7 +1673,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_on_aggregate_column_with_compute_that_is_not_projected_and_verify_pushed_down()
+    void test_sort_on_aggregate_column_with_compute_that_is_not_projected_and_verify_pushed_down()
     {
         //@formatter:off
         String query = "select count(1) cnt "
@@ -1713,7 +1715,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_error_when_sorting_on_an_aliased_constant()
+    void test_error_when_sorting_on_an_aliased_constant()
     {
         //@formatter:off
         String query = "select 'hello' newCol "
@@ -1730,13 +1732,13 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("ORDER BY constant encountered"));
+            assertTrue(e.getMessage()
+                    .contains("ORDER BY constant encountered"), e.getMessage());
         }
     }
 
     @Test
-    public void test_error_when_sorting_on_a_constant()
+    void test_error_when_sorting_on_a_constant()
     {
         //@formatter:off
         String query = "select 'hello' "
@@ -1753,8 +1755,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("ORDER BY constant encountered"));
+            assertTrue(e.getMessage()
+                    .contains("ORDER BY constant encountered"), e.getMessage());
         }
     }
 

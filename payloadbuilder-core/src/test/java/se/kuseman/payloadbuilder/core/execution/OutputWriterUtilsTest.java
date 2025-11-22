@@ -1,11 +1,12 @@
 package se.kuseman.payloadbuilder.core.execution;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.io.StringWriter;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -17,10 +18,10 @@ import se.kuseman.payloadbuilder.core.JsonOutputWriter;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link OutputWriterUtils} */
-public class OutputWriterUtilsTest extends APhysicalPlanTest
+class OutputWriterUtilsTest extends APhysicalPlanTest
 {
     @Test
-    public void test_write_tuplevector_root()
+    void test_write_tuplevector_root()
     {
         //@formatter:off
         TupleVector vector = TupleVector.of(Schema.of(
@@ -49,7 +50,7 @@ public class OutputWriterUtilsTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_tuplevector_write()
+    void test_tuplevector_write()
     {
         //@formatter:off
         TupleVector vector = TupleVector.of(Schema.of(
@@ -79,7 +80,7 @@ public class OutputWriterUtilsTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_valuevector_write()
+    void test_valuevector_write()
     {
         ValueVector vector = ValueVector.literalInt(10, 5);
 

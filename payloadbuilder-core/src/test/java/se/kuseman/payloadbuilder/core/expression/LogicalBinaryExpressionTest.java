@@ -1,10 +1,11 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -17,10 +18,10 @@ import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link LogicalBinaryExpression} */
-public class LogicalBinaryExpressionTest extends APhysicalPlanTest
+class LogicalBinaryExpressionTest extends APhysicalPlanTest
 {
     @Test
-    public void test_and_bitsetvector()
+    void test_and_bitsetvector()
     {
         TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
 
@@ -39,7 +40,7 @@ public class LogicalBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_or_bitsetvector()
+    void test_or_bitsetvector()
     {
         TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
 
@@ -62,7 +63,7 @@ public class LogicalBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_and()
+    void test_and()
     {
         //@formatter:off
         TupleVector tv = TupleVector.of(Schema.of(
@@ -131,7 +132,7 @@ public class LogicalBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_or()
+    void test_or()
     {
       //@formatter:off
         TupleVector tv = TupleVector.of(Schema.of(

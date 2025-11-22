@@ -2,7 +2,7 @@ package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import javax.sql.DataSource;
 
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -11,15 +11,15 @@ import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 import se.kuseman.payloadbuilder.catalog.jdbc.SqlServer2017Test.SqlWaitStrategy;
 
 /** Test of SqlServer 2019 */
-public class SqlServer2019Test extends ASqlServerTest
+class SqlServer2019Test extends ASqlServerTest
 {
-    public SqlServer2019Test()
+    SqlServer2019Test()
     {
         super(SqlServer.getDatasource(), SqlServer.getUrl(), "com.microsoft.sqlserver.jdbc.SQLServerDriver", "sa", SqlServer.PASSWORD);
     }
 
-    @AfterClass
-    public static void tearDownClass()
+    @AfterAll
+    static void tearDownClass()
     {
         SqlServer.stop();
     }
