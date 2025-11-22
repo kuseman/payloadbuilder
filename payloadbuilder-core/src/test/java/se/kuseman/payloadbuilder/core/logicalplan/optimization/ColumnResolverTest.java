@@ -2,6 +2,9 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.List;
@@ -9,7 +12,7 @@ import java.util.Random;
 import java.util.Set;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -50,13 +53,13 @@ import se.kuseman.payloadbuilder.core.parser.ParseException;
 
 /** Test of {@link ColumnResolver} */
 // CSOFF
-public class ColumnResolverTest extends ALogicalPlanOptimizerTest
+class ColumnResolverTest extends ALogicalPlanOptimizerTest
 // CSON
 {
     private final ColumnResolver optimizer = new ColumnResolver();
 
     @Test
-    public void test_sub_query_expression_with_join_and_outer_references()
+    void test_sub_query_expression_with_join_and_outer_references()
     {
         //@formatter:off
         String query =  "SELECT * "
@@ -132,7 +135,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_expression_scan_schema_less()
+    void test_expression_scan_schema_less()
     {
         //@formatter:off
         String query = " "
@@ -186,7 +189,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_expression_scan_schema_full()
+    void test_expression_scan_schema_full()
     {
         //@formatter:off
         String query = " "
@@ -260,7 +263,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_expression_scan_table_variable_with_provided_schema()
+    void test_expression_scan_table_variable_with_provided_schema()
     {
         //@formatter:off
         String query = " "
@@ -315,7 +318,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_expression_scan_schema_full_wrong_type()
+    void test_expression_scan_schema_full_wrong_type()
     {
         //@formatter:off
         String query = " "
@@ -335,8 +338,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Expression scans must reference either Any or Table types."));
+            assertTrue(e.getMessage()
+                    .contains("Expression scans must reference either Any or Table types."), e.getMessage());
         }
     }
 
@@ -344,7 +347,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
      * When only having a single schema as input (either current or outer) and we have a multi qualifier (where the first part is NOT an alias) then we can resolve that expression to the single schema
      */
     @Test
-    public void test_multi_part_qualifier_gets_resolved_to_single_schema()
+    void test_multi_part_qualifier_gets_resolved_to_single_schema()
     {
         //@formatter:off
         String query = " "
@@ -386,7 +389,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
      * When only having a single schema as input (either current or outer) and we have a multi qualifier (where the first part is NOT an alias) then we can resolve that expression to the single schema
      */
     @Test
-    public void test_multi_part_qualifier_gets_resolved_to_single_schema_outer()
+    void test_multi_part_qualifier_gets_resolved_to_single_schema_outer()
     {
         //@formatter:off
         String query = " "
@@ -425,7 +428,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_distinct_asterisk_expansion()
+    void test_distinct_asterisk_expansion()
     {
         //@formatter:off
         String query = " "
@@ -468,7 +471,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_multi_part_qualifier()
+    void test_multi_part_qualifier()
     {
         //@formatter:off
         String query = " "
@@ -510,7 +513,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_expand_outer_reference_asterisk_in_sub_query_expression()
+    void test_expand_outer_reference_asterisk_in_sub_query_expression()
     {
         //@formatter:off
         String query = " "
@@ -580,7 +583,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregate()
+    void test_aggregate()
     {
         //@formatter:off
         String query = " "
@@ -629,7 +632,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_lambda_expression_no_populate_schema_less()
+    void test_lambda_expression_no_populate_schema_less()
     {
         // Test lambdas which not alter the schema for the lambda expression
         // Here we are sill in the outer schema when the lambda expression will evaluate
@@ -738,7 +741,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_lambda_expression_populate_schema_less()
+    void test_lambda_expression_populate_schema_less()
     {
         //@formatter:off
         String query = " "
@@ -839,7 +842,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sub_query_expression_missing_alias()
+    void test_sub_query_expression_missing_alias()
     {
         //@formatter:off
         String query = "select (select d.data row_id, s.col1, s.col2 from source for object_array) obj "
@@ -856,13 +859,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("s.col1 cannot be bound"));
+            assertTrue(e.getMessage()
+                    .contains("s.col1 cannot be bound"), e.getMessage());
         }
     }
 
     @Test
-    public void test_correlated_sub_query_correlates_computed_column_from_other_subquery()
+    void test_correlated_sub_query_correlates_computed_column_from_other_subquery()
     {
         //@formatter:off
         String query = ""
@@ -937,7 +940,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_precedence_of_current_outer_matches_asterisk_and_not_asterisk()
+    void test_precedence_of_current_outer_matches_asterisk_and_not_asterisk()
     {
         //@formatter:off
         String query = ""
@@ -1074,7 +1077,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_function_scan_with_correlated_arguments()
+    void test_function_scan_with_correlated_arguments()
     {
         //@formatter:off
         String query = "select a.col, r.* "
@@ -1123,7 +1126,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_function_scan_with_non_correlated_arguments()
+    void test_function_scan_with_non_correlated_arguments()
     {
         //@formatter:off
         String query = "select a.col, r.* "
@@ -1170,7 +1173,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_function_scan_with_non_existing_argument()
+    void test_function_scan_with_non_existing_argument()
     {
         //@formatter:off
         String query = "select * "
@@ -1185,13 +1188,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("a.col cannot be bound"));
+            assertTrue(e.getMessage()
+                    .contains("a.col cannot be bound"), e.getMessage());
         }
     }
 
     @Test
-    public void test_nested_correlated_function_scans()
+    void test_nested_correlated_function_scans()
     {
         //@formatter:off
         String query = ""
@@ -1256,7 +1259,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_correlated_function_scans_qualified_asterisk()
+    void test_nested_correlated_function_scans_qualified_asterisk()
     {
         //@formatter:off
         String query = ""
@@ -1317,7 +1320,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_correlated_function_scans_populate_asterisk()
+    void test_nested_correlated_function_scans_populate_asterisk()
     {
         //@formatter:off
         String query = ""
@@ -1387,7 +1390,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_correlated_function_scans_populate()
+    void test_nested_correlated_function_scans_populate()
     {
         //@formatter:off
         String query = ""
@@ -1465,7 +1468,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_correlated_function_scans_double_populate()
+    void test_nested_correlated_function_scans_double_populate()
     {
         //@formatter:off
         String query = ""
@@ -1542,7 +1545,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_populate_join_schema_less()
+    void test_populate_join_schema_less()
     {
         //@formatter:off
         String query = ""
@@ -1599,7 +1602,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_populate_join_schema_less_populate_alias_projection()
+    void test_populate_join_schema_less_populate_alias_projection()
     {
         //@formatter:off
         String query = ""
@@ -1648,7 +1651,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_populate_join_schema_less_asterisk_select()
+    void test_populate_join_schema_less_asterisk_select()
     {
         //@formatter:off
         String query = ""
@@ -1700,7 +1703,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_expression_scan_on_root_missing_table_column()
+    void test_expression_scan_on_root_missing_table_column()
     {
         String query = "select col from (a) a for object_array";
 
@@ -1712,13 +1715,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("a cannot be bound"));
+            assertTrue(e.getMessage()
+                    .contains("a cannot be bound"), e.getMessage());
         }
     }
 
     @Test
-    public void test_populate_join_expression_scan_schema_less()
+    void test_populate_join_expression_scan_schema_less()
     {
         //@formatter:off
         // Here we are accessing what seems to be outer columns (b.col, b.col2 in sub query expression) but we have an for clause
@@ -1801,7 +1804,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_populate_join_with_expression_scan_schema_full()
+    void test_populate_join_with_expression_scan_schema_full()
     {
         TableSourceReference e_b = new TableSourceReference(2, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("b"), "b");
 
@@ -1888,7 +1891,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_populate_join_schema_full()
+    void test_populate_join_schema_full()
     {
         TableSourceReference tableA = of(0, "", "tableA", "a");
         TableSourceReference tableB = of(0, "", "tableB", "b");
@@ -1945,7 +1948,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_that_sub_query_expression_with_no_table_source_with_unqualified_column_gets_resolved()
+    void test_that_sub_query_expression_with_no_table_source_with_unqualified_column_gets_resolved()
     {
         //@formatter:off
         String query = ""
@@ -1983,7 +1986,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_that_sub_query_expression_with_table_source_with_unqualified_column_gets_resolved_to_outer()
+    void test_that_sub_query_expression_with_table_source_with_unqualified_column_gets_resolved_to_outer()
     {
         /*
        * @formatter:off
@@ -2058,7 +2061,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sub_query_expression()
+    void test_sub_query_expression()
     {
         //@formatter:off
         String query = ""
@@ -2109,7 +2112,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sub_query_expression_outer_references()
+    void test_sub_query_expression_outer_references()
     {
         //@formatter:off
         String query = ""
@@ -2198,7 +2201,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_multiple_aliases_with_same_name_but_on_different_levels()
+    void test_multiple_aliases_with_same_name_but_on_different_levels()
     {
         /*
          * @formatter:off
@@ -2274,7 +2277,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_multiple_aliases_with_same_identifier_sub_query()
+    void test_multiple_aliases_with_same_identifier_sub_query()
     {
         /*
          * @formatter:off
@@ -2325,13 +2328,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Alias 'a' is specified multiple times."));
+            assertTrue(e.getMessage()
+                    .contains("Alias 'a' is specified multiple times."), e.getMessage());
         }
     }
 
     @Test
-    public void test_multiple_aliases_with_same_identifier_tables()
+    void test_multiple_aliases_with_same_identifier_tables()
     {
         /*
          * @formatter:off
@@ -2370,13 +2373,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Alias 'a' is specified multiple times."));
+            assertTrue(e.getMessage()
+                    .contains("Alias 'a' is specified multiple times."), e.getMessage());
         }
     }
 
     @Test
-    public void test_multiple_aliases_with_same_identifier_functions()
+    void test_multiple_aliases_with_same_identifier_functions()
     {
         /*
          * @formatter:off
@@ -2415,13 +2418,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Alias 'a' is specified multiple times."));
+            assertTrue(e.getMessage()
+                    .contains("Alias 'a' is specified multiple times."), e.getMessage());
         }
     }
 
     @Test
-    public void test_crorrlated_joins_no_bindable()
+    void test_crorrlated_joins_no_bindable()
     {
         String query = "" + "select * "
                        + "from tableA a "
@@ -2442,13 +2445,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("a.col cannot be bound"));
+            assertTrue(e.getMessage()
+                    .contains("a.col cannot be bound"), e.getMessage());
         }
     }
 
     @Test
-    public void test_subquery_with_cross_join_projecting_multi_table_source_schema_less()
+    void test_subquery_with_cross_join_projecting_multi_table_source_schema_less()
     {
         /*
          * @formatter:off
@@ -2523,7 +2526,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_subquery_with_nested_projections_computed_values()
+    void test_subquery_with_nested_projections_computed_values()
     {
         /*
          * @formatter:off
@@ -2584,7 +2587,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_correlated_subquery_schema_less()
+    void test_correlated_subquery_schema_less()
     {
         /*
          * @formatter:off
@@ -2665,7 +2668,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_qualified_asterisk_select_non_existent_alias()
+    void test_qualified_asterisk_select_non_existent_alias()
     {
         //@formatter:off
         String query = "" 
@@ -2688,13 +2691,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Alias c could not be bound"));
+            assertTrue(e.getMessage()
+                    .contains("Alias c could not be bound"), e.getMessage());
         }
     }
 
     @Test
-    public void test_correlated_subquery_projecting_outer_schema_less()
+    void test_correlated_subquery_projecting_outer_schema_less()
     {
         /*
          * @formatter:off
@@ -2785,7 +2788,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_correlated_subquery_projecting_outer_schema_full()
+    void test_correlated_subquery_projecting_outer_schema_full()
     {
         /*
          * @formatter:off
@@ -2887,7 +2890,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_correlated_subquery_schema_less()
+    void test_nested_correlated_subquery_schema_less()
     {
         String query = "" + "select * "
                        + "from tableA a "
@@ -2989,7 +2992,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_correlated_subquery_schema_less_2()
+    void test_nested_correlated_subquery_schema_less_2()
     {
         String query = "select * " + "from tableA a "
                        + "cross apply " // ------------- This join has an outer reference in the inner most join a.col2
@@ -3084,7 +3087,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_subquery_with_join_projecting_multi_table_source_schema_less()
+    void test_subquery_with_join_projecting_multi_table_source_schema_less()
     {
         /*
          * @formatter:off
@@ -3134,13 +3137,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Ambiguous column: x.col"));
+            assertTrue(e.getMessage()
+                    .contains("Ambiguous column: x.col"), e.getMessage());
         }
     }
 
     @Test
-    public void test_subquery_with_join_projecting_multi_table_source_with_schema()
+    void test_subquery_with_join_projecting_multi_table_source_with_schema()
     {
         /*
          * @formatter:off
@@ -3191,13 +3194,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("The column 'col' was specified multiple times for 'x'"));
+            assertTrue(e.getMessage()
+                    .contains("The column 'col' was specified multiple times for 'x'"), e.getMessage());
         }
     }
 
     @Test
-    public void test_subquery_with_join_projecting_multi_table_source_with_schema_ambiguity()
+    void test_subquery_with_join_projecting_multi_table_source_with_schema_ambiguity()
     {
         /*
          * @formatter:off
@@ -3248,13 +3251,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Ambiguous column: x.col"));
+            assertTrue(e.getMessage()
+                    .contains("Ambiguous column: x.col"), e.getMessage());
         }
     }
 
     @Test
-    public void test_table_with_joined_subquerys_schema_less()
+    void test_table_with_joined_subquerys_schema_less()
     {
         /*
          * @formatter:off
@@ -3330,7 +3333,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_subqueries_with_filters_schema_less()
+    void test_nested_subqueries_with_filters_schema_less()
     {
         /*
          * @formatter:off
@@ -3399,7 +3402,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_subqueries_with_filters_with_schema()
+    void test_nested_subqueries_with_filters_with_schema()
     {
         /*
          * @formatter:off
@@ -3472,7 +3475,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_unnamed_sub_query_columns()
+    void test_unnamed_sub_query_columns()
     {
         //@formatter:off
         String query = ""
@@ -3493,13 +3496,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Missing column name for ordinal 0 of x"));
+            assertTrue(e.getMessage()
+                    .contains("Missing column name for ordinal 0 of x"), e.getMessage());
         }
     }
 
     @Test
-    public void test_nested_subqueries_with_projections_schema_less()
+    void test_nested_subqueries_with_projections_schema_less()
     {
         /*
          * @formatter:off
@@ -3557,7 +3560,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_subqueries_with_projections_with_schema()
+    void test_nested_subqueries_with_projections_with_schema()
     {
         /*
          * @formatter:off
@@ -3639,7 +3642,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_subqueries_are_eliminated()
+    void test_nested_subqueries_are_eliminated()
     {
         TableSourceReference table = of(0, "es", "tableB", "b");
         TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
@@ -3695,7 +3698,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_projection_with_single_sub_query_schema_less()
+    void test_projection_with_single_sub_query_schema_less()
     {
         // select x.col1, col2
         // * from
@@ -3736,7 +3739,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_projection_with_join_static_schema_ambiguity()
+    void test_projection_with_join_static_schema_ambiguity()
     {
         /*
          * Static schema And col2 is present on both tables => throw queryexception
@@ -3771,13 +3774,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Ambiguous column: col2"));
+            assertTrue(e.getMessage()
+                    .contains("Ambiguous column: col2"), e.getMessage());
         }
     }
 
     @Test
-    public void test_projection_with_join_non_static_schema_ambiguity()
+    void test_projection_with_join_non_static_schema_ambiguity()
     {
         /* @formatter:off
          * select b.col1, col2 <--- col2 is unknown due to ambiguity in a schema less query
@@ -3814,13 +3817,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Ambiguous column: col2"));
+            assertTrue(e.getMessage()
+                    .contains("Ambiguous column: col2"), e.getMessage());
         }
     }
 
     @Test
-    public void test_projection_with_sub_query_and_join_static_schema()
+    void test_projection_with_sub_query_and_join_static_schema()
     {
         /*
          * Static schema And col2 is present on both tables => throw queryexception
@@ -3866,13 +3869,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("The column 'col1' was specified multiple times for 'x'"));
+            assertTrue(e.getMessage()
+                    .contains("The column 'col1' was specified multiple times for 'x'"), e.getMessage());
         }
     }
 
     @Test
-    public void test_projection_with_static_schema_missing_column()
+    void test_projection_with_static_schema_missing_column()
     {
         /*
          * Static schema And col2 is present on both tables => throw queryexception
@@ -3910,13 +3913,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("The column 'col1' was specified multiple times for 'x'"));
+            assertTrue(e.getMessage()
+                    .contains("The column 'col1' was specified multiple times for 'x'"), e.getMessage());
         }
     }
 
     @Test
-    public void test_projection_with_sub_query_static_schema()
+    void test_projection_with_sub_query_static_schema()
     {
         // select x.col1, col2
         // * from
@@ -3964,7 +3967,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_filter_with_sub_query_static_schema()
+    void test_filter_with_sub_query_static_schema()
     {
         TableSourceReference tableB = of(0, "es", "tableB", "b");
         TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
@@ -4005,7 +4008,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_filter_with_sub_query_schema_less()
+    void test_filter_with_sub_query_schema_less()
     {
         TableSourceReference table = of(0, "es", "tableB", "b");
         TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
@@ -4041,7 +4044,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_table_function_resolving()
+    void test_table_function_resolving()
     {
         ILogicalPlan plan = s("select * from range(1, 10) x");
         ILogicalPlan actual = optimize(context, plan);
@@ -4072,7 +4075,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_with_sub_query_static_schema()
+    void test_sort_with_sub_query_static_schema()
     {
         TableSourceReference table = of(0, "es", "tableB", "b");
         TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
@@ -4111,7 +4114,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sort_with_sub_query_non_static_schema()
+    void test_sort_with_sub_query_non_static_schema()
     {
         TableSourceReference table = of(0, "es", "tableB", "b");
         TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");

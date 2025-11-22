@@ -7,9 +7,10 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.commons.lang3.Strings.CI;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,11 +26,8 @@ import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -76,94 +74,119 @@ import se.kuseman.payloadbuilder.core.physicalplan.PlanUtils;
 import se.kuseman.payloadbuilder.core.test.AObjectOutputWriter.ColumnValue;
 
 /** Harness runner test */
-@RunWith(Parameterized.class)
-public class TestHarnessRunner
+class TestHarnessRunner
 {
     static final ObjectMapper MAPPER = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    private final TestHarness harness;
-    private final TestCase testCase;
-    private final boolean schemaLess;
-    private final boolean typedVectors;
-
-    /** Test */
-    @Parameterized.Parameters(
-            name = "{2}")
-    public static List<Object[]> testHarnesses()
+    private static List<Object[]> baseConstructs()
     {
-        List<String> testFiles = asList("BaseContructs.json", "Joins.json", "SystemFunctions.json", "TemporaryTables.json");
+        return testHarness("BaseConstructs.json");
+    }
 
-        List<TestHarness> harnesses = new ArrayList<>();
-        for (String file : testFiles)
+    private static List<Object[]> joins()
+    {
+        return testHarness("Joins.json");
+    }
+
+    private static List<Object[]> systemFunctions()
+    {
+        return testHarness("SystemFunctions.json");
+    }
+
+    private static List<Object[]> temporaryTables()
+    {
+        return testHarness("TemporaryTables.json");
+    }
+
+    /** Create arguments for provided harness filename. */
+    private static List<Object[]> testHarness(String filename)
+    {
+        TestHarness harness;
+
+        String resource = "/harnessCases/" + filename;
+        InputStream stream = TestHarnessRunner.class.getResourceAsStream(resource);
+        if (stream == null)
         {
-            String resource = "/harnessCases/" + file;
-            InputStream stream = TestHarnessRunner.class.getResourceAsStream(resource);
-            if (stream == null)
-            {
-                Assert.fail("No harness resouce found: " + resource);
-            }
-            try
-            {
-                harnesses.add(MAPPER.readValue(stream, TestHarness.class));
-            }
-            catch (IOException e)
-            {
-                throw new RuntimeException("Error reading harness file " + file, e);
-            }
+            fail("No harness resouce found: " + resource);
+        }
+        try
+        {
+            harness = MAPPER.readValue(stream, TestHarness.class);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error reading harness file " + filename, e);
         }
 
         List<Object[]> params = new ArrayList<>();
-
-        for (TestHarness harness : harnesses)
+        for (TestCase testCase : harness.getCases())
         {
-            for (TestCase testCase : harness.getCases())
+            for (Boolean schemaLess : asList(true, false))
             {
-                for (Boolean schemaLess : asList(true, false))
+                if (testCase.getSchemaLess() == null
+                        || testCase.getSchemaLess()
+                                .booleanValue() == schemaLess.booleanValue())
                 {
-                    if (testCase.getSchemaLess() == null
-                            || testCase.getSchemaLess()
-                                    .booleanValue() == schemaLess.booleanValue())
+                    for (Boolean typedVectors : asList(true, false))
                     {
-                        for (Boolean typedVectors : asList(true, false))
+                        if (testCase.getTypedVectors() == null
+                                || testCase.getTypedVectors()
+                                        .booleanValue() == typedVectors.booleanValue())
                         {
-                            if (testCase.getTypedVectors() == null
-                                    || testCase.getTypedVectors()
-                                            .booleanValue() == typedVectors.booleanValue())
-                            {
-                                String name = "%s#%s#%s".formatted(testCase.getName(), schemaLess ? "schema-less"
-                                        : "schema-full",
-                                        typedVectors ? "typed-vectors"
-                                                : "any-vectors");
+                            String name = "%s#%s#%s".formatted(testCase.getName(), schemaLess ? "schema-less"
+                                    : "schema-full",
+                                    typedVectors ? "typed-vectors"
+                                            : "any-vectors");
 
-                                params.add(new Object[] { harness, testCase, name, schemaLess, typedVectors });
-                            }
+                            params.add(new Object[] { harness, testCase, name, schemaLess, typedVectors });
                         }
                     }
                 }
             }
-
         }
-
         return params;
     }
 
-    public TestHarnessRunner(TestHarness harness, TestCase testCase, String name, boolean schemaLess, boolean typedVectors)
+    // CSOFF
+    @ParameterizedTest(
+            name = "{2}")
+    @MethodSource("baseConstructs")
+    void baseConstructs(TestHarness harness, TestCase testCase, String name, boolean schemaLess, boolean typedVectors)
     {
-        this.harness = harness;
-        this.testCase = testCase;
-        this.schemaLess = schemaLess;
-        this.typedVectors = typedVectors;
+        assumeFalse(testCase.isIgnore(), "Ignored");
+        testInternal(harness, testCase, name, schemaLess, typedVectors);
     }
 
-    @Test
-    public void test()
+    @ParameterizedTest(
+            name = "{2}")
+    @MethodSource("joins")
+    void joins(TestHarness harness, TestCase testCase, String name, boolean schemaLess, boolean typedVectors)
     {
-        Assume.assumeFalse("Ignored", testCase.isIgnore());
-        testInternal();
+        assumeFalse(testCase.isIgnore(), "Ignored");
+        testInternal(harness, testCase, name, schemaLess, typedVectors);
     }
+
+    @ParameterizedTest(
+            name = "{2}")
+    @MethodSource("systemFunctions")
+    void systemFunction(TestHarness harness, TestCase testCase, String name, boolean schemaLess, boolean typedVectors)
+    {
+        assumeFalse(testCase.isIgnore(), "Ignored");
+        testInternal(harness, testCase, name, schemaLess, typedVectors);
+    }
+
+    @ParameterizedTest(
+            name = "{2}")
+    @MethodSource("temporaryTables")
+    void temporaryTables(TestHarness harness, TestCase testCase, String name, boolean schemaLess, boolean typedVectors)
+    {
+        assumeFalse(testCase.isIgnore(), "Ignored");
+        testInternal(harness, testCase, name, schemaLess, typedVectors);
+    }
+    // CSON
 
     // CSOFF
-    private void testInternal()
+    private void testInternal(TestHarness harness, TestCase testCase, String name, boolean schemaLess, boolean typedVectors)
     // CSON
     {
         CatalogRegistry registry = new CatalogRegistry();
@@ -211,7 +234,7 @@ public class TestHarnessRunner
                 fail("Expected " + testCase.getExpectedException() + " to be thrown");
             }
 
-            assertSchemas(session, query);
+            assertSchemas(session, query, testCase, schemaLess, typedVectors);
         }
         catch (Throwable e)
         {
@@ -230,8 +253,8 @@ public class TestHarnessRunner
 
                 if (!isBlank(testCase.getExpectedMessageContains()))
                 {
-                    Assert.assertTrue("Expected message to contain " + testCase.getExpectedMessageContains() + ", but got " + e.getMessage(),
-                            CI.contains(e.getMessage(), testCase.getExpectedMessageContains()));
+                    assertTrue(CI.contains(e.getMessage(), testCase.getExpectedMessageContains()),
+                            "Expected message to contain " + testCase.getExpectedMessageContains() + ", but got " + e.getMessage());
                 }
 
                 return;
@@ -251,8 +274,8 @@ public class TestHarnessRunner
         int size = testCase.getExpectedResultSets()
                 .size();
 
-        Assert.assertEquals((schemaLess ? "SchemaLess: "
-                : "") + "Expected number of result sets to be equal", size, actualResultSets.size());
+        assertEquals(size, actualResultSets.size(), (schemaLess ? "SchemaLess: "
+                : "") + "Expected number of result sets to be equal");
 
         for (int i = 0; i < size; i++)
         {
@@ -261,7 +284,7 @@ public class TestHarnessRunner
         }
     }
 
-    private void assertSchemas(QuerySession session, CompiledQuery query)
+    private void assertSchemas(QuerySession session, CompiledQuery query, TestCase testCase, boolean schemaLess, boolean typedVectors)
     {
         List<Schema> actual = new ArrayList<>();
         List<Schema> expected = new ArrayList<>();
@@ -308,7 +331,7 @@ public class TestHarnessRunner
                     : "");
             prefix += (runtime ? " Runtime "
                     : " : ");
-            Assert.assertEquals(prefix + "Expected number of result schemas to be equal", expected.size(), actual.size());
+            assertEquals(expected.size(), actual.size(), prefix + "Expected number of result schemas to be equal");
 
             for (int i = 0; i < expected.size(); i++)
             {
@@ -320,7 +343,7 @@ public class TestHarnessRunner
     private void assertSchemaEquals(String prefix, Schema expected, Schema actual)
     {
         int size = expected.getSize();
-        Assert.assertEquals(prefix + "Expected number of columns to be equal", size, actual.getSize());
+        assertEquals(size, actual.getSize(), prefix + "Expected number of columns to be equal");
 
         for (int j = 0; j < size; j++)
         {
@@ -329,12 +352,13 @@ public class TestHarnessRunner
             Column actualColumn = actual.getColumns()
                     .get(j);
 
-            assertEquals(prefix + "Expected name of column: " + j + " to be equal", expectedColumn.getName(), actualColumn.getName());
-            assertEquals(prefix + "Expected type of column: " + expectedColumn.getName() + " to be equal", expectedColumn.getType()
+            assertEquals(expectedColumn.getName(), actualColumn.getName(), prefix + "Expected name of column: " + j + " to be equal");
+            assertEquals(expectedColumn.getType()
                     .getType(),
                     actualColumn.getType()
-                            .getType());
-            assertEquals(prefix + "Expected metaData of column: " + expectedColumn.getName() + " to be equal", expectedColumn.getMetaData(), actualColumn.getMetaData());
+                            .getType(),
+                    prefix + "Expected type of column: " + expectedColumn.getName() + " to be equal");
+            assertEquals(expectedColumn.getMetaData(), actualColumn.getMetaData(), prefix + "Expected metaData of column: " + expectedColumn.getName() + " to be equal");
 
             // Recursive compare of complex type
             if (expectedColumn.getType()
@@ -580,7 +604,7 @@ public class TestHarnessRunner
         public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
         {
             // Verify that catalogAlias is provided and is not empty in case of session default catalog
-            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+            assertTrue(isNotBlank(catalogAlias), "catalogAlias should not be empty");
 
             if (schemaLess)
             {
@@ -595,7 +619,7 @@ public class TestHarnessRunner
         public IDatasink getInsertIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, InsertIntoData data)
         {
             // Verify that catalogAlias is provided and is not empty in case of session default catalog
-            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+            assertTrue(isNotBlank(catalogAlias), "catalogAlias should not be empty");
 
             TestTable testTable = createdTables.get(table.getLast());
             if (testTable == null)
@@ -631,7 +655,7 @@ public class TestHarnessRunner
         public IDatasink getSelectIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, SelectIntoData data)
         {
             // Verify that catalogAlias is provided and is not empty in case of session default catalog
-            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+            assertTrue(isNotBlank(catalogAlias), "catalogAlias should not be empty");
 
             TestTable existingTestTable = getTestTable(table, false);
             if (existingTestTable != null)
@@ -692,7 +716,7 @@ public class TestHarnessRunner
         public void dropTable(IQuerySession session, String catalogAlias, QualifiedName table, boolean lenient)
         {
             // Verify that catalogAlias is provided and is not empty in case of session default catalog
-            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+            assertTrue(isNotBlank(catalogAlias), "catalogAlias should not be empty");
 
             if (createdTables.remove(table.getLast()) == null
                     && !lenient)
@@ -705,7 +729,7 @@ public class TestHarnessRunner
         public IDatasource getScanDataSource(IQuerySession session, String catalogAlias, QualifiedName table, DatasourceData data)
         {
             // Verify that catalogAlias is provided and is not empty in case of session default catalog
-            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+            assertTrue(isNotBlank(catalogAlias), "catalogAlias should not be empty");
 
             final TestTable testTable = getTestTable(table, true);
             final List<Object[]> rows = testTable.getRows();
@@ -779,7 +803,7 @@ public class TestHarnessRunner
         public TableSchema getSystemTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
         {
             // Verify that catalogAlias is provided and is not empty in case of session default catalog
-            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+            assertTrue(isNotBlank(catalogAlias), "catalogAlias should not be empty");
 
             String type = table.getLast();
             if (SYS_TABLES.equalsIgnoreCase(type))
@@ -806,7 +830,7 @@ public class TestHarnessRunner
         public IDatasource getSystemTableDataSource(IQuerySession session, String catalogAlias, QualifiedName table, DatasourceData data)
         {
             // Verify that catalogAlias is provided and is not empty in case of session default catalog
-            assertTrue("catalogAlias should not be empty", isNotBlank(catalogAlias));
+            assertTrue(isNotBlank(catalogAlias), "catalogAlias should not be empty");
 
             Supplier<TupleVector> vector = null;
             String type = table.getLast();

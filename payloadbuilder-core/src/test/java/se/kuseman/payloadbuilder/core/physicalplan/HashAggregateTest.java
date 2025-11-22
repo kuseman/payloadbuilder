@@ -2,6 +2,11 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -22,8 +27,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.time.DurationFormatUtils;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
@@ -51,34 +56,32 @@ import it.unimi.dsi.fastutil.ints.IntHash;
 import it.unimi.dsi.fastutil.ints.IntList;
 
 /** Test of {@link HashAggregate} */
-public class HashAggregateTest extends APhysicalPlanTest
+class HashAggregateTest extends APhysicalPlanTest
 {
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_invalid_input()
+    @Test
+    void test_invalid_input()
     {
         Schema schema = schema(new Type[] { Type.Int, Type.Any }, "col1", "col2");
         IDatasource ds = schemaLessDS(() ->
         {
         });
 
-        new HashAggregate(0, scan(ds, table, schema), asList(ce("col1")), emptyList(), null);
-    }
-
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_invalid_input_2()
-    {
-        Schema schema = schema(new Type[] { Type.Int, Type.Any }, "col1", "col2");
-        IDatasource ds = schemaLessDS(() ->
-        {
-        });
-
-        new HashAggregate(0, scan(ds, table, schema), emptyList(), asList(new AggregateWrapperExpression(ce("col1"), false, false)), null);
+        assertThrows(IllegalArgumentException.class, () -> new HashAggregate(0, scan(ds, table, schema), asList(ce("col1")), emptyList(), null));
     }
 
     @Test
-    public void test_distinct()
+    void test_invalid_input_2()
+    {
+        Schema schema = schema(new Type[] { Type.Int, Type.Any }, "col1", "col2");
+        IDatasource ds = schemaLessDS(() ->
+        {
+        });
+
+        assertThrows(IllegalArgumentException.class, () -> new HashAggregate(0, scan(ds, table, schema), emptyList(), asList(new AggregateWrapperExpression(ce("col1"), false, false)), null));
+    }
+
+    @Test
+    void test_distinct()
     {
         Schema schema = schema(new Type[] { Type.Int, Type.Any }, "col1", "col2");
 
@@ -113,7 +116,7 @@ public class HashAggregateTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_schema_less()
+    void test_schema_less()
     {
         MutableBoolean closed = new MutableBoolean();
 
@@ -203,9 +206,9 @@ public class HashAggregateTest extends APhysicalPlanTest
     /**
      * Measures the hash table implementation used in HashAggregate. JDK hashmap
      */
-    @Ignore
+    @Disabled
     @Test
-    public void test_measure_hash_table_jdk() throws InterruptedException, ExecutionException
+    void test_measure_hash_table_jdk() throws InterruptedException, ExecutionException
     {
         int rowCount = 1_000_000_000;
 
@@ -314,9 +317,9 @@ public class HashAggregateTest extends APhysicalPlanTest
     /**
      * Measures the hash table implementation used in HashAggregate.Int2ObjectOpenhashMap
      */
-    @Ignore
+    @Disabled
     @Test
-    public void test_measure_hash_table_fastutil() throws InterruptedException, ExecutionException
+    void test_measure_hash_table_fastutil() throws InterruptedException, ExecutionException
     {
         int rowCount = 1_000_000_00;
         final UTF8String[] strings = new UTF8String[413];
@@ -466,9 +469,9 @@ public class HashAggregateTest extends APhysicalPlanTest
     /**
      * Test that reflects the 1Rbc challenge regarding the group by. This test fakes the CSV reading and only foces on HashAggregate performance.
      */
-    @Ignore
+    @Disabled
     @Test
-    public void test_measure_1brc()
+    void test_measure_1brc()
     {
         Random r = new Random(System.nanoTime());
 

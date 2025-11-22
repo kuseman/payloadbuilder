@@ -2,6 +2,11 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -13,7 +18,7 @@ import java.util.Set;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -34,20 +39,19 @@ import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Test of {@link Projection} */
-public class ProjectionTest extends APhysicalPlanTest
+class ProjectionTest extends APhysicalPlanTest
 {
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_illegal_schema_expression_sizes()
+    @Test
+    void test_illegal_schema_expression_sizes()
     {
         IExpression col1 = ce("col1");
-        new Projection(0, scan(schemaDS(() ->
+        assertThrows(IllegalArgumentException.class, () -> new Projection(0, scan(schemaDS(() ->
         {
-        }, new TupleVector[0]), table, Schema.EMPTY), Schema.EMPTY, List.of(col1), table);
+        }, new TupleVector[0]), table, Schema.EMPTY), Schema.EMPTY, List.of(col1), table));
     }
 
     @Test
-    public void test_schema_full()
+    void test_schema_full()
     {
         Schema schema = schema("col1", "col3");
 
@@ -96,7 +100,7 @@ public class ProjectionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_schema_less_with_asteirsk()
+    void test_schema_less_with_asteirsk()
     {
         TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
@@ -207,7 +211,7 @@ public class ProjectionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_outer_reference_is_preserved_until_evaluation()
+    void test_outer_reference_is_preserved_until_evaluation()
     {
         Schema schema = schema("col1", "col3");
 

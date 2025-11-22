@@ -1,9 +1,12 @@
 package se.kuseman.payloadbuilder.core.execution;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.math.BigDecimal;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
@@ -11,10 +14,10 @@ import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 
 /** Unit test of {@link ExpressionMath} */
-public class ExpressionMathTest extends Assert
+public class ExpressionMathTest
 {
     @Test
-    public void test_negate()
+    void test_negate()
     {
         assertEquals(-1, ExpressionMath.negate(1));
         assertEquals(-1L, ExpressionMath.negate(1L));
@@ -26,7 +29,7 @@ public class ExpressionMathTest extends Assert
     }
 
     @Test
-    public void test_abs()
+    void test_abs()
     {
         assertEquals(1, ExpressionMath.abs(-1));
         assertEquals(1L, ExpressionMath.abs(-1L));
@@ -38,7 +41,7 @@ public class ExpressionMathTest extends Assert
     }
 
     @Test
-    public void test_ceiling()
+    void test_ceiling()
     {
         assertEquals(1, ExpressionMath.ceiling(1));
         assertEquals(1L, ExpressionMath.ceiling(1L));
@@ -50,7 +53,7 @@ public class ExpressionMathTest extends Assert
     }
 
     @Test
-    public void test_floor()
+    void test_floor()
     {
         assertEquals(1, ExpressionMath.floor(1));
         assertEquals(1L, ExpressionMath.floor(1L));
@@ -62,7 +65,7 @@ public class ExpressionMathTest extends Assert
     }
 
     @Test
-    public void test_subtract()
+    void test_subtract()
     {
         // int ->
         assertEquals(0, ExpressionMath.subtract(1, 1));
@@ -106,7 +109,7 @@ public class ExpressionMathTest extends Assert
     }
 
     @Test
-    public void test_multiply()
+    void test_multiply()
     {
         // int ->
         assertEquals(1, ExpressionMath.multiply(1, 1));
@@ -150,7 +153,7 @@ public class ExpressionMathTest extends Assert
     }
 
     @Test
-    public void test_divide()
+    void test_divide()
     {
         // int ->
         assertEquals(1, ExpressionMath.divide(1, 1));
@@ -194,7 +197,7 @@ public class ExpressionMathTest extends Assert
     }
 
     @Test
-    public void test_modulo()
+    void test_modulo()
     {
         // int ->
         assertEquals(0, ExpressionMath.modulo(1, 1));
@@ -238,7 +241,7 @@ public class ExpressionMathTest extends Assert
     }
 
     @Test
-    public void test_add()
+    void test_add()
     {
         // int ->
         assertEquals(2, ExpressionMath.add(1, 1));
@@ -284,7 +287,7 @@ public class ExpressionMathTest extends Assert
     }
 
     @Test
-    public void test_cmp_non_plb_types()
+    void test_cmp_non_plb_types()
     {
         assertEquals(-1, ExpressionMath.cmp(new TestComparable(), 10));
         assertEquals(1, ExpressionMath.cmp(new TestNonComparable(), new TestComparable()));
@@ -294,14 +297,14 @@ public class ExpressionMathTest extends Assert
     }
 
     @Test
-    public void test_cmp_dates()
+    void test_cmp_dates()
     {
         assertEquals(0, ExpressionMath.cmp(EpochDateTime.from(100000000), EpochDateTime.from(100000000)));
         assertEquals(0, ExpressionMath.cmp(EpochDateTimeOffset.from(100000000), EpochDateTimeOffset.from(100000000)));
     }
 
     @Test
-    public void test_cmp_numbers()
+    void test_cmp_numbers()
     {
         assertEquals(0, ExpressionMath.cmp(1D, 1D));
         assertEquals(0, ExpressionMath.cmp(1D, 1F));
@@ -397,8 +400,8 @@ public class ExpressionMathTest extends Assert
                 throw e;
             }
 
-            assertTrue("Expected exception message to contain " + messageContains + " but was: " + e.getMessage(), e.getMessage()
-                    .contains(messageContains));
+            assertTrue(e.getMessage()
+                    .contains(messageContains), "Expected exception message to contain " + messageContains + " but was: " + e.getMessage());
         }
     }
 }

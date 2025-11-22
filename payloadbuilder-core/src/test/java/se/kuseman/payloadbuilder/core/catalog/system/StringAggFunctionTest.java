@@ -1,10 +1,13 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -22,14 +25,14 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link StringAggFunction} */
-public class StringAggFunctionTest extends APhysicalPlanTest
+class StringAggFunctionTest extends APhysicalPlanTest
 {
     private IExpression col1 = ce("col1");
     private ScalarFunctionInfo function = SystemCatalog.get()
             .getScalarFunction("string_agg");
 
     @Test
-    public void test_misc()
+    void test_misc()
     {
         assertEquals(ResolvedType.of(Type.String), function.getType(List.of(col1)));
         assertEquals(ResolvedType.of(Type.String), function.getAggregateType(List.of(col1)));
@@ -42,8 +45,8 @@ public class StringAggFunctionTest extends APhysicalPlanTest
         }
         catch (UnsupportedOperationException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("string_agg DISTINCT is unsupported"));
+            assertTrue(e.getMessage()
+                    .contains("string_agg DISTINCT is unsupported"), e.getMessage());
         }
 
         try
@@ -53,8 +56,8 @@ public class StringAggFunctionTest extends APhysicalPlanTest
         }
         catch (UnsupportedOperationException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("string_agg DISTINCT is unsupported"));
+            assertTrue(e.getMessage()
+                    .contains("string_agg DISTINCT is unsupported"), e.getMessage());
         }
 
         try
@@ -64,13 +67,13 @@ public class StringAggFunctionTest extends APhysicalPlanTest
         }
         catch (QueryException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Delimiter to function string_agg in aggregate mode must be a constant of a variable expression"));
+            assertTrue(e.getMessage()
+                    .contains("Delimiter to function string_agg in aggregate mode must be a constant of a variable expression"), e.getMessage());
         }
     }
 
     @Test
-    public void test_aggregate()
+    void test_aggregate()
     {
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "sys", List.of(col1, new LiteralStringExpression("|")));
 

@@ -1,13 +1,14 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -24,14 +25,14 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link AggregateAvgFunction} */
-public class AggregateAvgFunctionTest extends APhysicalPlanTest
+class AggregateAvgFunctionTest extends APhysicalPlanTest
 {
     private IExpression col1 = ce("col1");
     private ScalarFunctionInfo function = SystemCatalog.get()
             .getScalarFunction("avg");
 
     @Test
-    public void test_object()
+    void test_object()
     {
         //@formatter:off
         ValueVector one = VectorTestUtils.vv(Type.Any,
@@ -59,7 +60,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_object_multi_vector()
+    void test_object_multi_vector()
     {
         //@formatter:off
         ValueVector one = VectorTestUtils.vv(Type.Any,
@@ -94,7 +95,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_decimal()
+    void test_decimal()
     {
         //@formatter:off
         ValueVector one = vv(ResolvedType.DECIMAL,
@@ -121,7 +122,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_decimal_multi_vector()
+    void test_decimal_multi_vector()
     {
         //@formatter:off
         ValueVector one = vv(ResolvedType.DECIMAL,
@@ -154,7 +155,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_int()
+    void test_int()
     {
         //@formatter:off
         ValueVector one = vv(Type.Int,
@@ -179,7 +180,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_long()
+    void test_long()
     {
         //@formatter:off
         ValueVector one = vv(Type.Long,
@@ -204,7 +205,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_long_scalar()
+    void test_long_scalar()
     {
         ValueVector smallLongs = vv(Type.Long, 10L, -1L, 100L, -200L);
 
@@ -219,7 +220,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_long_scalar_value_vector()
+    void test_long_scalar_value_vector()
     {
         ValueVector smallLongs = vv(Type.Long, 10L, -1L, 100L, -200L);
         ValueVector mediumLongs = ValueVector.literalLong(10_000_000L, 4);
@@ -236,7 +237,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_float()
+    void test_float()
     {
         //@formatter:off
         ValueVector one = vv(Type.Float,
@@ -263,7 +264,7 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_double()
+    void test_double()
     {
         //@formatter:off
         ValueVector one = vv(Type.Double,

@@ -1,6 +1,10 @@
 package se.kuseman.payloadbuilder.core.expression;
 
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -9,12 +13,12 @@ import se.kuseman.payloadbuilder.api.expression.IArithmeticUnaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Test of {@link ArithmeticUnaryExpression} */
-public class ArithmeticUnaryExpressionTest extends AExpressionTest
+class ArithmeticUnaryExpressionTest extends AExpressionTest
 {
     private static final IExpression NULL = new LiteralNullExpression(ResolvedType.of(Type.Boolean));
 
     @Test
-    public void test_fold()
+    void test_fold()
     {
         IExpression e;
 

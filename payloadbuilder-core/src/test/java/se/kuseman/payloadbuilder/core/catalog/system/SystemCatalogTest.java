@@ -3,6 +3,8 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -13,7 +15,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
@@ -26,10 +28,10 @@ import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AExpressionTest;
 
 /** Tests functions etc. in built in catalog */
-public class SystemCatalogTest extends AExpressionTest
+class SystemCatalogTest extends AExpressionTest
 {
     @Test
-    public void test_parseduration() throws Exception
+    void test_parseduration() throws Exception
     {
         assertExpression(null, null, "parseduration(null)");
         assertExpression(10_000L, null, "parseduration('00:00:10')");
@@ -42,7 +44,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_parsedatasize() throws Exception
+    void test_parsedatasize() throws Exception
     {
         assertExpression(null, null, "parsedatasize(null)");
         assertExpression(10L, null, "parsedatasize('10b')");
@@ -58,8 +60,8 @@ public class SystemCatalogTest extends AExpressionTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Could not parse data size: 1.mb"));
+            assertTrue(e.getMessage()
+                    .contains("Could not parse data size: 1.mb"), e.getMessage());
         }
         try
         {
@@ -68,13 +70,13 @@ public class SystemCatalogTest extends AExpressionTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Unkown data size unit: hb"));
+            assertTrue(e.getMessage()
+                    .contains("Unkown data size unit: hb"), e.getMessage());
         }
     }
 
     @Test
-    public void test_function_hash() throws Exception
+    void test_function_hash() throws Exception
     {
         assertExpression(null, null, "hash(null)");
         assertExpression(null, null, "hash(null,true)");
@@ -83,7 +85,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_base64() throws Exception
+    void test_base64() throws Exception
     {
         assertExpression(null, null, "base64_decode(null)");
         assertExpression(null, null, "base64_encode(null)");
@@ -94,14 +96,14 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_reverse() throws Exception
+    void test_reverse() throws Exception
     {
         assertExpression(null, null, "reverse(null)");
         assertExpression("olleh", null, "reverse('hello')");
     }
 
     @Test
-    public void test_current_timezone() throws Exception
+    void test_current_timezone() throws Exception
     {
         TimeZone timeZone = TimeZone.getDefault();
         try
@@ -117,7 +119,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_abs() throws Exception
+    void test_abs() throws Exception
     {
         assertExpression(null, null, "abs(null)");
         assertExpression(1, null, "abs(-1)");
@@ -137,13 +139,13 @@ public class SystemCatalogTest extends AExpressionTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Function abs does not support type: Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Function abs does not support type: Boolean"), e.getMessage());
         }
     }
 
     @Test
-    public void test_ceiling() throws Exception
+    void test_ceiling() throws Exception
     {
         assertExpression(null, null, "ceiling(null)");
         assertExpression(1, null, "ceiling(1)");
@@ -163,13 +165,13 @@ public class SystemCatalogTest extends AExpressionTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Function ceiling does not support type: Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Function ceiling does not support type: Boolean"), e.getMessage());
         }
     }
 
     @Test
-    public void test_floor() throws Exception
+    void test_floor() throws Exception
     {
         assertExpression(null, null, "floor(null)");
         assertExpression(1, null, "floor(1)");
@@ -189,13 +191,13 @@ public class SystemCatalogTest extends AExpressionTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Function floor does not support type: Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Function floor does not support type: Boolean"), e.getMessage());
         }
     }
 
     @Test
-    public void test_charindex() throws Exception
+    void test_charindex() throws Exception
     {
         assertExpression(null, null, "charindex(null, null)");
         assertExpression(null, null, "charindex('hello', null)");
@@ -207,7 +209,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_left_right() throws Exception
+    void test_left_right() throws Exception
     {
         assertExpression(null, null, "right(null, null)");
         assertExpression(null, null, "right(null, 12)");
@@ -226,13 +228,13 @@ public class SystemCatalogTest extends AExpressionTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Function left expects a positive integer value for argument 2"));
+            assertTrue(e.getMessage()
+                    .contains("Function left expects a positive integer value for argument 2"), e.getMessage());
         }
     }
 
     @Test
-    public void test_format() throws Exception
+    void test_format() throws Exception
     {
         Locale current = Locale.getDefault();
         try
@@ -305,20 +307,20 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_dereference() throws Exception
+    void test_dereference() throws Exception
     {
         assertExpression(null, null, "(null).key");
     }
 
     @Test
-    public void test_function_coalesce() throws Exception
+    void test_function_coalesce() throws Exception
     {
         assertExpression(10, null, "coalesce(null, null, 10)");
         assertExpression(20, null, "coalesce('20', null, 10)");
     }
 
     @Test
-    public void test_function_trim() throws Exception
+    void test_function_trim() throws Exception
     {
         assertExpression("hello", null, "trim('  hello  ')");
         assertExpression("hello  ", null, "ltrim('  hello  ')");
@@ -332,7 +334,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_function_stirng_split() throws Exception
+    void test_function_stirng_split() throws Exception
     {
         assertExpression(null, null, "string_split(null, null)");
         assertExpression(null, null, "string_split('hello', null)");
@@ -341,14 +343,14 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_randomInt() throws Exception
+    void test_randomInt() throws Exception
     {
         assertExpression(true, null, "randomInt(10) + 1 > 0");
         assertExpression(null, null, "randomInt(null) + 1 > 0");
     }
 
     @Test
-    public void test_function_concat() throws Exception
+    void test_function_concat() throws Exception
     {
         assertExpression("110.1", null, "concat(null,1,10.1)");
         assertExpression("", null, "concat(null,null)");
@@ -356,7 +358,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_function_string_agg() throws Exception
+    void test_function_string_agg() throws Exception
     {
         assertExpression(null, null, "string_agg(null, ',')");
         assertExpression("10", null, "string_agg(10, null)");
@@ -366,7 +368,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_function_array() throws Exception
+    void test_function_array() throws Exception
     {
         assertExpression(asList(1, 2, 3), null, "array(1,2,3)");
         assertExpression(emptyList(), null, "array()");
@@ -375,7 +377,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_function_contains() throws Exception
+    void test_function_contains() throws Exception
     {
         Map<String, Object> values = new HashMap<>();
         values.put("a", asList(-1, -2, -3, 0, 1, 2, 3));
@@ -401,7 +403,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_function_distinct() throws Exception
+    void test_function_distinct() throws Exception
     {
         Map<String, Object> values = new HashMap<>();
         values.put("a", asList(-1, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4));
@@ -420,7 +422,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_function_json_value() throws Exception
+    void test_function_json_value() throws Exception
     {
         assertExpression(null, null, "json_value(null)");
         assertExpression(emptyMap(), null, "json_value('{}')");
@@ -428,7 +430,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_function_isnull() throws Exception
+    void test_function_isnull() throws Exception
     {
         assertExpression(null, null, "isnull(null, null)");
         assertExpression(1, null, "isnull(null, 1)");
@@ -436,7 +438,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_function_isblank() throws Exception
+    void test_function_isblank() throws Exception
     {
         assertExpression("1", null, "isblank(null, 1)");
         assertExpression(null, null, "isblank(null, null)");
@@ -446,7 +448,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_template_string() throws Exception
+    void test_template_string() throws Exception
     {
         Map<String, Object> values = new HashMap<>();
         values.put("a", "hello world");
@@ -454,7 +456,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_getdate() throws Exception
+    void test_getdate() throws Exception
     {
         ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
 
@@ -475,7 +477,7 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
-    public void test_function_replace() throws Exception
+    void test_function_replace() throws Exception
     {
         assertExpression(null, null, "replace('hello xxx', null, 'world')");
         assertExpression(null, null, "replace('hello xxx', null, null)");

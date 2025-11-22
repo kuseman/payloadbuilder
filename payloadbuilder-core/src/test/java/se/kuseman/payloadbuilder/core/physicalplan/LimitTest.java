@@ -1,10 +1,13 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -15,10 +18,10 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /** Test of {@link Limit} */
-public class LimitTest extends APhysicalPlanTest
+class LimitTest extends APhysicalPlanTest
 {
     @Test
-    public void test()
+    void test()
     {
         MutableBoolean closed = new MutableBoolean();
         Schema schema = Schema.of(Column.of("col", Type.Int));

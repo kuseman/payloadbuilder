@@ -1,15 +1,18 @@
 package se.kuseman.payloadbuilder.api.catalog;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 
 /** Test of {@link QualifiedName} */
-public class QualifiedNameTest extends Assert
+class QualifiedNameTest
 {
     @Test
-    public void test_toString()
+    void test_toString()
     {
         assertEquals("part", QualifiedName.of("part")
                 .toString());

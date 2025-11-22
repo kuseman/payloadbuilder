@@ -22,7 +22,6 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
-import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
@@ -212,7 +211,7 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                         || (firstAsteriskIndex == -1
                                 && index > projectionExpressions.size()))
                 {
-                    throw new QueryException("ORDER BY position is out of range");
+                    throw new ParseException("ORDER BY position is out of range", item.getLocation());
                 }
                 // There are asterisks before or on the index then we sort by the ordinal runtime
                 else if (firstAsteriskIndex >= 0

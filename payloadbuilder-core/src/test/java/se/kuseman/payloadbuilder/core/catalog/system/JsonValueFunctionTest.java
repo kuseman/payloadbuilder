@@ -1,12 +1,15 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -20,20 +23,20 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link JsonValueFunction} */
-public class JsonValueFunctionTest extends APhysicalPlanTest
+class JsonValueFunctionTest extends APhysicalPlanTest
 {
     ScalarFunctionInfo f = SystemCatalog.get()
             .getScalarFunction("json_value");
 
     @Test
-    public void test_basic()
+    void test_basic()
     {
         assertEquals(ResolvedType.of(Type.Any), f.getType(asList(intLit(1))));
         assertEquals(Arity.ONE, f.arity());
     }
 
     @Test
-    public void test()
+    void test()
     {
         ValueVector actual;
 
@@ -69,8 +72,8 @@ public class JsonValueFunctionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Error deserializing 'broken'"));
+            assertTrue(e.getMessage()
+                    .contains("Error deserializing 'broken'"), e.getMessage());
         }
     }
 }

@@ -2,6 +2,11 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
@@ -17,8 +22,8 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.time.DurationFormatUtils;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -32,12 +37,12 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link ArithmeticBinaryExpression} */
-public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
+class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
 {
     private static final IExpression NULL = new LiteralNullExpression(ResolvedType.of(Type.Boolean));
 
     @Test
-    public void test_semantic_equals()
+    void test_semantic_equals()
     {
         IExpression left = e("a");
         IExpression right = e("b");
@@ -54,7 +59,7 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_fold()
+    void test_fold()
     {
         IExpression e;
 
@@ -106,14 +111,14 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_exceptions()
+    void test_exceptions()
     {
         assertCase(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.Boolean, true, Type.DateTime, 10, null, null, "Cannot perform arithmetics on types Boolean and DateTime"));
         assertCase(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.DateTime, 10, Type.Boolean, true, null, null, "Cannot perform arithmetics on types DateTime and Boolean"));
     }
 
     @Test
-    public void test_cases_implicit_cast()
+    void test_cases_implicit_cast()
     {
         List<TestCase> cases = new ArrayList<>();
 
@@ -155,7 +160,7 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_cases()
+    void test_cases()
     {
         IArithmeticBinaryExpression.Type[] ops = new IArithmeticBinaryExpression.Type[] {
                 IArithmeticBinaryExpression.Type.ADD, IArithmeticBinaryExpression.Type.SUBTRACT, IArithmeticBinaryExpression.Type.MULTIPLY, IArithmeticBinaryExpression.Type.DIVIDE,
@@ -239,7 +244,7 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_null()
+    void test_null()
     {
         assertCase(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.Int, null, Type.Float, 1.0F, Type.Float, null, null));
         assertCase(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.Int, 1, Type.Float, null, Type.Float, null, null));
@@ -247,7 +252,7 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_any()
+    void test_any()
     {
         assertCase(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.Any, 1, Type.Any, 1.0F, Type.Any, 2.0F, null));
         assertCase(new TestCase(IArithmeticBinaryExpression.Type.DIVIDE, Type.Any, 2L, Type.Any, 2L, Type.Any, 1L, null));
@@ -257,7 +262,7 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_int_add()
+    void test_int_add()
     {
         TupleVector tv = TupleVector.of(schema(new Type[] { Type.Int }, "col"), asList(vv(ResolvedType.of(Type.Int), 1, 2, 3, 4, 5)));
 
@@ -274,7 +279,7 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_add_int_and_float()
+    void test_add_int_and_float()
     {
         TupleVector tv = TupleVector.of(schema(new Type[] { Type.Int }, "col"), asList(vv(ResolvedType.of(Type.Int), 1, 2, 3, 4, 5)));
 
@@ -291,7 +296,7 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_add_int_and_double()
+    void test_add_int_and_double()
     {
         TupleVector tv = TupleVector.of(schema(new Type[] { Type.Int }, "col"), asList(vv(ResolvedType.of(Type.Int), 1, 2, 3, 4, 5)));
 
@@ -307,9 +312,8 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Type.Double), 11.1D, 12.1D, 13.1D, 14.1D, 15.1D), actual);
     }
 
-    @Test(
-            expected = ArithmeticException.class)
-    public void test_int_add_overflow()
+    @Test
+    void test_int_add_overflow()
     {
         TupleVector tv = TupleVector.of(schema(new Type[] { Type.Int }, "col"), asList(vv(ResolvedType.of(Type.Int), 1, 2, 3, 4, 5)));
 
@@ -320,7 +324,7 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
                 .getType());
 
         ValueVector actual = e.eval(tv, context);
-        assertEquals(10, actual.getInt(1)); // Triggers overflow
+        assertThrows(ArithmeticException.class, () -> assertEquals(10, actual.getInt(1))); // Triggers overflow
     }
 
     private void assertCase(TestCase test)
@@ -331,11 +335,11 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
         try
         {
             ValueVector result = e.eval(input, context);
-            assertEquals(test.toString(), ResolvedType.of(test.resultType), result.type());
-            assertEquals(test.toString(), 1, result.size());
+            assertEquals(ResolvedType.of(test.resultType), result.type(), test.toString());
+            assertEquals(1, result.size(), test.toString());
             if (test.result == null)
             {
-                assertTrue(test.toString(), result.isNull(0));
+                assertTrue(result.isNull(0), test.toString());
             }
             else
             {
@@ -358,8 +362,8 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
                 fail("Should not fail. " + test.toString() + "\n" + sw.toString());
             }
 
-            assertTrue("Should fail with message: " + test.assertExceptionMessage + " but was: " + ee.getMessage(), ee.getMessage()
-                    .contains(test.assertExceptionMessage));
+            assertTrue(ee.getMessage()
+                    .contains(test.assertExceptionMessage), "Should fail with message: " + test.assertExceptionMessage + " but was: " + ee.getMessage());
         }
     }
 
@@ -413,9 +417,9 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
         }
     }
 
-    @Ignore
+    @Disabled
     @Test
-    public void measure()
+    void measure()
     {
         Random r = new Random(System.nanoTime());
         final int[] numbers = new int[100_000_000];

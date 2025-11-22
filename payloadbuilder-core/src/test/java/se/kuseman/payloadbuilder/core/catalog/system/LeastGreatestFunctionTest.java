@@ -1,10 +1,11 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -19,7 +20,7 @@ import se.kuseman.payloadbuilder.core.expression.LiteralFloatExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link LeastGreatestFunction} */
-public class LeastGreatestFunctionTest extends APhysicalPlanTest
+class LeastGreatestFunctionTest extends APhysicalPlanTest
 {
     ScalarFunctionInfo least = SystemCatalog.get()
             .getScalarFunction("least");
@@ -27,7 +28,7 @@ public class LeastGreatestFunctionTest extends APhysicalPlanTest
             .getScalarFunction("greatest");
 
     @Test
-    public void test_type()
+    void test_type()
     {
         assertEquals(ResolvedType.of(Type.Int), least.getType(asList(intLit(1))));
         assertEquals(ResolvedType.of(Type.Float), least.getType(asList(intLit(1), new LiteralFloatExpression(10f))));
@@ -35,7 +36,7 @@ public class LeastGreatestFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test()
+    void test()
     {
         ValueVector actual;
 

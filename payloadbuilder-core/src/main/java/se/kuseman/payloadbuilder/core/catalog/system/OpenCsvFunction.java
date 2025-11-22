@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.input.CountingInputStream;
+import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -154,7 +154,7 @@ class OpenCsvFunction extends TableFunctionInfo
         final CsvNodeData nodeData = functionData.getNodeId() >= 0 ? context.getStatementContext()
                 .getOrCreateNodeData(functionData.getNodeId(), () -> new CsvNodeData())
                 : new CsvNodeData();
-        final CountingInputStream cis = closable instanceof CountingInputStream ci ? ci
+        final BoundedInputStream cis = closable instanceof BoundedInputStream ci ? ci
                 : null;
         final int batchSize = context.getBatchSize(functionData.getOptions());
         return new TupleIterator()
@@ -193,7 +193,7 @@ class OpenCsvFunction extends TableFunctionInfo
                     long time = System.nanoTime();
                     boolean hasNext = setNext();
                     nodeData.totalMillis += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
-                    nodeData.totalBytes = cis != null ? cis.getByteCount()
+                    nodeData.totalBytes = cis != null ? cis.getCount()
                             : 0;
                     return hasNext;
                 }
@@ -315,7 +315,9 @@ class OpenCsvFunction extends TableFunctionInfo
             }
             else if (obj instanceof InputStream is)
             {
-                CountingInputStream cis = new CountingInputStream(is);
+                BoundedInputStream cis = BoundedInputStream.builder()
+                        .setInputStream(is)
+                        .get();
                 // Jackson determines encoding based on BOM
                 return Pair.of(cis, (CsvParser) MAPPER.createParser(cis));
             }

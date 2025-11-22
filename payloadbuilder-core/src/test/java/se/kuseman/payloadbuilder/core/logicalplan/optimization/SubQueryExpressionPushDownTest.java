@@ -1,6 +1,9 @@
 package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.ArrayList;
@@ -9,7 +12,7 @@ import java.util.Random;
 import java.util.Set;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -40,15 +43,16 @@ import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.parser.Location;
+import se.kuseman.payloadbuilder.core.parser.ParseException;
 import se.kuseman.payloadbuilder.core.statement.LogicalSelectStatement;
 
 /** Test of {@link SubQueryExpressionPushDown} */
-public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
+class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 {
     private final SubQueryExpressionPushDown rule = new SubQueryExpressionPushDown();
 
     @Test
-    public void test_subquery_epxression_with_table_value_ctor_more_than_one_row()
+    void test_subquery_epxression_with_table_value_ctor_more_than_one_row()
     {
         String q = """
                 SELECT (
@@ -66,15 +70,15 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
             optimize(context, plan);
             fail();
         }
-        catch (se.kuseman.payloadbuilder.core.parser.ParseException e)
+        catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("A sub query expression must return a single row"));
+            assertTrue(e.getMessage()
+                    .contains("A sub query expression must return a single row"), e.getMessage());
         }
     }
 
     @Test
-    public void test_tables_values_ctor_in_projection()
+    void test_tables_values_ctor_in_projection()
     {
         String q = """
                 SELECT
@@ -125,7 +129,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_subquery_epxression_within_table_value_ctor()
+    void test_subquery_epxression_within_table_value_ctor()
     {
         String q = """
                 SELECT *
@@ -183,7 +187,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_subquery_epxression_with_multiple_column_references()
+    void test_subquery_epxression_with_multiple_column_references()
     {
         String q = """
                 SELECT
@@ -266,7 +270,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_operator_function_with_nested_sub_query()
+    void test_operator_function_with_nested_sub_query()
     {
         String q = """
                 SELECT
@@ -367,7 +371,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_operator_function_mixed_with_sub_query_scalar_and_correlation()
+    void test_operator_function_mixed_with_sub_query_scalar_and_correlation()
     {
         String q = """
                    select a.column,
@@ -484,7 +488,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sub_query_push_down_with_ordinals()
+    void test_sub_query_push_down_with_ordinals()
     {
         //@formatter:off
         String query = ""
@@ -551,7 +555,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_sub_query_push_down_with_ordinals_no_table_source()
+    void test_sub_query_push_down_with_ordinals_no_table_source()
     {
         //@formatter:off
         String query = ""
@@ -606,7 +610,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_without_for()
+    void test_without_for()
     {
         //@formatter:off
         String query = ""
@@ -675,7 +679,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_aggregation_without_for()
+    void test_aggregation_without_for()
     {
         //@formatter:off
         String query = """
@@ -785,7 +789,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_multiple_without_for()
+    void test_multiple_without_for()
     {
         //@formatter:off
         String query = ""
@@ -876,7 +880,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_multiple_correlated_without_for()
+    void test_multiple_correlated_without_for()
     {
         //@formatter:off
         String query = ""
@@ -971,7 +975,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_multiple_correlated_without_for_2()
+    void test_multiple_correlated_without_for_2()
     {
         //@formatter:off
         String query = ""
@@ -1046,7 +1050,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_multiple_correlated_without_for_3()
+    void test_multiple_correlated_without_for_3()
     {
         //@formatter:off
         String query = ""
@@ -1124,7 +1128,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_complex_sub_queries_without_for()
+    void test_complex_sub_queries_without_for()
     {
         // Here we have a arithmetic expression where one side is a subquery
         //@formatter:off
@@ -1176,7 +1180,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_sub_queries_without_for_gets_unnested()
+    void test_nested_sub_queries_without_for_gets_unnested()
     {
         //@formatter:off
         String query = ""
@@ -1230,7 +1234,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_correlated_sub_queries_without_for()
+    void test_correlated_sub_queries_without_for()
     {
         //@formatter:off
         String query = ""
@@ -1284,7 +1288,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_arithmetics_between_two_sub_query_expressions_one_correlated_the_other_not()
+    void test_arithmetics_between_two_sub_query_expressions_one_correlated_the_other_not()
     {
         //@formatter:off
         String query = ""

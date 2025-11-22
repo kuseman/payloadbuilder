@@ -1,6 +1,9 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -8,7 +11,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -17,10 +20,10 @@ import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link AtTimeZoneExpression} */
-public class AtTimeZoneExpressionTest extends APhysicalPlanTest
+class AtTimeZoneExpressionTest extends APhysicalPlanTest
 {
     @Test
-    public void test() throws Exception
+    void test() throws Exception
     {
         AtTimeZoneExpression e;
         ValueVector actual;
@@ -45,8 +48,8 @@ public class AtTimeZoneExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException ee)
         {
-            assertTrue(ee.getMessage(), ee.getMessage()
-                    .contains("Time zone 'dummy' could not be found."));
+            assertTrue(ee.getMessage()
+                    .contains("Time zone 'dummy' could not be found."), ee.getMessage());
         }
 
         e = new AtTimeZoneExpression(new LiteralStringExpression("hello"), new LiteralStringExpression("Z"));
@@ -58,8 +61,8 @@ public class AtTimeZoneExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException ee)
         {
-            assertTrue(ee.getMessage(), ee.getMessage()
-                    .contains("Cannot cast 'hello' to DateTime"));
+            assertTrue(ee.getMessage()
+                    .contains("Cannot cast 'hello' to DateTime"), ee.getMessage());
         }
 
         e = new AtTimeZoneExpression(new LiteralStringExpression("2000-10-10"), new LiteralStringExpression("Z"));

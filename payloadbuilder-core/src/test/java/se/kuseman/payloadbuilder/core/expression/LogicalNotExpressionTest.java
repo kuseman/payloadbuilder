@@ -1,6 +1,6 @@
 package se.kuseman.payloadbuilder.core.expression;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -10,10 +10,10 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link LogicalNotExpression} */
-public class LogicalNotExpressionTest extends APhysicalPlanTest
+class LogicalNotExpressionTest extends APhysicalPlanTest
 {
     @Test
-    public void test()
+    void test()
     {
         LogicalNotExpression e;
         ValueVector actual;

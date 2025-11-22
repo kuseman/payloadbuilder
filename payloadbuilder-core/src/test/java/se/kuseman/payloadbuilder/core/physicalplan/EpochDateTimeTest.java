@@ -1,5 +1,11 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -8,19 +14,18 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 
 /** Test of {@link EpochDateTime} */
-public class EpochDateTimeTest extends Assert
+public class EpochDateTimeTest
 {
     @Test
-    public void test()
+    void test()
     {
         EpochDateTime d = EpochDateTime.now();
         assertFalse(d.hasNulls());
@@ -57,13 +62,13 @@ public class EpochDateTimeTest extends Assert
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast '10.0 (Float)' to DateTime"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast '10.0 (Float)' to DateTime"), e.getMessage());
         }
     }
 
     @Test
-    public void test_add()
+    void test_add()
     {
         long longNow = Instant.parse("2010-10-10T00:10:00.00Z")
                 .toEpochMilli();
@@ -108,7 +113,7 @@ public class EpochDateTimeTest extends Assert
     }
 
     @Test
-    public void test_from_string()
+    void test_from_string()
     {
         assertEquals(EpochDateTime.from(LocalDateTime.of(2010, 10, 10, 0, 0, 0)), EpochDateTime.from("2010-10-10"));
         // Space separator
@@ -133,13 +138,13 @@ public class EpochDateTimeTest extends Assert
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 'ohhh no' to DateTime"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 'ohhh no' to DateTime"), e.getMessage());
         }
     }
 
     @Test
-    public void test_from_uf8_string()
+    void test_from_uf8_string()
     {
         assertEquals(EpochDateTime.from(LocalDateTime.of(2010, 10, 10, 0, 0, 0)), EpochDateTime.from(UTF8String.from("2010-10-10")));
         // Space separator
@@ -164,14 +169,14 @@ public class EpochDateTimeTest extends Assert
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 'ohhh no' to DateTime"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 'ohhh no' to DateTime"), e.getMessage());
         }
     }
 
-    @Ignore
+    @Disabled
     @Test
-    public void test1()
+    void test1()
     {
         long n = System.currentTimeMillis();
 

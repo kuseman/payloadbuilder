@@ -3,13 +3,18 @@ package se.kuseman.payloadbuilder.core.expression;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -25,14 +30,14 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link PredicateAnalyzer} */
-public class PredicateAnalyzerTest extends APhysicalPlanTest
+class PredicateAnalyzerTest extends APhysicalPlanTest
 {
     private TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
     private TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
     private TableSourceReference tableC = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableC"), "c");
 
     @Test
-    public void test_dereference_expression_with_qualified_column()
+    void test_dereference_expression_with_qualified_column()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -64,7 +69,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_dereference_expression_with_no_qualified_column()
+    void test_dereference_expression_with_no_qualified_column()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -83,7 +88,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_outerreference_column_expressions()
+    void test_outerreference_column_expressions()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -113,7 +118,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_equal_comparison_single_column_reference()
+    void test_equal_comparison_single_column_reference()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -160,8 +165,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableB"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableB"), e.getMessage());
         }
         assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -202,8 +207,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableB"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableB"), e.getMessage());
         }
         assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -214,7 +219,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_greater_than_comparison_single_column_reference()
+    void test_greater_than_comparison_single_column_reference()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -254,8 +259,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableB"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableB"), e.getMessage());
         }
         assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -301,8 +306,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableB"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableB"), e.getMessage());
         }
         assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -313,7 +318,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_equal_comparison_multi_column_reference()
+    void test_equal_comparison_multi_column_reference()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -361,8 +366,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -378,7 +383,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_greater_than_comparison_multi_column_reference()
+    void test_greater_than_comparison_multi_column_reference()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -425,8 +430,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -442,7 +447,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_equal_comparison_multi_column_reference_with_ambiguous_column()
+    void test_equal_comparison_multi_column_reference_with_ambiguous_column()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -492,8 +497,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col2", tableB), actualPair.getExpressionPair(tableB)
                 .getLeft());
@@ -505,7 +510,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_not_equal_single_column_reference()
+    void test_not_equal_single_column_reference()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -545,8 +550,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -557,7 +562,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_null_predicate()
+    void test_null_predicate()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -604,8 +609,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -616,7 +621,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_not_null_predicate()
+    void test_not_null_predicate()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -665,8 +670,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -677,7 +682,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_in_predicate()
+    void test_in_predicate()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -722,8 +727,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -734,7 +739,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_not_in_predicate()
+    void test_not_in_predicate()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -779,8 +784,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -791,7 +796,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_in_predicate_multi_column_references()
+    void test_in_predicate_multi_column_references()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -836,8 +841,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -848,7 +853,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_in_predicate_with_column_reference_inside_argument_list()
+    void test_in_predicate_with_column_reference_inside_argument_list()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -895,8 +900,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre("col1", tableA)), false), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -907,7 +912,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_like_predicate()
+    void test_like_predicate()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -952,8 +957,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -964,7 +969,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_not_like_predicate()
+    void test_not_like_predicate()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -1009,8 +1014,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -1021,7 +1026,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_function_call()
+    void test_function_call()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -1080,15 +1085,15 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableB"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableB"), e.getMessage());
         }
 
         assertEquals(Pair.of(fce, null), actualPair.getExpressionPair(tableA));
     }
 
     @Test
-    public void test_function_call_no_column_references()
+    void test_function_call_no_column_references()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -1146,7 +1151,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_complex_predicate()
+    void test_complex_predicate()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -1204,8 +1209,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
@@ -1235,8 +1240,8 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No expressions could be found in this pair for table source tableC"));
+            assertTrue(e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"), e.getMessage());
         }
         assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());

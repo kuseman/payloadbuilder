@@ -1,10 +1,12 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -25,7 +27,7 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.core.utils.CollectionUtils;
 
 /** Test of {@link MapFunction} */
-public class MapFunctionTest extends APhysicalPlanTest
+class MapFunctionTest extends APhysicalPlanTest
 {
     private final ScalarFunctionInfo mapFunction = SystemCatalog.get()
             .getScalarFunction("map");
@@ -35,7 +37,7 @@ public class MapFunctionTest extends APhysicalPlanTest
             .getScalarFunction("toarray");
 
     @Test
-    public void test_nested_mapping()
+    void test_nested_mapping()
     {
         ValueVector actual;
         TupleVector tv;
@@ -65,7 +67,7 @@ public class MapFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_mapping_populated_column()
+    void test_mapping_populated_column()
     {
         ValueVector actual;
         TupleVector tv;
@@ -107,7 +109,7 @@ public class MapFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_iterable_input()
+    void test_iterable_input()
     {
         ValueVector actual;
         TupleVector tv;
@@ -249,7 +251,7 @@ public class MapFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_non_iterable_input()
+    void test_non_iterable_input()
     {
         ValueVector actual;
         TupleVector tv;

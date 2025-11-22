@@ -2,11 +2,14 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.List;
 import java.util.NoSuchElementException;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -24,10 +27,10 @@ import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 
 /** Test {@link TableFunctionScan} */
-public class TableFunctionScanTest extends APhysicalPlanTest
+class TableFunctionScanTest extends APhysicalPlanTest
 {
     @Test
-    public void test_runtime_schema_is_set()
+    void test_runtime_schema_is_set()
     {
         TableSourceReference table = new TableSourceReference(666, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t");
 
@@ -47,7 +50,7 @@ public class TableFunctionScanTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_no_such_element()
+    void test_no_such_element()
     {
         Schema schema = Schema.of(col("Value", ResolvedType.of(Type.Int), table));
         IPhysicalPlan plan = new TableFunctionScan(0, schema, table, "", "System", SystemCatalog.get()
@@ -69,7 +72,7 @@ public class TableFunctionScanTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_that_a_table_source_is_attched_on_schema()
+    void test_that_a_table_source_is_attched_on_schema()
     {
         Schema schema = Schema.of(col("Value", ResolvedType.of(Type.Int), table));
         IPhysicalPlan plan = new TableFunctionScan(0, schema, table, "", "System", SystemCatalog.get()
@@ -81,7 +84,7 @@ public class TableFunctionScanTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_validation_asterisk_with_empty_runtime_schema()
+    void test_validation_asterisk_with_empty_runtime_schema()
     {
         Schema schema = Schema.of(ast("col", table));
         IPhysicalPlan plan = new TableFunctionScan(0, schema, table, "", "System", new TableFunctionInfo("dummy")
@@ -101,13 +104,13 @@ public class TableFunctionScanTest extends APhysicalPlanTest
         }
         catch (QueryException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("returned an empty schema"));
+            assertTrue(e.getMessage()
+                    .contains("returned an empty schema"), e.getMessage());
         }
     }
 
     @Test
-    public void test_validation_not_matching_runtime_schema_by_size()
+    void test_validation_not_matching_runtime_schema_by_size()
     {
         Schema schema = Schema.of(col("Value", ResolvedType.of(Type.Int), table), col("Value2", ResolvedType.of(Type.Int), table));
         IPhysicalPlan plan = new TableFunctionScan(0, schema, table, "", "System", new TableFunctionInfo("dummy")
@@ -127,13 +130,13 @@ public class TableFunctionScanTest extends APhysicalPlanTest
         }
         catch (QueryException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("doesn't match the planned schema"));
+            assertTrue(e.getMessage()
+                    .contains("doesn't match the planned schema"), e.getMessage());
         }
     }
 
     @Test
-    public void test_validation_not_matching_runtime_schema_by_column()
+    void test_validation_not_matching_runtime_schema_by_column()
     {
         Schema schema = Schema.of(col("Value", ResolvedType.of(Type.Int), table));
         IPhysicalPlan plan = new TableFunctionScan(0, schema, table, "", "System", new TableFunctionInfo("dummy")
@@ -153,13 +156,13 @@ public class TableFunctionScanTest extends APhysicalPlanTest
         }
         catch (QueryException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("doesn't match the planned schema"));
+            assertTrue(e.getMessage()
+                    .contains("doesn't match the planned schema"), e.getMessage());
         }
     }
 
     @Test
-    public void test_validation_not_matching_runtime_schema_by_type()
+    void test_validation_not_matching_runtime_schema_by_type()
     {
         Schema schema = Schema.of(col("Value", ResolvedType.of(Type.Int), table));
         IPhysicalPlan plan = new TableFunctionScan(0, schema, table, "", "System", new TableFunctionInfo("dummy")
@@ -178,8 +181,8 @@ public class TableFunctionScanTest extends APhysicalPlanTest
         }
         catch (QueryException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("doesn't match the planned schema"));
+            assertTrue(e.getMessage()
+                    .contains("doesn't match the planned schema"), e.getMessage());
         }
     }
 }

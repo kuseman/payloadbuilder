@@ -1,6 +1,12 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
@@ -10,7 +16,7 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -30,10 +36,10 @@ import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link IndexSeek} */
-public class IndexSeekTest extends APhysicalPlanTest
+class IndexSeekTest extends APhysicalPlanTest
 {
     @Test
-    public void test_no_keys()
+    void test_no_keys()
     {
         TableSourceReference tsf = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tbl"), "t");
         TupleVector tv1 = TupleVector.of(Schema.of(Column.of("col1", Type.Int)), List.of(VectorTestUtils.vv(Type.Int, 1, 2, 3, 4, 5)));
@@ -49,7 +55,7 @@ public class IndexSeekTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test()
+    void test()
     {
         TableSourceReference tsf = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tbl"), "t");
 
@@ -84,7 +90,7 @@ public class IndexSeekTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_batch()
+    void test_batch()
     {
         TableSourceReference tsf = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tbl"), "t");
 
@@ -159,7 +165,7 @@ public class IndexSeekTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_batch_close_in_middle_of_stream()
+    void test_batch_close_in_middle_of_stream()
     {
         TableSourceReference tsf = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tbl"), "t");
 
@@ -198,7 +204,7 @@ public class IndexSeekTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_batch_non_asterisk_schema()
+    void test_batch_non_asterisk_schema()
     {
         TableSourceReference tsf = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tbl"), "t");
 

@@ -1,6 +1,6 @@
 package se.kuseman.payloadbuilder.test;
 
-import org.junit.Assert;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -10,7 +10,7 @@ import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /** Vector utils that can be used when testing catalogs and asserting vectors */
-public class VectorTestUtils extends Assert
+public class VectorTestUtils
 {
     /** Create value vector of provided values */
     public static ValueVector vv(final Type type, final Object... values)
@@ -78,8 +78,8 @@ public class VectorTestUtils extends Assert
     {
         TupleVector e = expected;
         TupleVector a = actual;
-        assertEquals(message + " Schema should equal", e.getSchema(), a.getSchema());
-        assertEquals(message + " Row count should equal", e.getRowCount(), a.getRowCount());
+        assertEquals(e.getSchema(), a.getSchema(), message + " Schema should equal");
+        assertEquals(e.getRowCount(), a.getRowCount(), message + " Row count should equal");
         for (int j = 0; j < e.getSchema()
                 .getSize(); j++)
         {
@@ -98,7 +98,7 @@ public class VectorTestUtils extends Assert
     {
         ObjectVector e = expected;
         ObjectVector a = actual;
-        assertEquals(message + " Schema should equal", e.getSchema(), a.getSchema());
+        assertEquals(e.getSchema(), a.getSchema(), message + " Schema should equal");
         for (int j = 0; j < e.getSchema()
                 .getSize(); j++)
         {
@@ -112,7 +112,7 @@ public class VectorTestUtils extends Assert
         assertEquals(expected.size(), actual.size());
         for (int i = 0; i < expected.size(); i++)
         {
-            assertEquals("Row " + i + " should be null", expected.getAny(i), actual.isNull(i));
+            assertEquals(expected.getAny(i), actual.isNull(i), "Row " + i + " should be null");
         }
     }
 
@@ -131,8 +131,8 @@ public class VectorTestUtils extends Assert
     /** Assert that to value vectors equals */
     public static void assertVectorsEquals(String message, ValueVector expected, ValueVector actual, boolean performNumberCasts)
     {
-        assertEquals(message + "Types should equal", expected.type(), actual.type());
-        assertEquals(message + "Sizes should equal", expected.size(), actual.size());
+        assertEquals(expected.type(), actual.type(), message + "Types should equal");
+        assertEquals(expected.size(), actual.size(), message + "Sizes should equal");
 
         for (int i = 0; i < expected.size(); i++)
         {
@@ -148,7 +148,7 @@ public class VectorTestUtils extends Assert
 
         if (expectedIsNull != actualIsNull)
         {
-            assertEquals(message + "Row " + expectedRow + " not equal regarding isNull", expectedIsNull, actualIsNull);
+            assertEquals(expectedIsNull, actualIsNull, message + "Row " + expectedRow + " not equal regarding isNull");
         }
         if (expectedIsNull
                 && actualIsNull)
@@ -166,48 +166,48 @@ public class VectorTestUtils extends Assert
                 .getType())
         {
             case Boolean:
-                assertEquals(message + "Row " + expectedRow + " not equal", expected.getBoolean(expectedRow), actual.getBoolean(actualRow));
+                assertEquals(expected.getBoolean(expectedRow), actual.getBoolean(actualRow), message + "Row " + expectedRow + " not equal");
                 break;
             case Double:
                 // We accept some loss here when casting between floating points
-                assertEquals(message + "Row (double) " + expectedRow + " not equal (getDouble)", expected.getDouble(expectedRow), actual.getDouble(actualRow), 0.001);
+                assertEquals(expected.getDouble(expectedRow), actual.getDouble(actualRow), 0.001, message + "Row (double) " + expectedRow + " not equal (getDouble)");
                 if (performNumberCasts)
                 {
-                    assertEquals(message + "Row (double) " + expectedRow + " not equal (getInt)", (int) expected.getDouble(expectedRow), actual.getInt(actualRow));
-                    assertEquals(message + "Row (double) " + expectedRow + " not equal (getLong)", (long) expected.getDouble(expectedRow), actual.getLong(actualRow));
-                    assertEquals(message + "Row (double) " + expectedRow + " not equal (getFloat)", expected.getDouble(expectedRow), actual.getFloat(actualRow), 0.001);
+                    assertEquals((int) expected.getDouble(expectedRow), actual.getInt(actualRow), message + "Row (double) " + expectedRow + " not equal (getInt)");
+                    assertEquals((long) expected.getDouble(expectedRow), actual.getLong(actualRow), message + "Row (double) " + expectedRow + " not equal (getLong)");
+                    assertEquals(expected.getDouble(expectedRow), actual.getFloat(actualRow), 0.001, message + "Row (double) " + expectedRow + " not equal (getFloat)");
                 }
                 break;
             case Float:
                 // We accept some loss here when casting between floating points
-                assertEquals(message + "Row (float) " + expectedRow + " not equal (getFloat)", expected.getFloat(expectedRow), actual.getFloat(actualRow), 0.001);
+                assertEquals(expected.getFloat(expectedRow), actual.getFloat(actualRow), 0.001, message + "Row (float) " + expectedRow + " not equal (getFloat)");
                 if (performNumberCasts)
                 {
-                    assertEquals(message + "Row (float) " + expectedRow + " not equal (getInt)", (int) expected.getFloat(expectedRow), actual.getInt(actualRow));
-                    assertEquals(message + "Row (float) " + expectedRow + " not equal (getLong)", (long) expected.getFloat(expectedRow), actual.getLong(actualRow));
-                    assertEquals(message + "Row (float) " + expectedRow + " not equal (getDouble)", expected.getFloat(expectedRow), actual.getDouble(actualRow), 0.001);
+                    assertEquals((int) expected.getFloat(expectedRow), actual.getInt(actualRow), message + "Row (float) " + expectedRow + " not equal (getInt)");
+                    assertEquals((long) expected.getFloat(expectedRow), actual.getLong(actualRow), message + "Row (float) " + expectedRow + " not equal (getLong)");
+                    assertEquals(expected.getFloat(expectedRow), actual.getDouble(actualRow), 0.001, message + "Row (float) " + expectedRow + " not equal (getDouble)");
                 }
                 break;
             case Int:
-                assertEquals(message + "Row (int) " + expectedRow + " not equal (getInt)", expected.getInt(expectedRow), actual.getInt(actualRow));
+                assertEquals(expected.getInt(expectedRow), actual.getInt(actualRow), message + "Row (int) " + expectedRow + " not equal (getInt)");
                 if (performNumberCasts)
                 {
-                    assertEquals(message + "Row (int) " + expectedRow + " not equal (getLong)", expected.getInt(expectedRow), (int) actual.getLong(actualRow));
-                    assertEquals(message + "Row (int) " + expectedRow + " not equal (getFloat)", expected.getInt(expectedRow), (int) actual.getFloat(actualRow));
-                    assertEquals(message + "Row (int) " + expectedRow + " not equal (getDouble)", expected.getInt(expectedRow), (int) actual.getDouble(actualRow));
+                    assertEquals(expected.getInt(expectedRow), (int) actual.getLong(actualRow), message + "Row (int) " + expectedRow + " not equal (getLong)");
+                    assertEquals(expected.getInt(expectedRow), (int) actual.getFloat(actualRow), message + "Row (int) " + expectedRow + " not equal (getFloat)");
+                    assertEquals(expected.getInt(expectedRow), (int) actual.getDouble(actualRow), message + "Row (int) " + expectedRow + " not equal (getDouble)");
                 }
                 break;
             case Long:
-                assertEquals(message + "Row (long) " + expectedRow + " not equal (getLong)", expected.getLong(expectedRow), actual.getLong(actualRow));
+                assertEquals(expected.getLong(expectedRow), actual.getLong(actualRow), message + "Row (long) " + expectedRow + " not equal (getLong)");
                 if (performNumberCasts)
                 {
-                    assertEquals(message + "Row (long) " + expectedRow + " not equal (getInt)", (int) expected.getLong(expectedRow), actual.getInt(actualRow));
-                    assertEquals(message + "Row (long) " + expectedRow + " not equal (getFloat)", expected.getLong(expectedRow), (long) actual.getFloat(actualRow));
-                    assertEquals(message + "Row (long) " + expectedRow + " not equal (getDouble)", expected.getLong(expectedRow), (long) actual.getDouble(actualRow));
+                    assertEquals((int) expected.getLong(expectedRow), actual.getInt(actualRow), message + "Row (long) " + expectedRow + " not equal (getInt)");
+                    assertEquals(expected.getLong(expectedRow), (long) actual.getFloat(actualRow), message + "Row (long) " + expectedRow + " not equal (getFloat)");
+                    assertEquals(expected.getLong(expectedRow), (long) actual.getDouble(actualRow), message + "Row (long) " + expectedRow + " not equal (getDouble)");
                 }
                 break;
             case Decimal:
-                assertEquals(message + "Row (decimal) " + expectedRow + " not equal (getDecimal)", expected.getDecimal(expectedRow), actual.getDecimal(actualRow));
+                assertEquals(expected.getDecimal(expectedRow), actual.getDecimal(actualRow), message + "Row (decimal) " + expectedRow + " not equal (getDecimal)");
                 // if (performNumberCasts)
                 // {
                 // assertEquals(message + "Row (long) " + expectedRow + " not equal (getInt)", (int) expected.getLong(expectedRow), actual.getInt(actualRow));
@@ -216,13 +216,13 @@ public class VectorTestUtils extends Assert
                 // }
                 break;
             case String:
-                assertEquals(message + "Row " + expectedRow + " not equal", expected.getString(expectedRow), actual.getString(actualRow));
+                assertEquals(expected.getString(expectedRow), actual.getString(actualRow), message + "Row " + expectedRow + " not equal");
                 break;
             case DateTime:
-                assertEquals(message + "Row " + expectedRow + " not equal", expected.getDateTime(expectedRow), actual.getDateTime(actualRow));
+                assertEquals(expected.getDateTime(expectedRow), actual.getDateTime(actualRow), message + "Row " + expectedRow + " not equal");
                 break;
             case DateTimeOffset:
-                assertEquals(message + "Row " + expectedRow + " not equal", expected.getDateTimeOffset(expectedRow), actual.getDateTimeOffset(actualRow));
+                assertEquals(expected.getDateTimeOffset(expectedRow), actual.getDateTimeOffset(actualRow), message + "Row " + expectedRow + " not equal");
                 break;
             case Table:
                 assertTupleVectorsEquals("Table of row: " + expectedRow + ": ", expected.getTable(expectedRow), actual.getTable(actualRow));
@@ -263,7 +263,7 @@ public class VectorTestUtils extends Assert
                     act = ((UTF8String) act).toString();
                 }
 
-                assertEquals(message + "Row " + expectedRow + " not equal", exp, act);
+                assertEquals(exp, act, message + "Row " + expectedRow + " not equal");
                 break;
         }
     }

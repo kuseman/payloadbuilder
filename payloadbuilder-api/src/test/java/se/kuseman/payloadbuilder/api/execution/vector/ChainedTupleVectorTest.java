@@ -1,9 +1,13 @@
 package se.kuseman.payloadbuilder.api.execution.vector;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.util.List;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -13,10 +17,10 @@ import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link ChainedTupleVector} */
-public class ChainedTupleVectorTest extends Assert
+class ChainedTupleVectorTest
 {
     @Test
-    public void test_no_common_schema_sub_Set()
+    void test_no_common_schema_sub_Set()
     {
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, ChainedTupleVector.chain(List.of()));
 
@@ -43,13 +47,13 @@ public class ChainedTupleVectorTest extends Assert
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Schema of chained tuple vectors must share a common sub set of columns."));
+            assertTrue(e.getMessage()
+                    .contains("Schema of chained tuple vectors must share a common sub set of columns."), e.getMessage());
         }
     }
 
     @Test
-    public void test_no_or_single_vectors()
+    void test_no_or_single_vectors()
     {
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, ChainedTupleVector.chain(List.of()));
 
@@ -66,7 +70,7 @@ public class ChainedTupleVectorTest extends Assert
     }
 
     @Test
-    public void test_chain_same_schema_vectors()
+    void test_chain_same_schema_vectors()
     {
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, ChainedTupleVector.chain(List.of()));
 
@@ -89,7 +93,7 @@ public class ChainedTupleVectorTest extends Assert
     }
 
     @Test
-    public void test()
+    void test()
     {
         //@formatter:off
         TupleVector tv1 = TupleVector.of(Schema.of(

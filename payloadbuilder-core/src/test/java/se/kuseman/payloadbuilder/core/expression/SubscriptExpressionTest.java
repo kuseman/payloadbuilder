@@ -1,10 +1,13 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -20,10 +23,10 @@ import se.kuseman.payloadbuilder.api.utils.MapUtils;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link SubscriptExpression} */
-public class SubscriptExpressionTest extends APhysicalPlanTest
+class SubscriptExpressionTest extends APhysicalPlanTest
 {
     @Test
-    public void test_subscript_unsupported_type()
+    void test_subscript_unsupported_type()
     {
         IExpression e = new SubscriptExpression(new LiteralDecimalExpression(Decimal.from(10)), new LiteralBooleanExpression(false));
         try
@@ -33,13 +36,13 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException ee)
         {
-            assertTrue(ee.getMessage(), ee.getMessage()
-                    .contains("Cannot subscript Decimal with Boolean"));
+            assertTrue(ee.getMessage()
+                    .contains("Cannot subscript Decimal with Boolean"), ee.getMessage());
         }
     }
 
     @Test
-    public void test_subscript_unsupported_type_eval()
+    void test_subscript_unsupported_type_eval()
     {
         IExpression e = new SubscriptExpression(new LiteralDecimalExpression(Decimal.from(10)), new LiteralBooleanExpression(false));
         try
@@ -49,13 +52,13 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException ee)
         {
-            assertTrue(ee.getMessage(), ee.getMessage()
-                    .contains("Cannot subscript Decimal with Boolean"));
+            assertTrue(ee.getMessage()
+                    .contains("Cannot subscript Decimal with Boolean"), ee.getMessage());
         }
     }
 
     @Test
-    public void test_subscript_any_unsupported_value()
+    void test_subscript_any_unsupported_value()
     {
         IExpression expression;
         IExpression input;
@@ -78,13 +81,13 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript value: true"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript value: true"), e.getMessage());
         }
     }
 
     @Test
-    public void test_subscript_table_with_int()
+    void test_subscript_table_with_int()
     {
         IExpression expression;
         IExpression input;
@@ -225,8 +228,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript a Table with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript a Table with Boolean"), e.getMessage());
         }
 
         try
@@ -237,8 +240,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript a Table with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript a Table with Boolean"), e.getMessage());
         }
 
         // Test subscript with runtime time value that is not supported
@@ -254,13 +257,13 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript a Table with value: true"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript a Table with value: true"), e.getMessage());
         }
     }
 
     @Test
-    public void test_subscript_table_with_string()
+    void test_subscript_table_with_string()
     {
         IExpression expression;
         IExpression input;
@@ -332,7 +335,7 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_subscript_any_table_with_int()
+    void test_subscript_any_table_with_int()
     {
         IExpression expression;
         IExpression input;
@@ -473,8 +476,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript a Table with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript a Table with Boolean"), e.getMessage());
         }
 
         try
@@ -485,8 +488,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript Any with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript Any with Boolean"), e.getMessage());
         }
 
         // Test subscript with runtime time value that is not supported
@@ -502,13 +505,13 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript a Table with value: true"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript a Table with value: true"), e.getMessage());
         }
     }
 
     @Test
-    public void test_subscript_any_array_with_int()
+    void test_subscript_any_array_with_int()
     {
         IExpression expression;
         TupleVector tv;
@@ -582,8 +585,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript an Array with value: {key=value, key1=123}"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript an Array with value: {key=value, key1=123}"), e.getMessage());
         }
 
         // Test subscript with compile time value that is not supported
@@ -595,8 +598,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript an Array with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript an Array with Boolean"), e.getMessage());
         }
 
         try
@@ -607,13 +610,13 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript Any with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript Any with Boolean"), e.getMessage());
         }
     }
 
     @Test
-    public void test_subscript_any_string_with_int()
+    void test_subscript_any_string_with_int()
     {
         IExpression expression;
         TupleVector tv;
@@ -654,8 +657,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript a String with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript a String with Boolean"), e.getMessage());
         }
 
         try
@@ -666,13 +669,13 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript Any with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript Any with Boolean"), e.getMessage());
         }
     }
 
     @Test
-    public void test_subscript_string_with_int()
+    void test_subscript_string_with_int()
     {
         IExpression expression;
         TupleVector tv;
@@ -713,8 +716,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript a String with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript a String with Boolean"), e.getMessage());
         }
 
         // Unsupported subscript type Any
@@ -726,8 +729,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript a String with value: true"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript a String with value: true"), e.getMessage());
         }
 
         try
@@ -738,13 +741,13 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript a String with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript a String with Boolean"), e.getMessage());
         }
     }
 
     @Test
-    public void test_subscript_array_with_int()
+    void test_subscript_array_with_int()
     {
         IExpression expression;
         TupleVector tv;
@@ -818,8 +821,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript an Array with value: {key=value, key1=123}"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript an Array with value: {key=value, key1=123}"), e.getMessage());
         }
 
         // Test subscript with compile time value that is not supported
@@ -831,8 +834,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript an Array with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript an Array with Boolean"), e.getMessage());
         }
 
         try
@@ -843,8 +846,8 @@ public class SubscriptExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot subscript an Array with Boolean"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot subscript an Array with Boolean"), e.getMessage());
         }
     }
 }

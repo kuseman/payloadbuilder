@@ -1,12 +1,16 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -22,10 +26,10 @@ import se.kuseman.payloadbuilder.core.parser.ParseException;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link DereferenceExpression} */
-public class DereferenceExpressionTest extends APhysicalPlanTest
+class DereferenceExpressionTest extends APhysicalPlanTest
 {
     @Test
-    public void test_outerreference()
+    void test_outerreference()
     {
         IExpression e = DereferenceExpression.create(ce("a"), QualifiedName.of("b"), null);
         assertFalse(e.isOuterReference());
@@ -38,7 +42,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_dereference_map()
+    void test_dereference_map()
     {
         TupleVector tv;
         IExpression e;
@@ -60,7 +64,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_dereference_objectvector_missing_column()
+    void test_dereference_objectvector_missing_column()
     {
         Schema innerSchema = Schema.of(col("b", Type.Int));
 
@@ -71,13 +75,13 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
         }
         catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("No column found in object named: c, expected one of: [b (Int)]"));
+            assertTrue(e.getMessage()
+                    .contains("No column found in object named: c, expected one of: [b (Int)]"), e.getMessage());
         }
     }
 
     @Test
-    public void test_dereference_objectvector_by_ordinal()
+    void test_dereference_objectvector_by_ordinal()
     {
         TupleVector tv;
         IExpression e;
@@ -102,7 +106,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_dereference_objectvector_by_name()
+    void test_dereference_objectvector_by_name()
     {
         TupleVector tv;
         IExpression e;
@@ -127,7 +131,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_dereference_tuplevector_by_ordinal()
+    void test_dereference_tuplevector_by_ordinal()
     {
         TupleVector tv;
         IExpression e;
@@ -154,7 +158,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_dereference_tuplevector_by_name()
+    void test_dereference_tuplevector_by_name()
     {
         TupleVector tv;
         IExpression e;
@@ -184,7 +188,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_dereference_tuplevector_by_name_with_no_match()
+    void test_dereference_tuplevector_by_name_with_no_match()
     {
         TupleVector tv;
         IExpression e;

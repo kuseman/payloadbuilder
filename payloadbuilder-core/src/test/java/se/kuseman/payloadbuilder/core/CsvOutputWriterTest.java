@@ -1,18 +1,19 @@
 package se.kuseman.payloadbuilder.core;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.io.StringWriter;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.core.CsvOutputWriter.CsvSettings;
 
 /** Test of {@link CsvOutputWriter} */
-public class CsvOutputWriterTest extends Assert
+class CsvOutputWriterTest
 {
     @Test
-    public void test_delayed_headers()
+    void test_delayed_headers()
     {
         Pair<StringWriter, CsvOutputWriter> p = writer();
 
@@ -91,7 +92,7 @@ public class CsvOutputWriterTest extends Assert
     }
 
     @Test
-    public void test()
+    void test()
     {
         Pair<StringWriter, CsvOutputWriter> p = writer();
         p.getValue()
@@ -160,7 +161,7 @@ public class CsvOutputWriterTest extends Assert
     }
 
     @Test
-    public void test_empty_columns_dont_yield_initial_new_line()
+    void test_empty_columns_dont_yield_initial_new_line()
     {
         CsvSettings settings = new CsvSettings();
         settings.setRowSeparator(System.lineSeparator());
