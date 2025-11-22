@@ -1,21 +1,21 @@
 package se.kuseman.payloadbuilder.api.catalog;
 
 import static java.util.Collections.emptyMap;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.MetaData;
 
 /** Test of {@link Column}. */
-public class ColumnTest
+class ColumnTest
 {
     @Test
-    public void test_metadata()
+    void test_metadata()
     {
         Column.MetaData metaData = new MetaData(emptyMap());
         assertTrue(metaData.isNullable());

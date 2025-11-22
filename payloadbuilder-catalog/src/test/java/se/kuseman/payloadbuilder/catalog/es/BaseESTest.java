@@ -2,7 +2,10 @@ package se.kuseman.payloadbuilder.catalog.es;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
-import static org.junit.Assume.assumeTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -30,9 +33,8 @@ import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.io.entity.StringEntity;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -65,7 +67,7 @@ import se.kuseman.payloadbuilder.test.IPredicateMock;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Base class for elastic test container tests */
-abstract class BaseESTest extends Assert
+abstract class BaseESTest
 {
     private static final String CATALOG_ALIAS = "es";
     private static final String INDEX = "test";
@@ -97,8 +99,8 @@ abstract class BaseESTest extends Assert
         this.version = version;
     }
 
-    @Before
-    public void setup() throws IOException
+    @BeforeEach
+    void setup() throws IOException
     {
         HttpGet mappings = new HttpGet(endpoint + "/_mappings");
         // Set<String> indices = emptySet();
@@ -137,7 +139,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_multi_type_scan() throws IOException
+    void test_multi_type_scan() throws IOException
     {
         assumeTrue(version.getStrategy()
                 .supportsTypes());
@@ -186,7 +188,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_system_tables() throws IOException
+    void test_system_tables() throws IOException
     {
         createIndex(endpoint, INDEX);
         for (Pair<String, Map<String, Object>> p : testData)
@@ -231,7 +233,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_system_indices() throws IOException
+    void test_system_indices() throws IOException
     {
         createIndex(endpoint, INDEX);
         for (Pair<String, Map<String, Object>> p : testData)
@@ -291,7 +293,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_system_columns() throws IOException
+    void test_system_columns() throws IOException
     {
         createIndex(endpoint, INDEX);
         for (Pair<String, Map<String, Object>> p : testData)
@@ -338,7 +340,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_search_body() throws IOException
+    void test_search_body() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -369,7 +371,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_search_body_with_scroll_size_in_options() throws IOException
+    void test_search_body_with_scroll_size_in_options() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -448,7 +450,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_search_body_with_scroll_size_in_body() throws IOException
+    void test_search_body_with_scroll_size_in_body() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -527,7 +529,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_cat()
+    void test_cat()
     {
         CatFunction f = new CatFunction();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", "")), 0, new ESDatasource.Data());
@@ -550,7 +552,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_nested() throws IOException
+    void test_nested() throws IOException
     {
         //@formatter:off
         Map<String, Object> mappings = ofEntries(
@@ -646,7 +648,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_index_non_id_field() throws IOException
+    void test_datasource_index_non_id_field() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -691,7 +693,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_index_id_field() throws IOException
+    void test_datasource_index_id_field() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -735,7 +737,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_index_non_id_field_batching() throws IOException
+    void test_datasource_index_non_id_field_batching() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -796,7 +798,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_sort_on_index() throws IOException
+    void test_datasource_sort_on_index() throws IOException
     {
         createIndex(endpoint, "test_001");
         createIndex(endpoint, "test_002");
@@ -834,7 +836,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_filter_on_index() throws IOException
+    void test_datasource_filter_on_index() throws IOException
     {
         // Somehow index is not filter:able in 1.x
         assumeTrue(version != Version._1X);
@@ -876,7 +878,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_filter_on_type() throws IOException
+    void test_datasource_filter_on_type() throws IOException
     {
         assumeTrue(version.getStrategy()
                 .supportsTypes());
@@ -925,7 +927,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_filter_on_id() throws IOException
+    void test_datasource_filter_on_id() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -971,7 +973,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_filter_on_id_with_in() throws IOException
+    void test_datasource_filter_on_id_with_in() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -1021,7 +1023,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_filter_on_id_with_not_in() throws IOException
+    void test_datasource_filter_on_id_with_not_in() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -1071,7 +1073,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_index_id_field_batching() throws IOException
+    void test_datasource_index_id_field_batching() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -1144,7 +1146,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_table_scan() throws IOException
+    void test_datasource_table_scan() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -1182,7 +1184,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_datasource_table_scan_batching() throws IOException
+    void test_datasource_table_scan_batching() throws IOException
     {
         createIndex(endpoint, INDEX);
 
@@ -1262,7 +1264,7 @@ abstract class BaseESTest extends Assert
     }
 
     @Test
-    public void test_ingore_unavailable_indices() throws IOException, InterruptedException
+    void test_ingore_unavailable_indices() throws IOException, InterruptedException
     {
         createIndex(endpoint, "ignoretest_opened");
         createIndex(endpoint, "ignoretest_closed");

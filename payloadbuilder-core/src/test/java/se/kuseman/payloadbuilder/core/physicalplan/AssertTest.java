@@ -1,11 +1,13 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.NoSuchElementException;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -17,10 +19,10 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
 
 /** Test of {@link Assert} */
-public class AssertTest extends APhysicalPlanTest
+class AssertTest extends APhysicalPlanTest
 {
     @Test
-    public void test_max_row_count()
+    void test_max_row_count()
     {
         MutableBoolean closed = new MutableBoolean();
         Schema schema = Schema.of(Column.of("col", ResolvedType.of(Type.Int)));
@@ -36,8 +38,8 @@ public class AssertTest extends APhysicalPlanTest
         }
         catch (QueryException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Query returned too many rows. Expected 99 row(s) to be returned."));
+            assertTrue(e.getMessage()
+                    .contains("Query returned too many rows. Expected 99 row(s) to be returned."), e.getMessage());
         }
 
         try

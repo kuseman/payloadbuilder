@@ -29,7 +29,7 @@ import java.util.function.Function;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.input.CountingInputStream;
+import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableInt;
@@ -507,9 +507,11 @@ class ESDatasource implements IDatasource
 
                                 throw new RuntimeException("Error query Elastic. Status: " + response.getCode() + "." + System.lineSeparator() + body);
                             }
-                            CountingInputStream cis = new CountingInputStream(entity.getContent());
+                            BoundedInputStream cis = BoundedInputStream.builder()
+                                    .setInputStream(entity.getContent())
+                                    .get();
                             ESResponse result = READER.readValue(cis);
-                            data.bytesReceived += cis.getByteCount();
+                            data.bytesReceived += cis.getCount();
                             return result;
                         });
                     }

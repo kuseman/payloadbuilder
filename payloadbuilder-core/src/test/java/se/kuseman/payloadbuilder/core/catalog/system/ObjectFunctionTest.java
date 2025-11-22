@@ -1,10 +1,13 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -23,7 +26,7 @@ import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link ObjectFunction} and {@link OperatorObjectFunction} */
-public class ObjectFunctionTest extends APhysicalPlanTest
+class ObjectFunctionTest extends APhysicalPlanTest
 {
     private final ScalarFunctionInfo scalar = SystemCatalog.get()
             .getScalarFunction("object");
@@ -33,7 +36,7 @@ public class ObjectFunctionTest extends APhysicalPlanTest
     private final IExpression col2 = ce("col2");
 
     @Test
-    public void test_fold()
+    void test_fold()
     {
         assertEquals(new LiteralObjectExpression(ObjectVector.EMPTY), scalar.fold(context, asList()));
 
@@ -45,7 +48,7 @@ public class ObjectFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_wrong_number_of_args()
+    void test_wrong_number_of_args()
     {
         TupleVector input = TupleVector.of(schema("col1", "col2"), asList(vv(Type.Any, 1, 2, 3), vv(Type.Any, 4, 5, 6)));
         try
@@ -55,8 +58,8 @@ public class ObjectFunctionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Function object requires an even number of arguments"));
+            assertTrue(e.getMessage()
+                    .contains("Function object requires an even number of arguments"), e.getMessage());
         }
 
         try
@@ -66,13 +69,13 @@ public class ObjectFunctionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Function object requires an even number of arguments"));
+            assertTrue(e.getMessage()
+                    .contains("Function object requires an even number of arguments"), e.getMessage());
         }
     }
 
     @Test
-    public void test_wrong_type_of_key_args()
+    void test_wrong_type_of_key_args()
     {
         TupleVector input = TupleVector.of(schema("col1", "col2"), asList(vv(Type.Any, 1, 2, 3), vv(Type.Any, 4, 5, 6)));
         try
@@ -82,8 +85,8 @@ public class ObjectFunctionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Function object requires literal string keys"));
+            assertTrue(e.getMessage()
+                    .contains("Function object requires literal string keys"), e.getMessage());
         }
 
         try
@@ -93,13 +96,13 @@ public class ObjectFunctionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Function object requires literal string keys"));
+            assertTrue(e.getMessage()
+                    .contains("Function object requires literal string keys"), e.getMessage());
         }
     }
 
     @Test
-    public void test_aggregate()
+    void test_aggregate()
     {
         TupleVector input;
         TupleVector tupleVector;
@@ -156,7 +159,7 @@ public class ObjectFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_scalar()
+    void test_scalar()
     {
         TupleVector input;
         ValueVector actual;
@@ -184,7 +187,7 @@ public class ObjectFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_operator()
+    void test_operator()
     {
         TupleVector input;
         ValueVector actual;

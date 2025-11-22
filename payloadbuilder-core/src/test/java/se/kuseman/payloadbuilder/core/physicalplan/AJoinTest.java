@@ -1,7 +1,11 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
-import static org.junit.Assume.assumeNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -11,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -34,7 +38,7 @@ import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Base class for testing joins */
-public abstract class AJoinTest extends APhysicalPlanTest
+abstract class AJoinTest extends APhysicalPlanTest
 {
     /** Create a physical plan to test for inner join implementations */
     abstract IPhysicalPlan createInnerJoin(IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> predicate, String populateAlias);
@@ -66,7 +70,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     // ---------------------- Index
 
     @Test
-    public void test_left_join_no_populate_and_push_outer_reference_verify_children_are_closed_with_break()
+    void test_left_join_no_populate_and_push_outer_reference_verify_children_are_closed_with_break()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -89,7 +93,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_and_push_outer_reference_verify_children_are_closed_with_break()
+    void test_inner_join_no_populate_and_push_outer_reference_verify_children_are_closed_with_break()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -112,7 +116,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_populate_and_push_outer_reference_verify_children_are_closed_with_break()
+    void test_inner_join_populate_and_push_outer_reference_verify_children_are_closed_with_break()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -135,7 +139,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_with_populate_and_push_outer_reference_no_outer_rows()
+    void test_inner_join_with_populate_and_push_outer_reference_no_outer_rows()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -144,7 +148,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), TupleVector.EMPTY);
 
         IPhysicalPlan plan = createIndexInnerJoin(scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "p");
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -157,7 +161,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_with_populate_and_push_outer_reference_no_inner_rows()
+    void test_inner_join_with_populate_and_push_outer_reference_no_inner_rows()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -166,7 +170,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), TupleVector.EMPTY);
 
         IPhysicalPlan plan = createIndexInnerJoin(scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "p");
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -178,7 +182,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_with_populate_and_push_outer_reference_no_inner_rows()
+    void test_left_join_with_populate_and_push_outer_reference_no_inner_rows()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -188,7 +192,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
 
         IPhysicalPlan plan = new Sort(0, createIndexLeftJoin(scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "p"),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED)));
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -206,7 +210,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_with_populate_and_push_outer_reference()
+    void test_inner_join_with_populate_and_push_outer_reference()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -254,7 +258,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         });
 
         IPhysicalPlan plan = createIndexInnerJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "p");
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -286,7 +290,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_with_populate_and_push_outer_reference_smaller_inner()
+    void test_inner_join_with_populate_and_push_outer_reference_smaller_inner()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -334,7 +338,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         });
 
         IPhysicalPlan plan = createIndexInnerJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "p");
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -363,7 +367,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_with_push_outer_reference()
+    void test_inner_join_with_push_outer_reference()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -410,7 +414,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         });
 
         IPhysicalPlan plan = createIndexInnerJoin(scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null);
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -427,7 +431,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_with_push_outer_reference()
+    void test_inner_join_no_populate_with_push_outer_reference()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -474,7 +478,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         });
 
         IPhysicalPlan plan = createIndexInnerJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null);
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -492,7 +496,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_with_push_outer_reference_smaller_inner()
+    void test_inner_join_no_populate_with_push_outer_reference_smaller_inner()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -539,7 +543,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         });
 
         IPhysicalPlan plan = createIndexInnerJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null);
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -557,7 +561,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors()
+    void test_inner_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -596,7 +600,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         });
 
         IPhysicalPlan plan = createIndexInnerJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null);
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -614,7 +618,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_with_push_outer_reference_multiple_outer_vectors_smaller_inner()
+    void test_inner_join_no_populate_with_push_outer_reference_multiple_outer_vectors_smaller_inner()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -652,7 +656,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         });
 
         IPhysicalPlan plan = createIndexInnerJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null);
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -670,7 +674,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors()
+    void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -711,7 +715,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         IPhysicalPlan plan = new Sort(0, createIndexLeftJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED)));
 
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
         TupleVector actual = PlanUtils.concat(context, plan.execute(context));
@@ -728,7 +732,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors()
+    void test_left_join_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -767,7 +771,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         });
 
         IPhysicalPlan plan = createIndexLeftJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "a");
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context, it);
@@ -797,7 +801,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors_no_matches_in_middle_and_last_batch()
+    void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors_no_matches_in_middle_and_last_batch()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -853,7 +857,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         IPhysicalPlan plan = new Sort(0, createIndexLeftJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED)));
 
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
 
         TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
@@ -869,7 +873,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors_no_matches_in_middle_and_first_batch()
+    void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors_no_matches_in_middle_and_first_batch()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -925,7 +929,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         IPhysicalPlan plan = new Sort(0, createIndexLeftJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED)));
 
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
         TupleVector actual = PlanUtils.concat(context, plan.execute(context));
@@ -942,7 +946,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors_mixed_matches_in_middle_and_first_batch()
+    void test_left_join_no_populate_with_push_outer_reference_mixed_sizes_multiple_outer_vectors_mixed_matches_in_middle_and_first_batch()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -1010,7 +1014,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         IPhysicalPlan plan = new Sort(0, createIndexLeftJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED)));
 
-        assumeNotNull(plan);
+        assumeTrue(plan != null);
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
         TupleVector actual = PlanUtils.concat(context, plan.execute(context));
@@ -1027,7 +1031,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_schema_less_smaller_inner()
+    void test_inner_join_no_populate_schema_less_smaller_inner()
     {
         List<TupleVector> outer = List.of(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3))));
         List<TupleVector> inner = List.of(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 1, 2))));
@@ -1068,7 +1072,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_ordinal_columns_smaller_inner()
+    void test_inner_join_no_populate_ordinal_columns_smaller_inner()
     {
         Schema outerSchema = Schema.of(Column.of("col1", Type.Int));
         Schema innerSchema = Schema.of(Column.of("col3", Type.Int));
@@ -1117,7 +1121,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_ordinal_columns()
+    void test_inner_join_no_populate_ordinal_columns()
     {
         Schema outerSchema = Schema.of(Column.of("col1", Type.Int));
         Schema innerSchema = Schema.of(Column.of("col3", Type.Int));
@@ -1168,70 +1172,70 @@ public abstract class AJoinTest extends APhysicalPlanTest
     // ---------------------- No populate
 
     @Test
-    public void test_inner_join_no_populate_single_vectors_schema_less()
+    void test_inner_join_no_populate_single_vectors_schema_less()
     {
         assertInnerJoinNoPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 1, 2)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_no_populate_single_vectors_schema_less()
+    void test_left_join_no_populate_single_vectors_schema_less()
     {
         assertLeftJoinNoPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3)))));
     }
 
     @Test
-    public void test_inner_join_no_populate_multiple_outer_vectors_schema_less()
+    void test_inner_join_no_populate_multiple_outer_vectors_schema_less()
     {
         assertInnerJoinNoPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(outerSchema, asList(vv(Type.Any, 1), vv(Type.Any, 2)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_no_populate_multiple_outer_vectors_schema_less()
+    void test_left_join_no_populate_multiple_outer_vectors_schema_less()
     {
         assertLeftJoinNoPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 4))), TupleVector.of(outerSchema, asList(vv(Type.Any, 2, 1), vv(Type.Any, 5, 6)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_no_populate_multiple_outer_vectors_schema_less_unkown_estimate_size()
+    void test_left_join_no_populate_multiple_outer_vectors_schema_less_unkown_estimate_size()
     {
         assertLeftJoinNoPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 4))), TupleVector.of(outerSchema, asList(vv(Type.Any, 2, 1), vv(Type.Any, 5, 6)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3)))), true);
     }
 
     @Test
-    public void test_inner_join_no_populate_multiple_inner_vectors_schema_less()
+    void test_inner_join_no_populate_multiple_inner_vectors_schema_less()
     {
         assertInnerJoinNoPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 1, 2)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_no_populate_multiple_inner_vectors_schema_less()
+    void test_left_join_no_populate_multiple_inner_vectors_schema_less()
     {
         assertLeftJoinNoPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 2, 3)))));
     }
 
     @Test
-    public void test_inner_join_no_populate_multiple_outer_and_inner_vectors_schema_less()
+    void test_inner_join_no_populate_multiple_outer_and_inner_vectors_schema_less()
     {
         assertInnerJoinNoPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(outerSchema, asList(vv(Type.Any, 1), vv(Type.Any, 2)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_no_populate_multiple_outer_and_inner_schema_less()
+    void test_left_join_no_populate_multiple_outer_and_inner_schema_less()
     {
         assertLeftJoinNoPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 4))), TupleVector.of(outerSchema, asList(vv(Type.Any, 2, 1), vv(Type.Any, 5, 6)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_no_populate_schema_less_no_matching_inner_rows()
+    void test_left_join_no_populate_schema_less_no_matching_inner_rows()
     {
         List<TupleVector> outer = asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 1, 2))));
         List<TupleVector> inner = asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 4, 5, 6), vv(Type.Any, 1, 2, 3))));
@@ -1262,7 +1266,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_no_matching_inner_rows()
+    void test_left_join_no_populate_no_matching_inner_rows()
     {
         List<TupleVector> outer = asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 1, 2))));
         List<TupleVector> inner = asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 4, 5, 6), vv(Type.Any, 1, 2, 3))));
@@ -1293,7 +1297,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_schema_less_no_matching_inner_rows_smaller_inner()
+    void test_left_join_no_populate_schema_less_no_matching_inner_rows_smaller_inner()
     {
         List<TupleVector> outer = asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1, 2), vv(Type.Any, 1, 2, 3))));
         List<TupleVector> inner = asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 4, 5), vv(Type.Any, 1, 2))));
@@ -1324,7 +1328,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_no_matching_inner_rows_smaller_inner()
+    void test_left_join_no_populate_no_matching_inner_rows_smaller_inner()
     {
         List<TupleVector> outer = asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1, 2), vv(Type.Any, 1, 2, 3))));
         List<TupleVector> inner = asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 4, 5), vv(Type.Any, 1, 2))));
@@ -1355,7 +1359,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_different_any_data_types_but_equal_when_promote()
+    void test_left_join_no_populate_different_any_data_types_but_equal_when_promote()
     {
         List<TupleVector> outer = asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 4))), TupleVector.of(outerSchema, asList(vv(Type.Any, 2, 1), vv(Type.Any, 5, 6))));
         List<TupleVector> inner = asList(TupleVector.of(innerSchema, asList(vv(Type.Any, "0", "0", "1"), vv(Type.Any, 1, 2, 3))));
@@ -1386,7 +1390,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_different_types_but_equal_when_promote()
+    void test_left_join_no_populate_different_types_but_equal_when_promote()
     {
         Schema outerSchema = Schema.of(col("col1", ResolvedType.of(Type.Int), table), col("col2", ResolvedType.of(Type.Any), table));
         Schema innerSchema = Schema.of(col("col3", ResolvedType.of(Type.String), tableB), col("col4", ResolvedType.of(Type.Any), tableB));
@@ -1422,63 +1426,63 @@ public abstract class AJoinTest extends APhysicalPlanTest
     // ---------------------- Populate
 
     @Test
-    public void test_inner_join_populate_single_vectors_schema_less()
+    void test_inner_join_populate_single_vectors_schema_less()
     {
         assertInnerJoinWithPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 1, 2)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_populate_single_vectors_schema_less()
+    void test_left_join_populate_single_vectors_schema_less()
     {
         assertLeftJoinPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3)))));
     }
 
     @Test
-    public void test_inner_join_populate_multiple_outer_vectors_schema_less()
+    void test_inner_join_populate_multiple_outer_vectors_schema_less()
     {
         assertInnerJoinWithPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(outerSchema, asList(vv(Type.Any, 1), vv(Type.Any, 2)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_populate_multiple_outer_vectors_schema_less()
+    void test_left_join_populate_multiple_outer_vectors_schema_less()
     {
         assertLeftJoinPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 4))), TupleVector.of(outerSchema, asList(vv(Type.Any, 2, 1), vv(Type.Any, 5, 6)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3)))));
     }
 
     @Test
-    public void test_inner_join_populate_multiple_inner_vectors_schema_less()
+    void test_inner_join_populate_multiple_inner_vectors_schema_less()
     {
         assertInnerJoinWithPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 1, 2)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_populate_multiple_inner_vectors_schema_less()
+    void test_left_join_populate_multiple_inner_vectors_schema_less()
     {
         assertLeftJoinPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 2, 3)))));
     }
 
     @Test
-    public void test_inner_join_populate_multiple_outer_and_inner_vectors_schema_less()
+    void test_inner_join_populate_multiple_outer_and_inner_vectors_schema_less()
     {
         assertInnerJoinWithPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(outerSchema, asList(vv(Type.Any, 1), vv(Type.Any, 2)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_populate_multiple_outer_and_inner_schema_less()
+    void test_left_join_populate_multiple_outer_and_inner_schema_less()
     {
         assertLeftJoinPopulateSchemaLess(asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 4))), TupleVector.of(outerSchema, asList(vv(Type.Any, 2, 1), vv(Type.Any, 5, 6)))),
                 asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 2, 3)))));
     }
 
     @Test
-    public void test_left_join_populate_schema_less_no_matching_inner_rows()
+    void test_left_join_populate_schema_less_no_matching_inner_rows()
     {
         List<TupleVector> outer = asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 1, 2))));
         List<TupleVector> inner = asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 4, 5, 6), vv(Type.Any, 1, 2, 3))));
@@ -1508,7 +1512,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_populate_no_matching_inner_rows()
+    void test_left_join_populate_no_matching_inner_rows()
     {
         List<TupleVector> outer = asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 1, 2))));
         List<TupleVector> inner = asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 4, 5, 6), vv(Type.Any, 1, 2, 3))));
@@ -1538,7 +1542,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_populate_schema_less_no_matching_inner_rows_smaller_inner()
+    void test_left_join_populate_schema_less_no_matching_inner_rows_smaller_inner()
     {
         List<TupleVector> outer = asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1, 2), vv(Type.Any, 1, 2, 3))));
         List<TupleVector> inner = asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 4, 5), vv(Type.Any, 1, 2))));
@@ -1568,7 +1572,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_populate_no_matching_inner_rows_smaller_inner()
+    void test_left_join_populate_no_matching_inner_rows_smaller_inner()
     {
         List<TupleVector> outer = asList(TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1, 2), vv(Type.Any, 1, 2, 3))));
         List<TupleVector> inner = asList(TupleVector.of(innerSchema, asList(vv(Type.Any, 4, 5), vv(Type.Any, 1, 2))));
@@ -1600,7 +1604,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     // ---------------------- Misc checks
 
     @Test
-    public void test_inner_join_no_populate_verify_children_are_closed_with_break()
+    void test_inner_join_no_populate_verify_children_are_closed_with_break()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1621,7 +1625,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_verify_children_are_closed_with_break()
+    void test_left_join_no_populate_verify_children_are_closed_with_break()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1642,7 +1646,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_populate_verify_children_are_closed_with_break()
+    void test_inner_join_populate_verify_children_are_closed_with_break()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1662,7 +1666,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_populate_verify_children_are_closed_with_break()
+    void test_left_join_populate_verify_children_are_closed_with_break()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1682,7 +1686,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_no_outer_vectors()
+    void test_inner_join_no_populate_no_outer_vectors()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerOpened = new AtomicBoolean();
@@ -1711,7 +1715,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_zero_rows_outer_vector()
+    void test_inner_join_no_populate_zero_rows_outer_vector()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerOpened = new AtomicBoolean();
@@ -1740,7 +1744,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_no_outer_rows()
+    void test_inner_join_no_populate_no_outer_rows()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerOpened = new AtomicBoolean();
@@ -1768,7 +1772,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_populate_no_outer_rows()
+    void test_inner_join_populate_no_outer_rows()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerOpened = new AtomicBoolean();
@@ -1796,7 +1800,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_no_inner_vectors()
+    void test_inner_join_no_populate_no_inner_vectors()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1815,7 +1819,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_no_inner_vectors_unknown_estimate()
+    void test_inner_join_no_populate_no_inner_vectors_unknown_estimate()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1834,7 +1838,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_no_inner_vectors_unknown_estimate()
+    void test_left_join_no_populate_no_inner_vectors_unknown_estimate()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1859,7 +1863,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_no_inner_rows()
+    void test_inner_join_no_populate_no_inner_rows()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1889,7 +1893,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_all_null_inner_rows()
+    void test_inner_join_no_populate_all_null_inner_rows()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1919,7 +1923,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_all_null_outer_rows()
+    void test_inner_join_no_populate_all_null_outer_rows()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1949,7 +1953,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_no_inner_rows_schema_less()
+    void test_left_join_no_populate_no_inner_rows_schema_less()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -1976,7 +1980,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_no_inner_rows_verify_plan_and_runtime_schema_with_asterisk_schema()
+    void test_left_join_no_populate_no_inner_rows_verify_plan_and_runtime_schema_with_asterisk_schema()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2002,7 +2006,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_outer_schema()
+    void test_left_join_no_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_outer_schema()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2028,7 +2032,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_inner_schema()
+    void test_left_join_no_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_inner_schema()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2057,7 +2061,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_no_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_outer_and_inner_schema()
+    void test_left_join_no_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_outer_and_inner_schema()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2086,7 +2090,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_with_populate_no_inner_rows_verify_plan_and_runtime_schema_with_asterisk_schema()
+    void test_left_join_with_populate_no_inner_rows_verify_plan_and_runtime_schema_with_asterisk_schema()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2114,7 +2118,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_with_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_outer_schema()
+    void test_left_join_with_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_outer_schema()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2142,7 +2146,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_with_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_inner_schema()
+    void test_left_join_with_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_inner_schema()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2170,7 +2174,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_left_join_with_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_outer_and_inner_schema()
+    void test_left_join_with_populate_no_inner_rows_verify_plan_and_runtime_schema_with_static_outer_and_inner_schema()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2198,7 +2202,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_populate_no_inner_rows()
+    void test_inner_join_populate_no_inner_rows()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2217,7 +2221,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_no_populate_no_matching_rows()
+    void test_inner_join_no_populate_no_matching_rows()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2236,7 +2240,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inner_join_populate_no_matching_rows()
+    void test_inner_join_populate_no_matching_rows()
     {
         AtomicBoolean outerClosed = new AtomicBoolean();
         AtomicBoolean innerClosed = new AtomicBoolean();
@@ -2256,7 +2260,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
 
     // @Ignore("Not correct test, there can be a schema when one side is empty. Ie. constant scan")
     // @Test
-    // public void test_no_schema_when_one_input_is_schema_less()
+    // void test_no_schema_when_one_input_is_schema_less()
     // {
     // IDatasource dsOuter;
     // IDatasource dsInner;

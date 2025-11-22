@@ -2,14 +2,14 @@ package se.kuseman.payloadbuilder.catalog.es;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
@@ -22,10 +22,10 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link MustacheCompileFunction} */
-public class MustacheCompileFunctionTest extends Assert
+class MustacheCompileFunctionTest
 {
     @Test
-    public void test()
+    void test()
     {
         MustacheCompileFunction f = new MustacheCompileFunction();
 

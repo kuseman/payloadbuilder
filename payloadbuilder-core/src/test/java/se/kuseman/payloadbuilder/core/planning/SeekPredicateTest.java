@@ -2,12 +2,14 @@ package se.kuseman.payloadbuilder.core.planning;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -21,18 +23,17 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link SeekPredicate} */
-public class SeekPredicateTest extends APhysicalPlanTest
+class SeekPredicateTest extends APhysicalPlanTest
 {
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_fail_with_empty_items()
+    @Test
+    void test_fail_with_empty_items()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col1", "col2"), ColumnsType.ANY);
-        new SeekPredicate(0, index, emptyList());
+        assertThrows(IllegalArgumentException.class, () -> new SeekPredicate(0, index, emptyList()));
     }
 
     @Test
-    public void test()
+    void test()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col1", "col2"), ColumnsType.ANY);
 
@@ -59,7 +60,7 @@ public class SeekPredicateTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_push_down_equal()
+    void test_push_down_equal()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col1", "col2"), ColumnsType.ANY);
 
@@ -81,7 +82,7 @@ public class SeekPredicateTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_push_down_in()
+    void test_push_down_in()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col1", "col2"), ColumnsType.ANY);
 

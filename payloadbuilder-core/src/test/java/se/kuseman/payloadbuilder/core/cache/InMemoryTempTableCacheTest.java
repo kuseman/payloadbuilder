@@ -1,13 +1,14 @@
 package se.kuseman.payloadbuilder.core.cache;
 
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -15,10 +16,10 @@ import se.kuseman.payloadbuilder.core.cache.AInMemoryCache.CacheImpl;
 import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
 
 /** Test of {@link InMemoryTempTableCache} */
-public class InMemoryTempTableCacheTest extends Assert
+class InMemoryTempTableCacheTest
 {
     @Test
-    public void test_reload() throws InterruptedException
+    void test_reload() throws InterruptedException
     {
         InMemoryTempTableCache cache = new InMemoryTempTableCache();
 

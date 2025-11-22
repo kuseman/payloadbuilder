@@ -3,10 +3,10 @@ package se.kuseman.payloadbuilder.catalog.http;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -18,9 +18,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.mock.Expectation;
 import org.mockserver.model.HttpRequest;
@@ -55,26 +55,26 @@ import se.kuseman.payloadbuilder.test.IPredicateMock;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link HttpCatalog} */
-public class HttpCatalogTest
+class HttpCatalogTest
 {
     private HttpCatalog catalog = new HttpCatalog();
     private ClientAndServer mockServer;
 
-    @Before
-    public void startMockServer()
+    @BeforeEach
+    void startMockServer()
     {
         mockServer = startClientAndServer();
     }
 
-    @After
-    public void shutdown()
+    @AfterEach
+    void shutdown()
     {
         mockServer.stop();
         catalog.close();
     }
 
     @Test
-    public void test_getTableSchema()
+    void test_getTableSchema()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         QualifiedName table = QualifiedName.of("http://www.service.com/");
@@ -99,7 +99,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getSeekDataSource_get()
+    void test_getSeekDataSource_get()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         DatasourceData data = new DatasourceData(0, emptyList(), emptyList(), Projection.ALL,
@@ -136,7 +136,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getSeekDataSource_post()
+    void test_getSeekDataSource_post()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         DatasourceData data = new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, List.of(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("post")),
@@ -174,7 +174,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getSeekDataSource_post_with_json_response_path()
+    void test_getSeekDataSource_post_with_json_response_path()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         DatasourceData data = new DatasourceData(0, emptyList(), emptyList(), Projection.ALL,
@@ -214,7 +214,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getSeekDataSource_post_strings()
+    void test_getSeekDataSource_post_strings()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         //@formatter:off
@@ -255,7 +255,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getScanDataSource_invalid_table_name()
+    void test_getScanDataSource_invalid_table_name()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         DatasourceData data = new DatasourceData(0, emptyList(), emptyList(), Projection.ALL,
@@ -267,13 +267,13 @@ public class HttpCatalogTest
         }
         catch (CompileException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Tables qualifiers for HttpCatalog only supportes one part."));
+            assertTrue(e.getMessage()
+                    .contains("Tables qualifiers for HttpCatalog only supportes one part."), e.getMessage());
         }
     }
 
     @Test
-    public void test_getScanDataSource_eq_predicate()
+    void test_getScanDataSource_eq_predicate()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
@@ -284,7 +284,7 @@ public class HttpCatalogTest
 
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost:" + mockServer.getPort()), data);
 
-        assertEquals("predicate for 'id' column should be consumed", 1, predicates.size());
+        assertEquals(1, predicates.size(), "predicate for 'id' column should be consumed");
 
         Expectation[] mocks = mockServer.when(HttpRequest.request("/id_value")
                 .withMethod("get"))
@@ -311,7 +311,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getScanDataSource_in_predicate()
+    void test_getScanDataSource_in_predicate()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
@@ -322,7 +322,7 @@ public class HttpCatalogTest
 
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost:" + mockServer.getPort()), data);
 
-        assertEquals("predicate for 'id' column should be consumed", 1, predicates.size());
+        assertEquals(1, predicates.size(), "predicate for 'id' column should be consumed");
 
         Expectation[] mocks = mockServer.when(HttpRequest.request("/value1%2C%2Bvalue2")
                 .withMethod("get"))
@@ -349,7 +349,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getScanDataSource_predicate_not_supported_predicate()
+    void test_getScanDataSource_predicate_not_supported_predicate()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
@@ -364,13 +364,13 @@ public class HttpCatalogTest
         }
         catch (CompileException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("All request placeholders must be used. Placeholders not processed: [id]"));
+            assertTrue(e.getMessage()
+                    .contains("All request placeholders must be used. Placeholders not processed: [id]"), e.getMessage());
         }
     }
 
     @Test
-    public void test_query_null_endpoint()
+    void test_query_null_endpoint()
     {
         TableFunctionInfo function = catalog.getTableFunction("query");
         assertEquals(Arity.ONE, function.arity());
@@ -385,13 +385,13 @@ public class HttpCatalogTest
         catch (IllegalArgumentException e)
         {
             e.printStackTrace();
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("endpoint must be a non null string value"));
+            assertTrue(e.getMessage()
+                    .contains("endpoint must be a non null string value"), e.getMessage());
         }
     }
 
     @Test
-    public void test_query_function_fallback_response_transformer()
+    void test_query_function_fallback_response_transformer()
     {
         Expectation[] mocks = mockServer.when(HttpRequest.request("/")
                 .withMethod("get"))
@@ -427,7 +427,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_query_function_non_200()
+    void test_query_function_non_200()
     {
         Expectation[] mocks = mockServer.when(HttpRequest.request("/")
                 .withMethod("get"))
@@ -447,15 +447,15 @@ public class HttpCatalogTest
         }
         catch (RuntimeException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Response was non 200. Code: 404, body: error error"));
+            assertTrue(e.getMessage()
+                    .contains("Response was non 200. Code: 404, body: error error"), e.getMessage());
         }
 
         mockServer.verify(mocks[0].getId());
     }
 
     @Test
-    public void test_query_function_no_server()
+    void test_query_function_no_server()
     {
         TableFunctionInfo function = catalog.getTableFunction("query");
         assertEquals(Arity.ONE, function.arity());
@@ -469,13 +469,13 @@ public class HttpCatalogTest
         }
         catch (RuntimeException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Error performing HTTP request"));
+            assertTrue(e.getMessage()
+                    .contains("Error performing HTTP request"), e.getMessage());
         }
     }
 
     @Test
-    public void test_query_function_no_server_dont_fail()
+    void test_query_function_no_server_dont_fail()
     {
         TableFunctionInfo function = catalog.getTableFunction("query");
         assertEquals(Arity.ONE, function.arity());
@@ -488,7 +488,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_query_function_non_200_dont_fail()
+    void test_query_function_non_200_dont_fail()
     {
         Expectation[] mocks = mockServer.when(HttpRequest.request("/")
                 .withMethod("get"))
@@ -508,7 +508,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_query_function_json_response_transformer()
+    void test_query_function_json_response_transformer()
     {
         String body = "{\"json\":\"value\"}";
         Expectation[] mocks = mockServer.when(HttpRequest.request("/api")
@@ -555,7 +555,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_query_function_json_response_transformer_json_response_path()
+    void test_query_function_json_response_transformer_json_response_path()
     {
         String body = "{\"json\":\"value\"}";
         Expectation[] mocks = mockServer.when(HttpRequest.request("/api")
@@ -604,7 +604,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_query_function_csv_response_transformer()
+    void test_query_function_csv_response_transformer()
     {
         Expectation[] mocks = mockServer.when(HttpRequest.request("/csv")
                 .withMethod("get"))
@@ -642,7 +642,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_query_function_xml_response_transformer()
+    void test_query_function_xml_response_transformer()
     {
         Expectation[] mocks = mockServer.when(HttpRequest.request("/xml")
                 .withMethod("get"))
@@ -689,7 +689,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_query_function_csv_response_transforme_columnseparator()
+    void test_query_function_csv_response_transforme_columnseparator()
     {
         Expectation[] mocks = mockServer.when(HttpRequest.request("/csv")
                 .withMethod("get"))
@@ -730,7 +730,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getScanDataSource_with_no_placeholders()
+    void test_getScanDataSource_with_no_placeholders()
     {
         String body = "{\"json\":\"value\"}";
         Expectation[] mocks = mockServer.when(HttpRequest.request("/")
@@ -769,7 +769,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getScanDataSource_with_no_placeholders_non_200_repsonse_code()
+    void test_getScanDataSource_with_no_placeholders_non_200_repsonse_code()
     {
         String body = "{\"json\":\"value\"}";
         Expectation[] mocks = mockServer.when(HttpRequest.request("/")
@@ -794,15 +794,15 @@ public class HttpCatalogTest
         }
         catch (RuntimeException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Response was non 200. Code: 404, body: some error"));
+            assertTrue(e.getMessage()
+                    .contains("Response was non 200. Code: 404, body: some error"), e.getMessage());
         }
 
         mockServer.verify(mocks[0].getId());
     }
 
     @Test
-    public void test_getScanDataSource_with_no_placeholders_non_200_repsonse_code_dont_fail()
+    void test_getScanDataSource_with_no_placeholders_non_200_repsonse_code_dont_fail()
     {
         String body = "{\"json\":\"value\"}";
         Expectation[] mocks = mockServer.when(HttpRequest.request("/")
@@ -828,7 +828,7 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getScanDataSource_with_no_placeholders_missing_endpoint_catalog_property()
+    void test_getScanDataSource_with_no_placeholders_missing_endpoint_catalog_property()
     {
         String body = "{\"json\":\"value\"}";
         IExecutionContext context = TestUtils.mockExecutionContext("http", Map.of(), 0, null);
@@ -846,8 +846,8 @@ public class HttpCatalogTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Missing catalog property 'endpoint' for catalog alias: http"));
+            assertTrue(e.getMessage()
+                    .contains("Missing catalog property 'endpoint' for catalog alias: http"), e.getMessage());
         }
     }
 

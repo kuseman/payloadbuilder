@@ -1,15 +1,16 @@
 package se.kuseman.payloadbuilder.catalog.http;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.net.URI;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** Test of {@link HttpDataSource} */
-public class HttpDataSourceTest extends Assert
+class HttpDataSourceTest
 {
     @Test
-    public void test_createUri()
+    void test_createUri()
     {
         assertEquals(URI.create("http://localhost"), HttpDataSource.getURI("http://localhost"));
         assertEquals(URI.create("https://localhost:8080"), HttpDataSource.getURI("https://localhost:8080"));

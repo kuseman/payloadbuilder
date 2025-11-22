@@ -1,12 +1,16 @@
 package se.kuseman.payloadbuilder.bytes;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.List;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -18,46 +22,41 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link PayloadWriter} */
-public class PayloadWriterTest extends Assert
+class PayloadWriterTest
 {
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_fail_any()
+    @Test
+    void test_fail_any()
     {
         ValueVector v = vv(Type.Any, 1, 2, 3, 4);
-        PayloadWriter.write(v);
-    }
-
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_invalid_payload()
-    {
-        PayloadReader.read(new byte[] { 1, 2, 3 });
-    }
-
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_invalid_payload_1()
-    {
-        PayloadReader.read(new byte[] { PayloadReader.P, PayloadReader.L, PayloadReader.B });
-    }
-
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_invalid_payload_2()
-    {
-        PayloadReader.read(new byte[] { PayloadReader.P, PayloadReader.L, PayloadReader.B, 1, 2, 3 });
-    }
-
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_invalid_payload_3()
-    {
-        PayloadReader.read(new byte[] { PayloadReader.P, PayloadReader.L, 1, 2, PayloadReader.B });
+        assertThrows(IllegalArgumentException.class, () -> PayloadWriter.write(v));
     }
 
     @Test
-    public void test_schema_recreation_with_more_expected_columns()
+    void test_invalid_payload()
+    {
+        assertThrows(IllegalArgumentException.class, () -> PayloadReader.read(new byte[] { 1, 2, 3 }));
+    }
+
+    @Test
+    void test_invalid_payload_1()
+    {
+        assertThrows(IllegalArgumentException.class, () -> PayloadReader.read(new byte[] { PayloadReader.P, PayloadReader.L, PayloadReader.B }));
+    }
+
+    @Test
+    void test_invalid_payload_2()
+    {
+        assertThrows(IllegalArgumentException.class, () -> PayloadReader.read(new byte[] { PayloadReader.P, PayloadReader.L, PayloadReader.B, 1, 2, 3 }));
+    }
+
+    @Test
+    void test_invalid_payload_3()
+    {
+        assertThrows(IllegalArgumentException.class, () -> PayloadReader.read(new byte[] { PayloadReader.P, PayloadReader.L, 1, 2, PayloadReader.B }));
+    }
+
+    @Test
+    void test_schema_recreation_with_more_expected_columns()
     {
         // @formatter:off
         Schema schemaV1 = Schema.of(
@@ -109,7 +108,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_schema_diff_with_nested_array()
+    void test_schema_diff_with_nested_array()
     {
         // @formatter:off
         Schema schemaV1 = Schema.of(
@@ -148,7 +147,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_schema_diff_with_nested_array_object()
+    void test_schema_diff_with_nested_array_object()
     {
         // @formatter:off
         Schema innerSchema = Schema.of(Column.of("col", Column.Type.Int));
@@ -212,7 +211,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_schema_diff_with_nested_array_table()
+    void test_schema_diff_with_nested_array_table()
     {
         // @formatter:off
         Schema innerSchema = Schema.of(Column.of("col", Column.Type.Int));
@@ -276,7 +275,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_schema_diff_with_nested_table()
+    void test_schema_diff_with_nested_table()
     {
         // @formatter:off
         Schema innerSchemaV1 = Schema.of(
@@ -377,7 +376,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_schema_diff_with_nested_object()
+    void test_schema_diff_with_nested_object()
     {
         // @formatter:off
         Schema innerSchemaV1 = Schema.of(
@@ -479,7 +478,7 @@ public class PayloadWriterTest extends Assert
 
     /** Test a migration flow where we obsolete old columns and the switches the data type */
     @Test
-    public void test_schema_migration_flow()
+    void test_schema_migration_flow()
     {
         // @formatter:off
         Schema schemaV1 = Schema.of(
@@ -601,7 +600,7 @@ public class PayloadWriterTest extends Assert
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage().contains("Cannot cast String to Array"));
+            assertTrue(e.getMessage().contains("Cannot cast String to Array"), e.getMessage());
         }
 
         VectorTestUtils.assertVectorsEquals(vv(Type.String, "one", "two", "three", null, "five"), oldSchemaNewPayload.getColumn(4));
@@ -641,7 +640,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_array()
+    void test_array()
     {
         ValueVector v;
         ValueVector actual;
@@ -705,7 +704,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_decimal()
+    void test_decimal()
     {
         ValueVector v;
         ValueVector actual;
@@ -762,7 +761,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_datetime()
+    void test_datetime()
     {
         ValueVector v;
         ValueVector actual;
@@ -819,7 +818,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_int()
+    void test_int()
     {
         ValueVector v;
         ValueVector actual;
@@ -866,7 +865,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_long_cache()
+    void test_long_cache()
     {
         ValueVector v;
         ValueVector actual;
@@ -942,7 +941,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_double_cache()
+    void test_double_cache()
     {
         ValueVector v;
         ValueVector actual;
@@ -1018,7 +1017,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_long()
+    void test_long()
     {
         ValueVector v;
         ValueVector actual;
@@ -1074,7 +1073,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_string()
+    void test_string()
     {
         ValueVector v;
         ValueVector actual;
@@ -1130,7 +1129,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_double()
+    void test_double()
     {
         ValueVector v;
         ValueVector actual;
@@ -1186,7 +1185,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_boolean()
+    void test_boolean()
     {
         ValueVector v;
         ValueVector actual;
@@ -1252,7 +1251,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_float()
+    void test_float()
     {
         ValueVector v;
         ValueVector actual;
@@ -1302,7 +1301,7 @@ public class PayloadWriterTest extends Assert
      * Regression where we had a mismatch in input schema and payload schema where equal arrays wasn't re-added correctly.
      */
     @Test
-    public void test_table_with_array_1()
+    void test_table_with_array_1()
     {
         ValueVector v;
         byte[] bytes;
@@ -1349,7 +1348,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_table_with_array()
+    void test_table_with_array()
     {
         ValueVector v;
         byte[] bytes;
@@ -1488,7 +1487,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_table_context_schema()
+    void test_table_context_schema()
     {
         ValueVector v;
         TupleVector actual;
@@ -1925,7 +1924,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_table()
+    void test_table()
     {
         ValueVector v;
         ValueVector actual;
@@ -1988,7 +1987,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_object()
+    void test_object()
     {
         ValueVector v;
         ValueVector actual;
@@ -2053,7 +2052,7 @@ public class PayloadWriterTest extends Assert
     }
 
     @Test
-    public void test_nested_table()
+    void test_nested_table()
     {
         ValueVector v;
         ValueVector actual;

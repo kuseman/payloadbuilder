@@ -1,10 +1,11 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -18,13 +19,13 @@ import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link RegexpLikeFunction} */
-public class RegexpLikeFunctionTest extends APhysicalPlanTest
+class RegexpLikeFunctionTest extends APhysicalPlanTest
 {
     private final ScalarFunctionInfo f = SystemCatalog.get()
             .getScalarFunction("regexp_like");
 
     @Test
-    public void test()
+    void test()
     {
         assertEquals(ResolvedType.of(Type.Boolean), f.getType(asList()));
 

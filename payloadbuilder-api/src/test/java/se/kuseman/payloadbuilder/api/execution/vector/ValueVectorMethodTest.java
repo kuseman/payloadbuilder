@@ -1,15 +1,16 @@
 package se.kuseman.payloadbuilder.api.execution.vector;
 
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.util.Arrays;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /** Base class that tests implementations of {@link ValueVector} and makes sure that methods are overridden. */
-public abstract class ValueVectorMethodTest extends Assert
+public abstract class ValueVectorMethodTest
 {
     private final Class<? extends ValueVector> clazz;
 
@@ -19,7 +20,7 @@ public abstract class ValueVectorMethodTest extends Assert
     }
 
     @Test
-    public void test_all_get_datatype_methods_are_declared()
+    void test_all_get_datatype_methods_are_declared()
     {
         Arrays.stream(Column.Type.values())
                 .map(t -> "get" + t)
@@ -27,7 +28,7 @@ public abstract class ValueVectorMethodTest extends Assert
     }
 
     @Test
-    public void test_hasNulls_method()
+    void test_hasNulls_method()
     {
         assertMethod("hasNulls");
     }

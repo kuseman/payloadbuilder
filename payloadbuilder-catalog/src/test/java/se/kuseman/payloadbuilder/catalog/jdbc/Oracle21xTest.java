@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 
 import java.sql.SQLException;
@@ -9,8 +10,8 @@ import java.util.Map;
 
 import javax.sql.DataSource;
 
-import org.junit.AfterClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.utility.DockerImageName;
@@ -33,9 +34,9 @@ import se.kuseman.payloadbuilder.test.VectorTestUtils;
 import oracle.jdbc.datasource.impl.OracleDataSource;
 
 /** Test of Oracle21.x */
-public class Oracle21xTest extends BaseJDBCTest
+class Oracle21xTest extends BaseJDBCTest
 {
-    public Oracle21xTest()
+    Oracle21xTest()
     {
         super(Oracle.getDatasource(), Oracle.getUrl(), "oracle.jdbc.OracleDriver", TEST_DB, Oracle.PASSWORD);
     }
@@ -62,7 +63,7 @@ public class Oracle21xTest extends BaseJDBCTest
     }
 
     @Test
-    public void test_clob() throws SQLException
+    void test_clob() throws SQLException
     {
         QualifiedName table = QualifiedName.of("clob_test");
         InsertSink sink = new InsertSink(catalog, table, CATALOG_ALIAS,
@@ -97,8 +98,8 @@ public class Oracle21xTest extends BaseJDBCTest
         it.close();
     }
 
-    @AfterClass
-    public static void tearDownClass()
+    @AfterAll
+    static void tearDownClass()
     {
         Oracle.stop();
     }

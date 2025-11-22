@@ -1,6 +1,9 @@
 package se.kuseman.payloadbuilder.core.execution.vector;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertTupleVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -8,7 +11,7 @@ import java.util.BitSet;
 import java.util.List;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -25,10 +28,10 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link TupleVectorBuilder} */
-public class TupleVectorBuilderTest extends APhysicalPlanTest
+class TupleVectorBuilderTest extends APhysicalPlanTest
 {
     @Test
-    public void test_append_single_table_and_object_with_empty_schema()
+    void test_append_single_table_and_object_with_empty_schema()
     {
         TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
 
@@ -79,7 +82,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_append_single_row_different_schema_and_vector_types()
+    void test_append_single_row_different_schema_and_vector_types()
     {
         TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
 
@@ -155,7 +158,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_append_with_constant_scan_input()
+    void test_append_with_constant_scan_input()
     {
         TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
         b.append(TupleVector.EMPTY);
@@ -177,7 +180,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_invalid_filter_size()
+    void test_invalid_filter_size()
     {
         TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
         //@formatter:off
@@ -192,13 +195,13 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Filter size must equal tuple vector row count"));
+            assertTrue(e.getMessage()
+                    .contains("Filter size must equal tuple vector row count"), e.getMessage());
         }
     }
 
     @Test
-    public void test_filter()
+    void test_filter()
     {
         TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
         //@formatter:off
@@ -229,7 +232,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_append_populate()
+    void test_append_populate()
     {
         Schema innerSchema = Schema.of(Column.of("col2", Type.Float), Column.of("col3", Type.String));
 
@@ -284,7 +287,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_filter_bitset()
+    void test_filter_bitset()
     {
         TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
         //@formatter:off
@@ -317,7 +320,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test()
+    void test()
     {
         TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
 

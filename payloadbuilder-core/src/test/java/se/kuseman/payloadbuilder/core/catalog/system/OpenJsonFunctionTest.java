@@ -2,6 +2,10 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -12,7 +16,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -29,13 +33,13 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link OpenJsonFunction} */
-public class OpenJsonFunctionTest extends APhysicalPlanTest
+class OpenJsonFunctionTest extends APhysicalPlanTest
 {
     private final TableFunctionInfo f = SystemCatalog.get()
             .getTableFunction("openjson");
 
     @Test
-    public void test_empty_on_null()
+    void test_empty_on_null()
     {
         assertEquals(Arity.ONE, f.arity());
         TupleIterator it = f.execute(context, "", asList(e("null")), new FunctionData(0, emptyList()));
@@ -43,7 +47,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_empty_object()
+    void test_empty_object()
     {
         TupleIterator it = f.execute(context, "", asList(e("'{}'")), new FunctionData(0, emptyList()));
 
@@ -72,7 +76,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_object()
+    void test_object()
     {
         TupleIterator it = f.execute(context, "", asList(e("'{ \"key\": 123 }'")), new FunctionData(0, emptyList()));
 
@@ -90,7 +94,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_empty_array()
+    void test_empty_array()
     {
         TupleIterator it = f.execute(context, "", asList(e("'[]'")), new FunctionData(0, emptyList()));
 
@@ -109,7 +113,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_array_object()
+    void test_array_object()
     {
         TupleIterator it = f.execute(context, "", asList(e("'[{ \"key\": 123 },{ \"key2\": 456}]'")), new FunctionData(0, emptyList()));
 
@@ -134,7 +138,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_array_object_batch_size()
+    void test_array_object_batch_size()
     {
         TupleIterator it = f.execute(context, "", asList(e("'[{ \"key\": 123 },{ \"key2\": 456}]'")), new FunctionData(0, List.of(new Option(IExecutionContext.BATCH_SIZE, intLit(1)))));
 
@@ -173,7 +177,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_array_object_empty_row()
+    void test_array_object_empty_row()
     {
         TupleIterator it = f.execute(context, "", asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}]'")), new FunctionData(0, emptyList()));
 
@@ -198,7 +202,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_pointer_not_found()
+    void test_pointer_not_found()
     {
         TupleIterator it = f.execute(context, "", asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}]'")), new FunctionData(0, List.of(new Option(OpenJsonFunction.JSONPATH, e("'/none'")))));
 
@@ -207,7 +211,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_pointer_to_array()
+    void test_pointer_to_array()
     {
         TupleIterator it = f.execute(context, "", asList(e("'{\"rows\": [{ \"key\": 123 },{ \"key2\": 456},{}], \"otherData\": { \"key\":234 }}'")),
                 new FunctionData(0, List.of(new Option(OpenJsonFunction.JSONPATH, e("'/rows'")))));
@@ -233,7 +237,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_pointer_to_object()
+    void test_pointer_to_object()
     {
         TupleIterator it = f.execute(context, "", asList(e("'{\"otherData\": { \"key\":234 }, \"row\": { \"key\": 123 }}'")),
                 new FunctionData(0, List.of(new Option(OpenJsonFunction.JSONPATH, e("'/row'")))));
@@ -258,7 +262,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_pointer_to_empty_object()
+    void test_pointer_to_empty_object()
     {
         TupleIterator it = f.execute(context, "", asList(e("'{\"otherData\": { \"key\":234 }, \"row\": {}}'")), new FunctionData(0, List.of(new Option(OpenJsonFunction.JSONPATH, e("'/row'")))));
 
@@ -275,7 +279,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_pointer_to_empty_array()
+    void test_pointer_to_empty_array()
     {
         TupleIterator it = f.execute(context, "", asList(e("'{\"otherData\": { \"key\":234 }, \"rows\": []}'")), new FunctionData(0, List.of(new Option(OpenJsonFunction.JSONPATH, e("'/rows'")))));
 
@@ -285,7 +289,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_array_mixed_values()
+    void test_array_mixed_values()
     {
         TupleIterator it = f.execute(context, "", asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}, true]'")), new FunctionData(0, emptyList()));
 
@@ -309,7 +313,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_array_broken_json_last()
+    void test_array_broken_json_last()
     {
         TupleIterator it = f.execute(context, "", asList(e("'[{ \"key\": 123 },{ \"key2\": 456},{}, true'")), new FunctionData(0, emptyList()));
 
@@ -320,13 +324,13 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Error reading JSON"));
+            assertTrue(e.getMessage()
+                    .contains("Error reading JSON"), e.getMessage());
         }
     }
 
     @Test
-    public void test_reader_gets_picked_up()
+    void test_reader_gets_picked_up()
     {
         MutableBoolean closed = new MutableBoolean(false);
         IExpression arg = Mockito.mock(IExpression.class);
@@ -368,7 +372,7 @@ public class OpenJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_inputstream_gets_picked_up()
+    void test_inputstream_gets_picked_up()
     {
         MutableBoolean closed = new MutableBoolean(false);
         IExpression arg = Mockito.mock(IExpression.class);

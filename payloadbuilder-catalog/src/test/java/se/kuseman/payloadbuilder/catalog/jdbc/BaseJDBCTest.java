@@ -2,7 +2,10 @@ package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
-import static org.junit.Assume.assumeTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -31,10 +34,9 @@ import java.util.stream.IntStream;
 
 import javax.sql.DataSource;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -72,7 +74,7 @@ import it.unimi.dsi.fastutil.ints.IntArrays;
 
 /** Base test class for {@link JdbcCatalog} */
 // CSOFF
-abstract class BaseJDBCTest extends Assert
+abstract class BaseJDBCTest
 // CSON
 {
     protected static final String CATALOG_ALIAS = "jdbc";
@@ -187,16 +189,16 @@ abstract class BaseJDBCTest extends Assert
         }
     }
 
-    @After
-    public void shutdown()
+    @AfterEach
+    void shutdown()
     {
         IExecutionContext context = mockExecutionContext();
         catalog.dropTable(context.getSession(), CATALOG_ALIAS, TEST_TABLE, false);
         catalog.close();
     }
 
-    @Before
-    public void before()
+    @BeforeEach
+    void before()
     {
         //@formatter:off
         List<Column> columns = List.of(
@@ -256,7 +258,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_sql_server_warnings_exceptions()
+    void test_sql_server_warnings_exceptions()
     {
         // Multi statement queries is not supported by all rdbms:es
         assumeTrue(jdbcUrl.contains("sqlserver"));
@@ -318,7 +320,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_sql_server_datetime_offset()
+    void test_sql_server_datetime_offset()
     {
         // Multi statement queries is not supported by all rdbms:es
         assumeTrue(jdbcUrl.contains("sqlserver"));
@@ -359,7 +361,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_datasource_table_scan_projection()
+    void test_datasource_table_scan_projection()
     {
         IExecutionContext context = mockExecutionContext();
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, TEST_TABLE,
@@ -378,7 +380,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_datasource_table_scan_with_projection_option_override_plb_type()
+    void test_datasource_table_scan_with_projection_option_override_plb_type()
     {
         IExecutionContext context = mockExecutionContext();
 
@@ -400,7 +402,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_datasource_table_scan_with_projection_option_batch_size()
+    void test_datasource_table_scan_with_projection_option_batch_size()
     {
         IExecutionContext context = mockExecutionContext();
 
@@ -428,7 +430,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_datasource_table_scan_with_projection_option()
+    void test_datasource_table_scan_with_projection_option()
     {
         IExecutionContext context = mockExecutionContext();
 
@@ -450,7 +452,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_datasource_table_scan_asterisk()
+    void test_datasource_table_scan_asterisk()
     {
         IExecutionContext context = mockExecutionContext();
 
@@ -591,7 +593,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_datasource_table_scan_asterisk_with_sortitems()
+    void test_datasource_table_scan_asterisk_with_sortitems()
     {
         IExecutionContext context = mockExecutionContext();
         List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of(INT_COL), Order.DESC)));
@@ -629,7 +631,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_datasource_table_scan_asterisk_with_sortitems_with_predicates()
+    void test_datasource_table_scan_asterisk_with_sortitems_with_predicates()
     {
         IExecutionContext context = mockExecutionContext();
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of(INT_COL), Order.DESC)));
@@ -666,7 +668,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_datasource_index_seek_asterisk_with_sortitems()
+    void test_datasource_index_seek_asterisk_with_sortitems()
     {
         IExecutionContext context = mockExecutionContext();
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, asList(INT_COL), Arrays.<Object[]>asList(new Object[] { 1, 3, 5 }));
@@ -703,7 +705,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_datasource_index_seek_multiple_columns_asterisk_with_sortitems()
+    void test_datasource_index_seek_multiple_columns_asterisk_with_sortitems()
     {
         IExecutionContext context = mockExecutionContext();
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, asList(INT_COL, STRING100_COL), Arrays.<Object[]>asList(new Object[] { 1, 3, 5 }, new Object[] { "oöe", "five", "three" }));

@@ -2,6 +2,10 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -12,7 +16,7 @@ import java.util.NoSuchElementException;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -30,13 +34,13 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link OpenCsvFunction} */
-public class OpenCsvFunctionTest extends APhysicalPlanTest
+class OpenCsvFunctionTest extends APhysicalPlanTest
 {
     private final TableFunctionInfo f = SystemCatalog.get()
             .getTableFunction("opencsv");
 
     @Test
-    public void test_empty_on_null()
+    void test_empty_on_null()
     {
         assertEquals(Arity.ONE, f.arity());
         TupleIterator it = f.execute(context, "", asList(e("null")), new FunctionData(0, emptyList()));
@@ -44,7 +48,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_only_headers()
+    void test_only_headers()
     {
         TupleIterator it = f.execute(context, "", asList(e("""
                 'col1,col2,col3
@@ -73,7 +77,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_batch_size()
+    void test_batch_size()
     {
         TupleIterator it = f.execute(context, "", asList(e("""
                 'key
@@ -117,7 +121,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_missing_column_value()
+    void test_missing_column_value()
     {
         TupleIterator it = f.execute(context, "", asList(e("""
                 'key,key2
@@ -149,7 +153,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test()
+    void test()
     {
         TupleIterator it = f.execute(context, "", asList(e("""
                 'key,key2
@@ -181,7 +185,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_column_separator()
+    void test_column_separator()
     {
         TupleIterator it = f.execute(context, "", asList(e("""
                 'key;key2
@@ -213,7 +217,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_column_separator_headers()
+    void test_column_separator_headers()
     {
         FunctionData functionData = new FunctionData(0, List.of(new Option(OpenCsvFunction.COLUMN_HEADERS, e("'key;key2'")), new Option(OpenCsvFunction.COLUMN_SEPARATOR, e("';'"))));
         assertEquals(Schema.of(Column.of("key", Type.String), Column.of("key2", Type.String)), f.getSchema(context, "", List.of(), functionData.getOptions()));
@@ -248,7 +252,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_reader_gets_picked_up()
+    void test_reader_gets_picked_up()
     {
         MutableBoolean closed = new MutableBoolean(false);
         IExpression arg = Mockito.mock(IExpression.class);
@@ -295,7 +299,7 @@ public class OpenCsvFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_input_stream_gets_picked_up()
+    void test_input_stream_gets_picked_up()
     {
         MutableBoolean closed = new MutableBoolean(false);
         IExpression arg = Mockito.mock(IExpression.class);

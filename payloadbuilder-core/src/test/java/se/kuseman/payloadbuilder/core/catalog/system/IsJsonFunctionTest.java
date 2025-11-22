@@ -1,10 +1,11 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -17,7 +18,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link IsJsonFunction} */
-public class IsJsonFunctionTest extends APhysicalPlanTest
+class IsJsonFunctionTest extends APhysicalPlanTest
 {
     ScalarFunctionInfo isjson = SystemCatalog.get()
             .getScalarFunction("isjson");
@@ -27,7 +28,7 @@ public class IsJsonFunctionTest extends APhysicalPlanTest
             .getScalarFunction("isjsonarray");
 
     @Test
-    public void test_basic()
+    void test_basic()
     {
         assertEquals(ResolvedType.of(Type.Boolean), isjson.getType(asList(intLit(1))));
         assertEquals(Arity.ONE, isjson.arity());
@@ -38,7 +39,7 @@ public class IsJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_isjson()
+    void test_isjson()
     {
         //@formatter:off
         Object[] values = new Object[]   {1,    2,    true, false, null, "null", "no", "{}",  "[]", "{\"key\":123}", "[1,2,3]", "{",   ""};
@@ -54,7 +55,7 @@ public class IsJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_isobject()
+    void test_isobject()
     {
         //@formatter:off
         Object[] values = new Object[]   {1,     2,     true,  false,  null, "null",  "no", "{}",  "[]",  "{\"key\":123}", "[1,2,3]", "{",    ""};
@@ -70,7 +71,7 @@ public class IsJsonFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_isarray()
+    void test_isarray()
     {
         //@formatter:off
         Object[] values = new Object[]   {1,     2,     true,  false,  null, "null",  "no", "{}",   "[]",  "{\"key\":123}", "[1,2,3]", "{",   ""};

@@ -1,10 +1,12 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -14,10 +16,10 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 
 /** Test of {@link ConstantScan} */
-public class ConstantScanTest extends APhysicalPlanTest
+class ConstantScanTest extends APhysicalPlanTest
 {
     @Test
-    public void test()
+    void test()
     {
         IPhysicalPlan plan = new Projection(1, new ConstantScan(0, TupleVector.CONSTANT), Schema.of(col("TEN", ResolvedType.of(Type.Int)), col("HELLO", ResolvedType.of(Type.String))),
                 asList(new AliasExpression(e("10"), "TEN"), new AliasExpression(e("'hello'"), "HELLO")), null);

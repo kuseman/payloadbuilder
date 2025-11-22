@@ -5,7 +5,7 @@ import java.time.ZonedDateTime;
 
 import javax.sql.DataSource;
 
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.HostPortWaitStrategy;
 import org.testcontainers.utility.DockerImageName;
@@ -16,15 +16,15 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 
 /** Test of MySql8.x */
-public class MySql8xTest extends BaseJDBCTest
+class MySql8xTest extends BaseJDBCTest
 {
-    public MySql8xTest()
+    MySql8xTest()
     {
         super(Mysql.getDatasource(), Mysql.getUrl(), "com.mysql.cj.jdbc.Driver", "root", Mysql.PASSWORD);
     }
 
-    @AfterClass
-    public static void tearDownClass()
+    @AfterAll
+    static void tearDownClass()
     {
         Mysql.stop();
     }

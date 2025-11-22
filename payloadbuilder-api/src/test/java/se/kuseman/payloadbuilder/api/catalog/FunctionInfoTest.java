@@ -1,15 +1,17 @@
 package se.kuseman.payloadbuilder.api.catalog;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 
 /** Test of {@link FunctionInfo} */
-public class FunctionInfoTest extends Assert
+class FunctionInfoTest
 {
     @Test
-    public void test_arity()
+    void test_arity()
     {
         assertTrue(FunctionInfo.Arity.NO_LIMIT.satisfies(0));
         assertTrue(FunctionInfo.Arity.NO_LIMIT.satisfies(1));

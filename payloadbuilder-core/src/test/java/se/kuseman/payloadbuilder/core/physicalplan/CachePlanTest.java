@@ -1,12 +1,13 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -14,10 +15,10 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link CachePlan} */
-public class CachePlanTest extends APhysicalPlanTest
+class CachePlanTest extends APhysicalPlanTest
 {
     @Test
-    public void test_empty()
+    void test_empty()
     {
         AtomicInteger executeCount = new AtomicInteger();
         AtomicInteger closeCount = new AtomicInteger();
@@ -36,7 +37,7 @@ public class CachePlanTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test()
+    void test()
     {
         AtomicInteger executeCount = new AtomicInteger();
         AtomicInteger closeCount = new AtomicInteger();

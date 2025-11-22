@@ -1,16 +1,20 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 
 /** Test of {@link Decimal} */
-public class DecimalTest extends org.junit.Assert
+class DecimalTest
 {
     @SuppressWarnings("unlikely-arg-type")
     @Test
-    public void test()
+    void test()
     {
         Decimal d = Decimal.from("10.10");
 

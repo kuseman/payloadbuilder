@@ -1,19 +1,21 @@
 package se.kuseman.payloadbuilder.bytes;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.nio.ByteBuffer;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link NullBufferWriter} */
-public class NullBufferWriterTest extends Assert
+class NullBufferWriterTest
 {
     @Test
-    public void test()
+    void test()
     {
         Reference<NullBuffer> ref = new Reference<>();
         NullBuffer nullBuffer;
@@ -32,7 +34,7 @@ public class NullBufferWriterTest extends Assert
 
         for (int i = 0; i < v.size(); i++)
         {
-            assertEquals("Row " + i, v.isNull(i), nullBuffer.isNull(i));
+            assertEquals(v.isNull(i), nullBuffer.isNull(i), "Row " + i);
         }
 
         writer = new BytesWriter();
@@ -45,7 +47,7 @@ public class NullBufferWriterTest extends Assert
         nullBuffer = ref.getValue();
         for (int i = 0; i < v.size(); i++)
         {
-            assertEquals("Row " + i, v.isNull(i), nullBuffer.isNull(i));
+            assertEquals(v.isNull(i), nullBuffer.isNull(i), "Row " + i);
         }
 
         writer = new BytesWriter();
@@ -59,7 +61,7 @@ public class NullBufferWriterTest extends Assert
         nullBuffer = ref.getValue();
         for (int i = 0; i < v.size(); i++)
         {
-            assertEquals("Row " + i, v.isNull(i), nullBuffer.isNull(i));
+            assertEquals(v.isNull(i), nullBuffer.isNull(i), "Row " + i);
         }
 
         writer = new BytesWriter();
@@ -72,7 +74,7 @@ public class NullBufferWriterTest extends Assert
         nullBuffer = ref.getValue();
         for (int i = 0; i < v.size(); i++)
         {
-            assertEquals("Row " + i, v.isNull(i), nullBuffer.isNull(i));
+            assertEquals(v.isNull(i), nullBuffer.isNull(i), "Row " + i);
         }
 
         writer = new BytesWriter();
@@ -85,7 +87,7 @@ public class NullBufferWriterTest extends Assert
         nullBuffer = ref.getValue();
         for (int i = 0; i < v.size(); i++)
         {
-            assertEquals("Row " + i, v.isNull(i), nullBuffer.isNull(i));
+            assertEquals(v.isNull(i), nullBuffer.isNull(i), "Row " + i);
         }
 
         writer = new BytesWriter();
@@ -98,7 +100,7 @@ public class NullBufferWriterTest extends Assert
         nullBuffer = ref.getValue();
         for (int i = 0; i < v.size(); i++)
         {
-            assertEquals("Row " + i, v.isNull(i), nullBuffer.isNull(i));
+            assertEquals(v.isNull(i), nullBuffer.isNull(i), "Row " + i);
         }
 
         writer = new BytesWriter();
@@ -114,7 +116,7 @@ public class NullBufferWriterTest extends Assert
         nullBuffer = ref.getValue();
         for (int i = 0; i < v.size(); i++)
         {
-            assertEquals("Row " + i, v.isNull(i), nullBuffer.isNull(i));
+            assertEquals(v.isNull(i), nullBuffer.isNull(i), "Row " + i);
         }
     }
 

@@ -1,10 +1,11 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -20,7 +21,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link AggregateObjectArrayFunction} and {@link OperatorObjectArrayFunction} */
-public class ObjectArrayFunctionTest extends APhysicalPlanTest
+class ObjectArrayFunctionTest extends APhysicalPlanTest
 {
     private final ScalarFunctionInfo scalar = SystemCatalog.get()
             .getScalarFunction("object_array");
@@ -30,7 +31,7 @@ public class ObjectArrayFunctionTest extends APhysicalPlanTest
     private final IExpression col2 = ce("col2");
 
     @Test
-    public void test_aggregate()
+    void test_aggregate()
     {
         TupleVector input;
         ValueVector actual;
@@ -83,7 +84,7 @@ public class ObjectArrayFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_operator()
+    void test_operator()
     {
         TupleVector input;
         ValueVector actual;

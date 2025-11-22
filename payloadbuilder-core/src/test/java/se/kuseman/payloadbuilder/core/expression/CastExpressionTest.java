@@ -1,10 +1,12 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -17,10 +19,10 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link CastExpression} */
-public class CastExpressionTest extends APhysicalPlanTest
+class CastExpressionTest extends APhysicalPlanTest
 {
     @Test
-    public void test()
+    void test()
     {
         //@formatter:off
         Schema schema = Schema.of(
@@ -66,8 +68,8 @@ public class CastExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast 'one' to Int"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast 'one' to Int"), e.getMessage());
         }
 
         ce = new CastExpression(ce("boolean"), ResolvedType.of(Type.Int));
@@ -86,8 +88,8 @@ public class CastExpressionTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast [2010-10-10T00:00:00] (DateTime) to Int"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot cast [2010-10-10T00:00:00] (DateTime) to Int"), e.getMessage());
         }
 
         ce = new CastExpression(ce("stringInt"), ResolvedType.of(Type.Int));

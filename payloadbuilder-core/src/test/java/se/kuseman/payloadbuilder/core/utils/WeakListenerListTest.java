@@ -1,15 +1,16 @@
 package se.kuseman.payloadbuilder.core.utils;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** Test of {@link WeakListenerList} */
-public class WeakListenerListTest extends Assert
+class WeakListenerListTest
 {
     @Test
-    public void test()
+    void test()
     {
         WeakListenerList list = new WeakListenerList();
 

@@ -1,15 +1,16 @@
 package se.kuseman.payloadbuilder.bytes;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.nio.ByteBuffer;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** Test of {@link BytesWriter} */
-public class BytesWriterTest extends Assert
+class BytesWriterTest
 {
     @Test
-    public void test_varInt()
+    void test_varInt()
     {
         BytesWriter w = new BytesWriter();
         w.putVarInt(0);

@@ -2,12 +2,14 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.io.StringWriter;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -25,32 +27,32 @@ import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.execution.OutputWriterUtils;
 
 /** Test of {@link OperatorFunctionScan} */
-public class OperatorFunctionScanTest extends APhysicalPlanTest
+class OperatorFunctionScanTest extends APhysicalPlanTest
 {
     private final TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "a");
     private final Schema schema = Schema.of(col("col1", ResolvedType.of(Type.Any), table), col("col2", ResolvedType.of(Type.Any), table));
 
     @Test
-    public void test_object_array()
+    void test_object_array()
     {
         assertEquals("[{\"col1\":1,\"col2\":4},{\"col1\":2,\"col2\":5},{\"col1\":3,\"col2\":6}]",
                 toJson(getValue("OBJECT_ARRAY", schema, TupleVector.of(schema, asList(vv(ResolvedType.of(Type.Any), 1, 2, 3), vv(ResolvedType.of(Type.Any), 4, 5, 6))))));
     }
 
     // @Test
-    // public void test_object()
+    // void test_object()
     // {
     // assertEquals("{\"col1\":1,\"col2\":4}", toJson(getValue("OBJECT", schema, TupleVector.of(schema, asList(vv(ResolvedType.of(Type.Any), 1, 2, 3), vv(ResolvedType.of(Type.Any), 4, 5, 6))))));
     // }
     //
     // @Test
-    // public void test_array()
+    // void test_array()
     // {
     // assertEquals("[1,4,2,5,3,6]", toJson(getValue("ARRAY", schema, TupleVector.of(schema, asList(vv(ResolvedType.of(Type.Any), 1, 2, 3), vv(ResolvedType.of(Type.Any), 4, 5, 6))))));
     // }
 
     @Test
-    public void test_object_array_1()
+    void test_object_array_1()
     {
         Schema schema = Schema.of(col("col1", ResolvedType.of(Type.Any), table), col("col2", ResolvedType.of(Type.Any), table), col("col1 >= col2", ResolvedType.of(Type.Boolean), table));
 

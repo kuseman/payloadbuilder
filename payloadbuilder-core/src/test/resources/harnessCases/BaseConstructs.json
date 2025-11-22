@@ -1402,7 +1402,7 @@
       "query": [
         "select id - row_id newCol from data order by 10 desc"
       ],
-      "expectedException": "se.kuseman.payloadbuilder.core.QueryException",
+      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
       "expectedMessageContains": "ORDER BY position is out of range"
     },
     {

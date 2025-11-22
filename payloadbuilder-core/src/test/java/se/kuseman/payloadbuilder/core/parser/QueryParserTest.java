@@ -3,13 +3,16 @@ package se.kuseman.payloadbuilder.core.parser;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.List;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -64,7 +67,7 @@ import se.kuseman.payloadbuilder.core.statement.Statement;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link QueryParser} */
-public class QueryParserTest extends Assert
+class QueryParserTest
 {
     private static final QueryParser PARSER = new QueryParser();
 
@@ -89,7 +92,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_count()
+    void test_count()
     {
         assertExpressionFail(ParseException.class, "COUNT asterisk doesn't support ALL/DISTINCT", "count(ALL *)");
         assertExpressionFail(ParseException.class, "COUNT asterisk doesn't support ALL/DISTINCT", "count(DISTINCT *)");
@@ -100,13 +103,13 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_case()
+    void test_case()
     {
         assertExpression("case when a = 1 then 0 else 1 end");
     }
 
     @Test
-    public void test_backtick()
+    void test_backtick()
     {
         //@formatter:off
         assertExpression("'hello'+`world ${a+b}`", 
@@ -138,7 +141,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_backwards_compability_functions()
+    void test_backwards_compability_functions()
     {
         IExpression ce = new UnresolvedColumnExpression(QualifiedName.of("col"), -1, null);
 
@@ -170,14 +173,14 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_set()
+    void test_set()
     {
         assertQuery("set @var = 10");
         assertQuery("set @@system_prop = false");
     }
 
     @Test
-    public void test_misc()
+    void test_misc()
     {
         assertQuery("show tables");
         assertQuery("show functions");
@@ -200,7 +203,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_not()
+    void test_not()
     {
         assertEquals(e("a + 2 = 10"), assertExpression("NOT NOT (a + 2 = 10)"));
         assertEquals(e("a"), assertExpression("NOT NOT a"));
@@ -222,7 +225,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_cast()
+    void test_cast()
     {
         assertExpression("cast(@var AS array)", new CastExpression(new VariableExpression("var"), ResolvedType.array(Type.Any)));
         assertExpression("cast(@var AS int)", new CastExpression(new VariableExpression("var"), ResolvedType.of(Type.Int)));
@@ -252,7 +255,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_selectItems_assignment()
+    void test_selectItems_assignment()
     {
         assertSelect("select @var = 10");
         assertSelect("select @var = a.col from \"table\" a");
@@ -267,7 +270,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_subquery_expression()
+    void test_subquery_expression()
     {
         //@formatter:off
         Statement expected =
@@ -329,7 +332,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_selectItems()
+    void test_selectItems()
     {
         assertSelect("select 'str' myObj from articleName an where an.lang_id = 1 order by an.id asc nulls last, an.id2 desc nulls first, an.id3, an.id4 desc, an.id4 nulls last");
         assertSelect("select an.art_id, an.a_flg = an.b_flg as \"boolean column\" from articleName an");
@@ -337,7 +340,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_describe()
+    void test_describe()
     {
         assertQuery("describe select * from \"table\"");
         assertQuery("analyze select * from \"table\"");
@@ -348,7 +351,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_functions()
+    void test_functions()
     {
         assertExpression("isnull(null, 1+1.1)");
         assertExpression("coalesce(null, 1+1.1)");
@@ -389,7 +392,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_dereference()
+    void test_dereference()
     {
         assertExpression("(a.b).c");
 
@@ -413,7 +416,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_indirection()
+    void test_indirection()
     {
         // ==== Column ref
 
@@ -493,7 +496,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_subquery()
+    void test_subquery()
     {
         assertSelectFail(ParseException.class, "Assignment selects are not allowed in sub query context", "select * from (select @a=1 from tableA) x");
         assertSelectFail(ParseException.class, "SELECT INTO are not allowed in sub query context", "select * from (select 1,2 into #temp from tableA) x");
@@ -518,14 +521,14 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_control_flow()
+    void test_control_flow()
     {
         assertQuery("if true then print 'hello' else print 'world' end if");
         assertQuery("print hash(a,b); print hash(10, null); print hash(123, 12.10);");
     }
 
     @Test
-    public void test_joins()
+    void test_joins()
     {
         assertSelect("select art_id from article a");
 
@@ -568,7 +571,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_insert_into()
+    void test_insert_into()
     {
         assertQuery("""
                 DESCRIBE
@@ -640,7 +643,7 @@ public class QueryParserTest extends Assert
                 .get(0)).getInput()
                 .getSelect();
 
-        assertFalse("Nested limits should have been collapsed", plan.getInput() instanceof Limit);
+        assertFalse(plan.getInput() instanceof Limit, "Nested limits should have been collapsed");
         assertEquals(LiteralIntegerExpression.createLiteralNumericExpression("1"), plan.getLimitExpression());
 
         // Verify that we take the smallest TOP
@@ -656,12 +659,12 @@ public class QueryParserTest extends Assert
                 .get(0)).getInput()
                 .getSelect();
 
-        assertFalse("Nested limits should have been collapsed", plan.getInput() instanceof Limit);
+        assertFalse(plan.getInput() instanceof Limit, "Nested limits should have been collapsed");
         assertEquals(LiteralIntegerExpression.createLiteralNumericExpression("1"), plan.getLimitExpression());
     }
 
     @Test
-    public void test_select()
+    void test_select()
     {
         // Selects without table source
         assertEquals(new LogicalSelectStatement(ConstantScan.create(asList(litInt(1)), null), false), assertSelect("select 1"));
@@ -696,7 +699,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_table_value_ctor()
+    void test_table_value_ctor()
     {
         assertSelectFail(ParseException.class, "Count of each row must equal the column count.", """
                 select *
@@ -727,7 +730,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_logical_booleans()
+    void test_logical_booleans()
     {
         assertExpression("a and (b or c)");
         assertExpression("a and b and c and d");
@@ -736,7 +739,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_like()
+    void test_like()
     {
         //@formatter:off
         assertExpression("col like 'hello' and col2 not like 'world'",
@@ -751,7 +754,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_expressions()
+    void test_expressions()
     {
         assertExpression("1");
         assertExpression("+1");
@@ -790,7 +793,7 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_lambda_and_scopes()
+    void test_lambda_and_scopes()
     {
         assertExpression("articleAttribute.filter(a -> a.sku_id > 0)");
         assertExpression("articleAttribute.filter(a -> a.sku_id > 0).map(aa -> aa.sku_id).sum()");
@@ -820,9 +823,10 @@ public class QueryParserTest extends Assert
             {
                 throw e;
             }
-            assertTrue(e.getMessage(), isNotBlank(messageContains)
+            assertTrue(isNotBlank(messageContains)
                     && e.getMessage()
-                            .contains(messageContains));
+                            .contains(messageContains),
+                    e.getMessage());
         }
     }
 
@@ -839,9 +843,10 @@ public class QueryParserTest extends Assert
             {
                 throw e;
             }
-            assertTrue(e.getMessage(), isNotBlank(messageContains)
+            assertTrue(isNotBlank(messageContains)
                     && e.getMessage()
-                            .contains(messageContains));
+                            .contains(messageContains),
+                    e.getMessage());
         }
     }
 
@@ -884,8 +889,8 @@ public class QueryParserTest extends Assert
                 throw e;
             }
 
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains(messageContains));
+            assertTrue(e.getMessage()
+                    .contains(messageContains), e.getMessage());
         }
     }
 
