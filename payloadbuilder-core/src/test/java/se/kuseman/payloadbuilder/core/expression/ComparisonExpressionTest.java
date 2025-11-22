@@ -1,6 +1,10 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
@@ -11,7 +15,7 @@ import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -23,14 +27,14 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link ComparisonExpression} */
-public class ComparisonExpressionTest extends APhysicalPlanTest
+class ComparisonExpressionTest extends APhysicalPlanTest
 {
     private static final IExpression NULL = new LiteralNullExpression(ResolvedType.of(Type.Boolean));
     private static final IExpression TRUE = LiteralBooleanExpression.TRUE;
     private static final IExpression FALSE = LiteralBooleanExpression.FALSE;
 
     @Test
-    public void test_fold()
+    void test_fold()
     {
         IExpression e;
 
@@ -59,7 +63,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_string()
+    void test_string()
     {
         // EQ
         assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.String, UTF8String.from("hello"), Type.String, UTF8String.from("hello"), true, null));
@@ -99,7 +103,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_boolean()
+    void test_boolean()
     {
         // EQ
         // Bool <> Bool
@@ -221,7 +225,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_object()
+    void test_object()
     {
         assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Any, 1, Type.Any, 1, true, null));
         assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Any, 1, Type.Any, 1F, false, null));
@@ -238,7 +242,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_numbers()
+    void test_numbers()
     {
         // 4 times 4 time 6 combinations = 96
 
@@ -331,7 +335,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_numbers_int_false()
+    void test_numbers_int_false()
     {
         assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Int, 1, Type.Int, 0, false, null));
         assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Int, 1, Type.Int, 1, false, null));
@@ -342,7 +346,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_eq()
+    void test_eq()
     {
         TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
 
@@ -366,7 +370,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_neq()
+    void test_neq()
     {
         TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
 
@@ -390,7 +394,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_gt()
+    void test_gt()
     {
         TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
 
@@ -414,7 +418,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_gte()
+    void test_gte()
     {
         TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
 
@@ -438,7 +442,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_lt()
+    void test_lt()
     {
         TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
 
@@ -462,7 +466,7 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_lte()
+    void test_lte()
     {
         TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
 
@@ -500,11 +504,11 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
             assertEquals(1, result.size());
             if (test.result == null)
             {
-                assertTrue(test.toString(), result.isNull(0));
+                assertTrue(result.isNull(0), test.toString());
             }
             else
             {
-                assertEquals(test.toString(), test.result, result.getBoolean(0));
+                assertEquals(test.result, result.getBoolean(0), test.toString());
             }
 
             if (test.assertExceptionMessage != null)
@@ -522,8 +526,8 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
             StringWriter sw = new StringWriter();
             ee.printStackTrace(new PrintWriter(sw));
 
-            assertTrue("Should fail with message: " + test.assertExceptionMessage + " but was: " + sw.toString(), ee.getMessage()
-                    .contains(test.assertExceptionMessage));
+            assertTrue(ee.getMessage()
+                    .contains(test.assertExceptionMessage), "Should fail with message: " + test.assertExceptionMessage + " but was: " + sw.toString());
         }
     }
 

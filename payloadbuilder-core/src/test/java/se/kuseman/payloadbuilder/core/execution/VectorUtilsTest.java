@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core.execution;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.math.BigDecimal;
@@ -10,7 +11,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -26,10 +27,10 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link VectorUtils} */
-public class VectorUtilsTest extends APhysicalPlanTest
+class VectorUtilsTest extends APhysicalPlanTest
 {
     @Test
-    public void test_populate_cartesian()
+    void test_populate_cartesian()
     {
         Schema innerSchema = Schema.of(Column.of("col3", Type.Boolean), Column.of("col4", Type.String));
         //@formatter:off
@@ -53,7 +54,7 @@ public class VectorUtilsTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_cartesian()
+    void test_cartesian()
     {
         //@formatter:off
         TupleVector vector1 = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.Float)), asList(
@@ -77,7 +78,7 @@ public class VectorUtilsTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_hash()
+    void test_hash()
     {
         assertEquals(629, VectorUtils.hash(new ValueVector[] { vv(ResolvedType.of(Type.Int), new Object[] { null }) }, 0));
         assertEquals(630, VectorUtils.hash(new ValueVector[] { vv(Type.Int, 1) }, 0));
@@ -105,7 +106,7 @@ public class VectorUtilsTest extends APhysicalPlanTest
 
     /** This test verifies that hash is equal for any's any actual types. This because hash match should work across types. */
     @Test
-    public void test_hash_any_and_actual_types_get_the_same_values()
+    void test_hash_any_and_actual_types_get_the_same_values()
     {
         assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.String, UTF8String.from("hello")) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, "hello") }, 0));
         assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.String, UTF8String.from("hello")) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, UTF8String.from("hello")) }, 0));
@@ -136,7 +137,7 @@ public class VectorUtilsTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_equals()
+    void test_equals()
     {
         assertEquals(false, VectorUtils.equals(new ValueVector[] { VectorTestUtils.vv(ResolvedType.of(Type.Int), new Object[] { null, 10 }) }, 0, 1));
         assertEquals(true, VectorUtils.equals(new ValueVector[] { vv(ResolvedType.of(Type.Int), new Object[] { null }) }, 0, 0));
@@ -163,7 +164,7 @@ public class VectorUtilsTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_compare()
+    void test_compare()
     {
         assertEquals(0, VectorUtils.compare(vv(Type.Int, 1), vv(Type.Int, 1), Type.Int, 0, 0));
         assertEquals(-1, VectorUtils.compare(vv(Type.Int, 1), vv(Type.Int, 2), Type.Int, 0, 0));

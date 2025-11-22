@@ -2,6 +2,10 @@ package se.kuseman.payloadbuilder.core.execution;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -9,7 +13,7 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.NoSuchElementException;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -25,10 +29,10 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link TemporaryTable} */
-public class TemporaryTableTest extends APhysicalPlanTest
+class TemporaryTableTest extends APhysicalPlanTest
 {
     @Test
-    public void test_no_indices()
+    void test_no_indices()
     {
         //@formatter:off
         TupleVector tv = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.String)), asList(
@@ -47,13 +51,13 @@ public class TemporaryTableTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("This tempoarary table does not have any indices"));
+            assertTrue(e.getMessage()
+                    .contains("This tempoarary table does not have any indices"), e.getMessage());
         }
     }
 
     @Test
-    public void test_bad_input()
+    void test_bad_input()
     {
       //@formatter:off
         TupleVector tv = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.String)), asList(
@@ -75,8 +79,8 @@ public class TemporaryTableTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("This tempoarary table does not have index: index [col] (ANY)"));
+            assertTrue(e.getMessage()
+                    .contains("This tempoarary table does not have index: index [col] (ANY)"), e.getMessage());
         }
 
         try
@@ -87,8 +91,8 @@ public class TemporaryTableTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Temporary table indices must have ALL columns type"));
+            assertTrue(e.getMessage()
+                    .contains("Temporary table indices must have ALL columns type"), e.getMessage());
         }
 
         try
@@ -99,13 +103,13 @@ public class TemporaryTableTest extends APhysicalPlanTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot index temporary table,  missing column: col66 in schema: [col1 (Int), col2 (String)]"));
+            assertTrue(e.getMessage()
+                    .contains("Cannot index temporary table,  missing column: col66 in schema: [col1 (Int), col2 (String)]"), e.getMessage());
         }
     }
 
     @Test
-    public void test()
+    void test()
     {
         //@formatter:off
         TupleVector tv = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.String)), asList(
@@ -175,7 +179,7 @@ public class TemporaryTableTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_multi_column()
+    void test_multi_column()
     {
         //@formatter:off
         TupleVector tv = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.String), Column.of("col3", Type.Float)), asList(
@@ -238,7 +242,7 @@ public class TemporaryTableTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_index_scanning_with_different_seek_key_type_than_index_type()
+    void test_index_scanning_with_different_seek_key_type_than_index_type()
     {
         //@formatter:off
         TupleVector tv = TupleVector.of(Schema.of(Column.of("col1", Type.Int)), asList(
@@ -274,7 +278,7 @@ public class TemporaryTableTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_index_scanning_with_different_seek_key_type_than_index_type_2()
+    void test_index_scanning_with_different_seek_key_type_than_index_type_2()
     {
         //@formatter:off
         TupleVector tv = TupleVector.of(Schema.of(Column.of("col1", Type.String)), asList(

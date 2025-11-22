@@ -1,6 +1,10 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -9,7 +13,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -25,10 +29,10 @@ import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 
 /** Test of {@link Filter} */
-public class FilterTest extends APhysicalPlanTest
+class FilterTest extends APhysicalPlanTest
 {
     @Test
-    public void test_no_matches()
+    void test_no_matches()
     {
         MutableBoolean closed = new MutableBoolean();
 
@@ -59,7 +63,7 @@ public class FilterTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test()
+    void test()
     {
         MutableBoolean closed = new MutableBoolean();
 
@@ -84,7 +88,7 @@ public class FilterTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_outer_reference_is_preserved_until_evaluation()
+    void test_outer_reference_is_preserved_until_evaluation()
     {
         TupleVector tv = TupleVector.of(schema("col1", "col3"), asList(vv(Type.Any, 3, 4), vv(Type.Any, 5, 3)));
 

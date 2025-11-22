@@ -1,12 +1,14 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -20,20 +22,19 @@ import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link ColumnExpression} */
-public class ColumnExpressionTest extends APhysicalPlanTest
+class ColumnExpressionTest extends APhysicalPlanTest
 {
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_illegal_args_no_ordinal_no_path_no_asterisk()
+    @Test
+    void test_illegal_args_no_ordinal_no_path_no_asterisk()
     {
         TableSourceReference tableSource = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t");
-        ColumnExpression.Builder.of("col", ResolvedType.of(Type.Any))
+        assertThrows(IllegalArgumentException.class, () -> ColumnExpression.Builder.of("col", ResolvedType.of(Type.Any))
                 .withColumnReference(new ColumnReference("col", tableSource, Column.MetaData.EMPTY))
-                .build();
+                .build());
     }
 
     @Test
-    public void test_ordinal_no_column_reference()
+    void test_ordinal_no_column_reference()
     {
         // CSOFF
         ColumnExpression e;
@@ -82,7 +83,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_column_no_column_reference()
+    void test_column_no_column_reference()
     {
         // CSOFF
         ColumnExpression e;
@@ -166,7 +167,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_column_with_table_reference()
+    void test_column_with_table_reference()
     {
         // CSOFF
         ColumnExpression e;

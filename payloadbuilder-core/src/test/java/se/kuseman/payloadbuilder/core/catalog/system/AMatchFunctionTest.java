@@ -1,10 +1,11 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -21,7 +22,7 @@ import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link AMatchFunction} */
-public class AMatchFunctionTest extends APhysicalPlanTest
+class AMatchFunctionTest extends APhysicalPlanTest
 {
     private final ScalarFunctionInfo all = SystemCatalog.get()
             .getScalarFunction("all");
@@ -31,7 +32,7 @@ public class AMatchFunctionTest extends APhysicalPlanTest
             .getScalarFunction("none");
 
     @Test
-    public void test_iterable_input()
+    void test_iterable_input()
     {
         assertIterableMatchFunction(all, new Object[] { false, true, false, null, null }, new Object[] { false, false, true, true });
         assertIterableMatchFunction(any, new Object[] { true, false, true, null, null }, new Object[] { false, true, false, true });
@@ -39,7 +40,7 @@ public class AMatchFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_non_iterable_input()
+    void test_non_iterable_input()
     {
         assertNonIterableMatchFunction(all, new Object[] { false, true, true, null }, new Object[] { false, null, true, true });
         assertNonIterableMatchFunction(any, new Object[] { false, true, true, null }, new Object[] { false, null, true, true });

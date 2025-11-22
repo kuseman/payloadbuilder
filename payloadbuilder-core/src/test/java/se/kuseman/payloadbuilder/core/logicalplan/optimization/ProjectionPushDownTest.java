@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.List;
@@ -8,7 +9,7 @@ import java.util.Random;
 import java.util.Set;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -34,7 +35,7 @@ import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Test of {@link ProjectionPushDown} */
-public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
+class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
 {
     private final ColumnResolver columnOptimizer = new ColumnResolver();
     private final ProjectionPushDown projectionPushDown = new ProjectionPushDown();
@@ -43,7 +44,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     private final Schema schemaB = Schema.of(ast("b", tableB));
 
     @Test
-    public void test_projection_on_one_table_from_join()
+    void test_projection_on_one_table_from_join()
     {
         //@formatter:off
         String query = """
@@ -86,7 +87,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_asterisk_projection()
+    void test_asterisk_projection()
     {
         //@formatter:off
         String query = """
@@ -120,7 +121,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_asterisk_projection_in_correlated_sub_query()
+    void test_asterisk_projection_in_correlated_sub_query()
     {
         //@formatter:off
         String query = """
@@ -168,7 +169,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_asterisk_projection_sub_query_with_no_projection_on_table_source()
+    void test_asterisk_projection_sub_query_with_no_projection_on_table_source()
     {
         // Verify that projection is not set when we have an asterisk projection above in hierarchy
         //@formatter:off
@@ -218,7 +219,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_mixed_asterisk_with_column_projections()
+    void test_mixed_asterisk_with_column_projections()
     {
         // Verify that we don't recreate table source with projected columns here
         // since we have an asterisk select and hence we need all column not only "col"
@@ -257,7 +258,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_nested_projections()
+    void test_nested_projections()
     {
         /*@formatter:off
          * 
@@ -312,7 +313,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_single_projection_and_table()
+    void test_single_projection_and_table()
     {
         //@formatter:off
         ILogicalPlan plan = projection(
@@ -336,7 +337,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_correlated_join_without_asterisk()
+    void test_correlated_join_without_asterisk()
     {
         ScalarFunctionInfo toTableFunc = SystemCatalog.get()
                 .getScalarFunction("totable");
@@ -386,7 +387,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_correlated_join_with_asterisk()
+    void test_correlated_join_with_asterisk()
     {
         ScalarFunctionInfo toTableFunc = SystemCatalog.get()
                 .getScalarFunction("totable");
@@ -439,7 +440,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
-    public void test_join()
+    void test_join()
     {
         //@formatter:off
         /*

@@ -1,5 +1,7 @@
 package se.kuseman.payloadbuilder.core;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.io.ByteArrayOutputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
@@ -9,17 +11,16 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.core.JsonOutputWriter.JsonSettings;
 
 /** Test of {@link JsonOutputWriter} */
-public class JsonOutputWriterTest extends Assert
+class JsonOutputWriterTest
 {
     @Test
-    public void test_outputstream_escape()
+    void test_outputstream_escape()
     {
         Pair<ByteArrayOutputStream, JsonOutputWriter> p = outputstream(new JsonSettings());
 
@@ -43,7 +44,7 @@ public class JsonOutputWriterTest extends Assert
     }
 
     @Test
-    public void test_allResultSetsAsOneArray_no_rows()
+    void test_allResultSetsAsOneArray_no_rows()
     {
         JsonSettings settings = new JsonSettings();
         settings.setAllResultSetsAsOneArray(true);
@@ -57,7 +58,7 @@ public class JsonOutputWriterTest extends Assert
     }
 
     @Test
-    public void test_allResultSetsAsOneArray()
+    void test_allResultSetsAsOneArray()
     {
         JsonSettings settings = new JsonSettings();
         settings.setAllResultSetsAsOneArray(true);
@@ -92,7 +93,7 @@ public class JsonOutputWriterTest extends Assert
     }
 
     @Test
-    public void test_resultSetsAsArrays()
+    void test_resultSetsAsArrays()
     {
         JsonSettings settings = new JsonSettings();
         settings.setResultSetsAsArrays(true);
@@ -129,7 +130,7 @@ public class JsonOutputWriterTest extends Assert
     }
 
     @Test
-    public void test_row_and_resultset_separator()
+    void test_row_and_resultset_separator()
     {
         JsonSettings settings = new JsonSettings();
         settings.setRowSeparator("####");
@@ -168,7 +169,7 @@ public class JsonOutputWriterTest extends Assert
     }
 
     @Test
-    public void test()
+    void test()
     {
         Pair<StringWriter, JsonOutputWriter> p = writer();
         p.getValue()
@@ -318,7 +319,7 @@ public class JsonOutputWriterTest extends Assert
     }
 
     @Test
-    public void test_outputstream()
+    void test_outputstream()
     {
         Pair<ByteArrayOutputStream, JsonOutputWriter> p = outputstream(new JsonSettings());
         p.getValue()

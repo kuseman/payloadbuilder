@@ -2,9 +2,10 @@ package se.kuseman.payloadbuilder.catalog.es;
 
 import java.util.Map;
 
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
-import org.testcontainers.elasticsearch.ElasticsearchContainer;
+import org.testcontainers.utility.DockerImageName;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -12,15 +13,15 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMeta.Version;
 
 /** Test with elastic search 8.X */
-public class ES8XTest extends BaseESTest
+class ES8XTest extends BaseESTest
 {
-    public ES8XTest()
+    ES8XTest()
     {
         super(ES.ES_ENDPOINT, ESCatalog.SINGLE_TYPE_TABLE_NAME, Version._8X);
     }
 
-    @AfterClass
-    public static void tearDownClass()
+    @AfterAll
+    static void tearDownClass()
     {
         ES.stop();
     }
@@ -41,8 +42,11 @@ public class ES8XTest extends BaseESTest
 
     static class ES
     {
+        private static final int PORT = 9200;
         private static final String IMAGE_NAME = "docker.elastic.co/elasticsearch/elasticsearch:8.7.1";
-        private static final ElasticsearchContainer ES_CONTAINER = new ElasticsearchContainer(IMAGE_NAME);
+        @SuppressWarnings("resource")
+        private static final GenericContainer<?> ES_CONTAINER = new GenericContainer<>(DockerImageName.parse(IMAGE_NAME)).withExposedPorts(PORT)
+                .withEnv(Map.of("xpack.security.enabled", "false", "discovery.type", "single-node"));
 
         static final String ES_ENDPOINT;
 
@@ -53,7 +57,7 @@ public class ES8XTest extends BaseESTest
                     .withEnv("ES_JAVA_OPTS", "-Xms256m -Xmx512m -XX:MaxDirectMemorySize=536870912");
             ES_CONTAINER.start();
 
-            ES_ENDPOINT = "http://" + ES_CONTAINER.getHttpHostAddress();
+            ES_ENDPOINT = "http://" + ES_CONTAINER.getHost() + ":" + ES_CONTAINER.getMappedPort(PORT);
 
             Runtime.getRuntime()
                     .addShutdownHook(new Thread(() -> ES_CONTAINER.stop()));

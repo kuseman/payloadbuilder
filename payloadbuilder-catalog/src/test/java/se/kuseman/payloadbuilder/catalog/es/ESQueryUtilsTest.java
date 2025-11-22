@@ -5,13 +5,16 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -28,19 +31,18 @@ import se.kuseman.payloadbuilder.test.IPredicateMock;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link ESQueryUtils} */
-public class ESQueryUtilsTest extends Assert
+class ESQueryUtilsTest
 {
     private IExecutionContext context = Mockito.mock(IExecutionContext.class);
 
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_getSearchTemplateUrl_fail()
+    @Test
+    void test_getSearchTemplateUrl_fail()
     {
-        ESQueryUtils.getSearchUrl("", "myindex", "_doc", 100, null, true);
+        assertThrows(IllegalArgumentException.class, () -> ESQueryUtils.getSearchUrl("", "myindex", "_doc", 100, null, true));
     }
 
     @Test
-    public void test_getSearchTemplateUrl()
+    void test_getSearchTemplateUrl()
     {
         // Global type (_doc)
         assertEquals("http://localhost:9200/*/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true",
@@ -69,7 +71,7 @@ public class ESQueryUtilsTest extends Assert
     }
 
     @Test
-    public void test_getSearchUrl()
+    void test_getSearchUrl()
     {
         assertEquals("http://localhost:9200/*/_search?filter_path=_scroll_id,hits.hits&ignore_unavailable=true", ESQueryUtils.getSearchUrl("http://localhost:9200", null, "_doc", null, null, false));
         assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&ignore_unavailable=true",
@@ -84,49 +86,45 @@ public class ESQueryUtilsTest extends Assert
                 ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", "_doc", 200, 2, false));
     }
 
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_getSearchUrl_fail()
+    @Test
+    void test_getSearchUrl_fail()
     {
-        ESQueryUtils.getSearchUrl("", "myindex", "_doc", 100, null, false);
+        assertThrows(IllegalArgumentException.class, () -> ESQueryUtils.getSearchUrl("", "myindex", "_doc", 100, null, false));
     }
 
     @Test
-    public void test_getScrollUrl()
+    void test_getScrollUrl()
     {
         assertEquals("http://localhost:9200/_search/scroll?scroll=2m&filter_path=_scroll_id,hits.hits", ESQueryUtils.getScrollUrl("http://localhost:9200", 2));
     }
 
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_getScrollUrl_fail()
+    @Test
+    void test_getScrollUrl_fail()
     {
-        ESQueryUtils.getScrollUrl("", 2);
+        assertThrows(IllegalArgumentException.class, () -> ESQueryUtils.getScrollUrl("", 2));
     }
 
     @Test
-    public void test_getMgetUrl()
+    void test_getMgetUrl()
     {
         assertEquals("http://localhost:9200/myindex/type/_mget", ESQueryUtils.getMgetUrl("http://localhost:9200", "myindex", "type"));
         assertEquals("http://localhost:9200/myindex/_mget", ESQueryUtils.getMgetUrl("http://localhost:9200", "myindex", ""));
     }
 
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_getMgetUrl_fail()
+    @Test
+    void test_getMgetUrl_fail()
     {
-        ESQueryUtils.getMgetUrl("", "", "");
-    }
-
-    @Test(
-            expected = IllegalArgumentException.class)
-    public void test_getMgetUrl_fail_1()
-    {
-        ESQueryUtils.getMgetUrl("index", "", "");
+        assertThrows(IllegalArgumentException.class, () -> ESQueryUtils.getMgetUrl("", "", ""));
     }
 
     @Test
-    public void test_search_body_singleType_with_index()
+    void test_getMgetUrl_fail_1()
+    {
+        assertThrows(IllegalArgumentException.class, () -> ESQueryUtils.getMgetUrl("index", "", ""));
+    }
+
+    @Test
+    void test_search_body_singleType_with_index()
     {
         // field1 != 20
         List<IPredicate> pairs = asList(IPredicateMock.neq("field1", 20));
@@ -156,7 +154,7 @@ public class ESQueryUtilsTest extends Assert
     }
 
     @Test
-    public void test_search_body_singleType()
+    void test_search_body_singleType()
     {
         assertEquals("{\"sort\":[\"_doc\"]}", ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), emptyList(), null, null, false, context));
         assertEquals(
@@ -232,7 +230,7 @@ public class ESQueryUtilsTest extends Assert
     }
 
     @Test
-    public void test_search_body_with_index()
+    void test_search_body_with_index()
     {
         ValueVector indexSeekValues = VectorTestUtils.vv(Type.Any, 1, 2, null);
 
@@ -254,7 +252,7 @@ public class ESQueryUtilsTest extends Assert
     }
 
     @Test
-    public void test_search_body()
+    void test_search_body()
     {
         assertEquals("{\"sort\":[\"_doc\"]}", ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), emptyList(), null, null, false, context));
         assertEquals(

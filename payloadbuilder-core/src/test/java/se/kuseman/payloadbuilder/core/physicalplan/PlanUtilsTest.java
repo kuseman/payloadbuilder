@@ -1,8 +1,10 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -15,10 +17,10 @@ import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link PlanUtils} */
-public class PlanUtilsTest extends APhysicalPlanTest
+class PlanUtilsTest extends APhysicalPlanTest
 {
     @Test
-    public void test_no_allocations()
+    void test_no_allocations()
     {
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col", Type.Int)), asList(ValueVector.literalInt(100, 500)));
         TupleVector actual = PlanUtils.concat(context, TupleIterator.singleton(vector));
@@ -36,7 +38,7 @@ public class PlanUtilsTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_full_batching()
+    void test_full_batching()
     {
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col", Type.Int)), asList(range(500)));
         TupleVector actual = PlanUtils.concat(context, split(vector, -1));
@@ -53,7 +55,7 @@ public class PlanUtilsTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_batching_with_estimated_batch_count()
+    void test_batching_with_estimated_batch_count()
     {
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col", Type.Int)), asList(range(500)));
         TupleIterator it = split(vector, vector.getRowCount());
@@ -73,7 +75,7 @@ public class PlanUtilsTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_batching_with_no_estimated_batch_count()
+    void test_batching_with_no_estimated_batch_count()
     {
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col", Type.Int)), asList(range(500)));
         TupleIterator it = split(vector, -1);

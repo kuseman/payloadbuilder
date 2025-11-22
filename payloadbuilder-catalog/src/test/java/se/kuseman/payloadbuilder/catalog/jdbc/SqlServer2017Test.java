@@ -1,12 +1,14 @@
 package se.kuseman.payloadbuilder.catalog.jdbc;
 
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.function.Supplier;
 
 import javax.sql.DataSource;
 
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.AbstractWaitStrategy;
 import org.testcontainers.containers.wait.strategy.WaitStrategyTarget;
@@ -15,28 +17,28 @@ import org.testcontainers.utility.DockerImageName;
 import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 
 /** Test of SqlServer 2017 */
-public class SqlServer2017Test extends ASqlServerTest
+class SqlServer2017Test extends ASqlServerTest
 {
-    public SqlServer2017Test()
+    SqlServer2017Test()
     {
         super(SqlServer.getDatasource(), SqlServer.getUrl(), "com.microsoft.sqlserver.jdbc.SQLServerDriver", "sa", SqlServer.PASSWORD);
     }
 
-    @AfterClass
-    public static void tearDownClass()
+    @AfterAll
+    static void tearDownClass()
     {
         SqlServer.stop();
     }
 
     @Override
-    public void before()
+    void before()
     {
-        org.junit.Assume.assumeTrue(SqlServer.CONTAINER.isRunning());
+        assumeTrue(SqlServer.CONTAINER.isRunning());
         super.before();
     }
 
     @Override
-    public void shutdown()
+    void shutdown()
     {
         if (SqlServer.CONTAINER.isRunning())
         {

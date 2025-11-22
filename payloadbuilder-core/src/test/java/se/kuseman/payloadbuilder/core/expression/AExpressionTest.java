@@ -1,11 +1,13 @@
 package se.kuseman.payloadbuilder.core.expression;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import org.junit.Assert;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -32,7 +34,7 @@ import se.kuseman.payloadbuilder.core.logicalplan.optimization.LogicalPlanOptimi
 import se.kuseman.payloadbuilder.core.parser.QueryParser;
 
 /** Base class for expression based tests */
-public abstract class AExpressionTest extends Assert
+public abstract class AExpressionTest
 {
     protected static final QueryParser PARSER = new QueryParser();
 
@@ -563,11 +565,11 @@ public abstract class AExpressionTest extends Assert
 
             if (actual instanceof byte[] bytes)
             {
-                assertArrayEquals("Eval: " + expression, (byte[]) expected, bytes);
+                assertArrayEquals((byte[]) expected, bytes, "Eval: " + expression);
             }
             else
             {
-                assertEquals("Eval: " + expression, expected, actual);
+                assertEquals(expected, actual, "Eval: " + expression);
             }
         }
         catch (Exception e)

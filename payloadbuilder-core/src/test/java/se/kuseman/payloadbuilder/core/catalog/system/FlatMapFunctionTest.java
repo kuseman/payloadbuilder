@@ -1,10 +1,11 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -21,7 +22,7 @@ import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link FlatMapFunction} */
-public class FlatMapFunctionTest extends APhysicalPlanTest
+class FlatMapFunctionTest extends APhysicalPlanTest
 {
     private final ScalarFunctionInfo flatMapFunction = SystemCatalog.get()
             .getScalarFunction("flatmap");
@@ -31,7 +32,7 @@ public class FlatMapFunctionTest extends APhysicalPlanTest
             .getScalarFunction("toarray");
 
     @Test
-    public void test_iterable_input()
+    void test_iterable_input()
     {
         ValueVector actual;
         TupleVector tv;
@@ -125,7 +126,7 @@ public class FlatMapFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_non_iterable_input()
+    void test_non_iterable_input()
     {
         ValueVector actual;
         TupleVector tv;

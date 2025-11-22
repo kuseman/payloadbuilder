@@ -1,6 +1,9 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
@@ -12,8 +15,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -39,16 +42,16 @@ import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link NestedLoop} */
-public class NestedLoopTest extends AJoinTest
+class NestedLoopTest extends AJoinTest
 {
     /**
      * Outer references set that is used to trigger outer nested loop. This isn't actually used in the operator only triggers the function and is used then analyzing operator
      */
     private Set<Column> outerReferences = asSet(col("col", ResolvedType.of(Type.Any), new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t")));
 
-    @Ignore
+    @Disabled
     @Test
-    public void measure()
+    void measure()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -155,7 +158,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_join_constant_scan()
+    void test_inner_join_constant_scan()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6))));
@@ -175,7 +178,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_join_with_populate_no_inner_rows()
+    void test_inner_join_with_populate_no_inner_rows()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         AtomicInteger outerClosed = new AtomicInteger();
@@ -194,7 +197,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_constant_scan_no_inner_rows()
+    void test_outer_loop_constant_scan_no_inner_rows()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), new TupleVector[0]);
@@ -213,7 +216,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_join_constant_scan_no_inner_rows()
+    void test_outer_join_constant_scan_no_inner_rows()
     {
         AtomicInteger innerClosed = new AtomicInteger();
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), new TupleVector[0]);
@@ -232,7 +235,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_no_populate_schema_less()
+    void test_outer_loop_no_populate_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -274,7 +277,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_no_populate_no_outer_schema_less_multiple_inner_vectors()
+    void test_outer_loop_no_populate_no_outer_schema_less_multiple_inner_vectors()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -307,7 +310,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_no_outer_vectors_schema_less()
+    void test_outer_loop_no_outer_vectors_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -327,7 +330,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_no_outer_rows_schema_less()
+    void test_outer_loop_no_outer_rows_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -347,7 +350,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_no_inner_rows_schema_less()
+    void test_outer_loop_no_inner_rows_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -370,7 +373,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_multiple_outer_vectors_no_inner_rows_schema_less()
+    void test_outer_loop_multiple_outer_vectors_no_inner_rows_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -394,7 +397,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_outer_reference_schema_less_outer_reference_values_are_preserved()
+    void test_outer_loop_outer_reference_schema_less_outer_reference_values_are_preserved()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -470,7 +473,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_multiple_outer_vectors_schema_less()
+    void test_outer_loop_multiple_outer_vectors_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -517,7 +520,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_populate_schema_less()
+    void test_outer_loop_populate_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -579,7 +582,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_populate_no_outer_rows_schema_less()
+    void test_outer_loop_populate_no_outer_rows_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -599,7 +602,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_populate_no_inner_rows_schema_less()
+    void test_outer_loop_populate_no_inner_rows_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -622,7 +625,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_outer_loop_populate_multiple_outer_vectors_schema_less()
+    void test_outer_loop_populate_multiple_outer_vectors_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -684,7 +687,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_no_outer()
+    void test_cross_join_no_populate_no_outer()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -719,7 +722,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_no_outer_switched_inputs()
+    void test_cross_join_no_populate_no_outer_switched_inputs()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -754,7 +757,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_verify_children_are_closed_with_break()
+    void test_cross_join_no_populate_verify_children_are_closed_with_break()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -777,7 +780,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_no_outer_rows()
+    void test_cross_join_no_populate_no_outer_rows()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -798,7 +801,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_no_inner_rows()
+    void test_cross_join_no_populate_no_inner_rows()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -820,7 +823,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_multiple_outer_vectors()
+    void test_cross_join_no_populate_multiple_outer_vectors()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -871,7 +874,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_multiple_inner_vectors()
+    void test_cross_join_no_populate_multiple_inner_vectors()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -920,7 +923,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_multiple_inner_and_outer_vectors()
+    void test_cross_join_no_populate_multiple_inner_and_outer_vectors()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -985,7 +988,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_single_rows()
+    void test_cross_join_no_populate_single_rows()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1020,7 +1023,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_no_populate_with_outer()
+    void test_inner_loop_no_populate_with_outer()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1059,7 +1062,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_populate_with_outer()
+    void test_inner_loop_populate_with_outer()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1113,7 +1116,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_populate_with_outer_no_inner_rows()
+    void test_inner_loop_populate_with_outer_no_inner_rows()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1133,7 +1136,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_populate_with_outer_no_outer_rows()
+    void test_inner_loop_populate_with_outer_no_outer_rows()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1154,7 +1157,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_populate_with_outer_multiple_outer_vectors()
+    void test_inner_loop_populate_with_outer_multiple_outer_vectors()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1206,7 +1209,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_populate_with_outer_multiple_inner_vectors()
+    void test_inner_loop_populate_with_outer_multiple_inner_vectors()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1250,7 +1253,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_populate_schema_less()
+    void test_cross_join_populate_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1304,7 +1307,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_populate_no_inner_rows_schema_less()
+    void test_cross_join_populate_no_inner_rows_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1324,7 +1327,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_populate_no_outer_rows_schema_less()
+    void test_cross_join_populate_no_outer_rows_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1345,7 +1348,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_populate_multiple_outer_vectors_schema_less()
+    void test_cross_join_populate_multiple_outer_vectors_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1397,7 +1400,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_populate_multiple_inner_vectors_schema_less()
+    void test_cross_join_populate_multiple_inner_vectors_schema_less()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1440,7 +1443,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_no_populate_with_outer_single_rows()
+    void test_inner_loop_no_populate_with_outer_single_rows()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1479,7 +1482,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_no_populate_with_outer_no_outer_rows()
+    void test_inner_loop_no_populate_with_outer_no_outer_rows()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1501,7 +1504,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_no_populate_with_outer_no_inner_rows()
+    void test_inner_loop_no_populate_with_outer_no_inner_rows()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1523,7 +1526,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_no_populate_with_outer_multiple_outer_vectors()
+    void test_inner_loop_no_populate_with_outer_multiple_outer_vectors()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1574,7 +1577,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_inner_loop_no_populate_with_outer_multiple_inner_vectors()
+    void test_inner_loop_no_populate_with_outer_multiple_inner_vectors()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1614,7 +1617,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_with_outer_multiple_inner_and_outer_vectors()
+    void test_cross_join_no_populate_with_outer_multiple_inner_and_outer_vectors()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();
@@ -1665,7 +1668,7 @@ public class NestedLoopTest extends AJoinTest
     }
 
     @Test
-    public void test_cross_join_no_populate_with_outer_multiple_inner_and_outer_vectors_2()
+    void test_cross_join_no_populate_with_outer_multiple_inner_and_outer_vectors_2()
     {
         AtomicInteger outerClosed = new AtomicInteger();
         AtomicInteger innerClosed = new AtomicInteger();

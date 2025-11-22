@@ -1,10 +1,11 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -20,7 +21,7 @@ import se.kuseman.payloadbuilder.core.expression.LiteralArrayExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link ArrayFunction} */
-public class ArrayFunctionTest extends APhysicalPlanTest
+class ArrayFunctionTest extends APhysicalPlanTest
 {
     private final ScalarFunctionInfo scalar = SystemCatalog.get()
             .getScalarFunction("array");
@@ -28,7 +29,7 @@ public class ArrayFunctionTest extends APhysicalPlanTest
     private final IExpression col2 = ce("col2");
 
     @Test
-    public void test_fold()
+    void test_fold()
     {
         IExpression fold = scalar.fold(context, asList());
         assertEquals(new LiteralArrayExpression(vv(Type.Any)), fold);
@@ -38,7 +39,7 @@ public class ArrayFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_scalar()
+    void test_scalar()
     {
         ValueVector actual = scalar.evalScalar(context, TupleVector.CONSTANT, "", asList(intLit(10), intLit(20)));
 
@@ -47,7 +48,7 @@ public class ArrayFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_aggregate()
+    void test_aggregate()
     {
         TupleVector input;
         ValueVector actual;

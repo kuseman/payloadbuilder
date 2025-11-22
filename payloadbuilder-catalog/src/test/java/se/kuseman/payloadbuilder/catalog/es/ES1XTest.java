@@ -1,6 +1,6 @@
 package se.kuseman.payloadbuilder.catalog.es;
 
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.HostPortWaitStrategy;
 import org.testcontainers.utility.DockerImageName;
@@ -8,17 +8,17 @@ import org.testcontainers.utility.DockerImageName;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMeta.Version;
 
 /** Test with elastic search 1X */
-public class ES1XTest extends BaseESTest
+class ES1XTest extends BaseESTest
 {
     private static final String TYPE = "testType";
 
-    public ES1XTest()
+    ES1XTest()
     {
         super(ES.ES_ENDPOINT, TYPE, Version._1X);
     }
 
-    @AfterClass
-    public static void tearDownClass()
+    @AfterAll
+    static void tearDownClass()
     {
         ES.stop();
     }

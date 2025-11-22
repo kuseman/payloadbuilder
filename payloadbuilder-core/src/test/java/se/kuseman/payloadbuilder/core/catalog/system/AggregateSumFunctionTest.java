@@ -1,12 +1,14 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -23,14 +25,14 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link AggregateSumFunction} */
-public class AggregateSumFunctionTest extends APhysicalPlanTest
+class AggregateSumFunctionTest extends APhysicalPlanTest
 {
     IExpression col1 = ce("col1");
     private ScalarFunctionInfo function = SystemCatalog.get()
             .getScalarFunction("sum");
 
     @Test
-    public void test_result_type()
+    void test_result_type()
     {
         IExpression e = ce("col", ResolvedType.of(Type.Int));
         assertEquals(ResolvedType.of(Type.Int), function.getType(asList(e)));
@@ -43,7 +45,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_object()
+    void test_object()
     {
         //@formatter:off
         ValueVector one = VectorTestUtils.vv(Type.Any,
@@ -70,7 +72,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_object_multi_vector()
+    void test_object_multi_vector()
     {
         //@formatter:off
         ValueVector one = VectorTestUtils.vv(Type.Any,
@@ -103,7 +105,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_decimal()
+    void test_decimal()
     {
         //@formatter:off
         ValueVector one = vv(ResolvedType.DECIMAL,
@@ -129,7 +131,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_decimal_multi_vectors()
+    void test_decimal_multi_vectors()
     {
         //@formatter:off
         ValueVector one = vv(ResolvedType.DECIMAL,
@@ -161,7 +163,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_object_scalar()
+    void test_object_scalar()
     {
         ValueVector mediumInts = ValueVector.literalAny(4, 10_000_000);
         Schema schema = schema(new Type[] { Type.Any }, "col1");
@@ -175,7 +177,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_object_scalar_value_vector()
+    void test_object_scalar_value_vector()
     {
         ValueVector smallInts = ValueVector.literalInt(10, 4);
         ValueVector mediumInts = ValueVector.literalInt(10_000_000, 4);
@@ -193,7 +195,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_int()
+    void test_int()
     {
         //@formatter:off
         ValueVector one = vv(Type.Int,
@@ -219,7 +221,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_int_all_null()
+    void test_int_all_null()
     {
         //@formatter:off
         ValueVector one = vv(Type.Int,
@@ -245,7 +247,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_long()
+    void test_long()
     {
         //@formatter:off
         ValueVector one = vv(Type.Long,
@@ -271,7 +273,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_float()
+    void test_float()
     {
         //@formatter:off
         ValueVector one = vv(Type.Float,
@@ -297,7 +299,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_double()
+    void test_double()
     {
         //@formatter:off
         ValueVector one = vv(Type.Double,
@@ -322,19 +324,17 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
         assertVectorsEquals(vv(Type.Double, 40_000_000D, 40D, null), actual);
     }
 
-    @Test(
-            expected = ArithmeticException.class)
-    public void test_long_overflow()
+    @Test
+    void test_long_overflow()
     {
         ValueVector longs = ValueVector.literalLong(Long.MAX_VALUE, Integer.MAX_VALUE);
         TupleVector input = TupleVector.of(Schema.of(Column.of("col1", Type.Long)), List.of(longs));
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(input, vv(Type.Int, 0), vv(ResolvedType.array(Type.Int), vv(Type.Int, 0, 1)), context);
+        assertThrows(ArithmeticException.class, () -> aggregator.appendGroup(input, vv(Type.Int, 0), vv(ResolvedType.array(Type.Int), vv(Type.Int, 0, 1)), context));
     }
 
-    @Test(
-            expected = ArithmeticException.class)
-    public void test_overflow_int()
+    @Test
+    void test_overflow_int()
     {
         //@formatter:off
         ValueVector one = vv(Type.Int,
@@ -347,11 +347,11 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
         TupleVector input = TupleVector.of(Schema.of(Column.of("col1", Type.Int)), List.of(one));
         
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(input, vv(Type.Int, 0, 1, 2), vv(ResolvedType.array(Type.Int),
+        assertThrows(ArithmeticException.class, () -> aggregator.appendGroup(input, vv(Type.Int, 0, 1, 2), vv(ResolvedType.array(Type.Int),
                 vv(Type.Int, 0, 1, 2, 3),
                 vv(Type.Int, 4, 5, 6, 7),
                 vv(Type.Int, 8, 9, 10, 11)),
-                context);
+                context));
         //@formatter:on
     }
 }

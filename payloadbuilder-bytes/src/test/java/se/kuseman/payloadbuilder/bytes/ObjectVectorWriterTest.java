@@ -1,20 +1,20 @@
 package se.kuseman.payloadbuilder.bytes;
 
 import static java.util.stream.Collectors.toList;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 
 /** Test of {@link ObjectVectorWriter} */
-public class ObjectVectorWriterTest extends Assert
+class ObjectVectorWriterTest
 {
     @Test
-    public void test_all_get_methods_are_declared_in_wrapper_vector()
+    void test_all_get_methods_are_declared_in_wrapper_vector()
     {
         List<String> methods = Arrays.stream(Column.Type.values())
                 .map(t -> "get" + t)

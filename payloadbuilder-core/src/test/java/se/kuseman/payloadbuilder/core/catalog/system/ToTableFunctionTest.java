@@ -7,7 +7,7 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.Map;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -23,13 +23,13 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test {@link ToTableFunction} */
-public class ToTableFunctionTest extends APhysicalPlanTest
+class ToTableFunctionTest extends APhysicalPlanTest
 {
     private final ScalarFunctionInfo function = SystemCatalog.get()
             .getScalarFunction("totable");
 
     @Test
-    public void test()
+    void test()
     {
         // "select * from open_map_collection((@col).attribute1.buckets)";
         //@formatter:off
@@ -71,7 +71,7 @@ public class ToTableFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_map()
+    void test_map()
     {
         TupleVector input = TupleVector.of(Schema.of(Column.of("col", ResolvedType.of(Type.Any))), asList(vv(Type.Any, null, ofEntries(entry("key", 123)))));
 
@@ -88,7 +88,7 @@ public class ToTableFunctionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_mixed_values()
+    void test_mixed_values()
     {
         TupleVector input = TupleVector.of(Schema.of(Column.of("col", ResolvedType.of(Type.Any))), asList(vv(Type.Any, vv(Type.Any, 1, true, null, ofEntries(entry("key", 123))))));
 

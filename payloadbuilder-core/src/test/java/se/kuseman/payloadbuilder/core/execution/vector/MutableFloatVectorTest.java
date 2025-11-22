@@ -1,9 +1,10 @@
 package se.kuseman.payloadbuilder.core.execution.vector;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -14,10 +15,10 @@ import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator.Allocator
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link MutableFloatVector} */
-public class MutableFloatVectorTest extends Assert
+class MutableFloatVectorTest
 {
     @Test
-    public void test_literal_creation()
+    void test_literal_creation()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Float), 2);
@@ -31,7 +32,7 @@ public class MutableFloatVectorTest extends Assert
     }
 
     @Test
-    public void test_literal_creation_null()
+    void test_literal_creation_null()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Float), 2);
@@ -47,7 +48,7 @@ public class MutableFloatVectorTest extends Assert
     }
 
     @Test
-    public void test_copy()
+    void test_copy()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Float), 2);
@@ -61,7 +62,7 @@ public class MutableFloatVectorTest extends Assert
     }
 
     @Test
-    public void test_put()
+    void test_put()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Float), 2);
@@ -74,7 +75,7 @@ public class MutableFloatVectorTest extends Assert
     }
 
     @Test
-    public void test_put_1()
+    void test_put_1()
     {
         VectorFactory factory = new VectorFactory(new BufferAllocator(new AllocatorSettings().withBitSize(1)));
         MutableValueVector b = factory.getMutableVector(ResolvedType.of(Column.Type.Float), 2);

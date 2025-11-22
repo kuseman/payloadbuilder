@@ -1,13 +1,14 @@
 package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.stream.Collectors.toList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.List;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -19,14 +20,14 @@ import se.kuseman.payloadbuilder.core.logicalplan.Join;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Test of {@link ColumnOrdinalResolver} */
-public class ColumnOrdinalResolverTest extends ALogicalPlanOptimizerTest
+class ColumnOrdinalResolverTest extends ALogicalPlanOptimizerTest
 {
     private ColumnResolver columnResolver = new ColumnResolver();
     private PredicatePushDown predicatePushDown = new PredicatePushDown();
     private ColumnOrdinalResolver rule = new ColumnOrdinalResolver();
 
     @Test
-    public void test_join_and_surrounding_filter_schema_full()
+    void test_join_and_surrounding_filter_schema_full()
     {
         //@formatter:off
         String query =""
