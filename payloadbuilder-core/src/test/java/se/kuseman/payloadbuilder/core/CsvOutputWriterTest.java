@@ -3,11 +3,17 @@ package se.kuseman.payloadbuilder.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.StringWriter;
+import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Test;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Option;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.core.CsvOutputWriter.CsvSettings;
+import se.kuseman.payloadbuilder.core.expression.LiteralNullExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 
 /** Test of {@link CsvOutputWriter} */
 class CsvOutputWriterTest
@@ -174,6 +180,28 @@ class CsvOutputWriterTest
                 .close();
         assertEquals("", p.getKey()
                 .toString());
+    }
+
+    @Test
+    void test_settings_from_options()
+    {
+        CsvSettings settings = CsvSettings.fromOptions(null, List.of());
+
+        settings = CsvSettings.fromOptions(null, List.of(new Option(QualifiedName.of("separatorchar"), new LiteralStringExpression(""))));
+        assertEquals(',', settings.getSeparatorChar());
+        settings = CsvSettings.fromOptions(null, List.of(new Option(QualifiedName.of("separatorchar"), new LiteralNullExpression(ResolvedType.STRING))));
+        assertEquals(',', settings.getSeparatorChar());
+        settings = CsvSettings.fromOptions(null, List.of(new Option(QualifiedName.of("separatorchar"), new LiteralStringExpression(";"))));
+        assertEquals(';', settings.getSeparatorChar());
+        settings = CsvSettings.fromOptions(null, List.of(new Option(QualifiedName.of("columnseparator"), new LiteralStringExpression("%"))));
+        assertEquals('%', settings.getSeparatorChar());
+
+        settings = CsvSettings.fromOptions(null, List.of(new Option(QualifiedName.of("escapechar"), new LiteralStringExpression(""))));
+        assertEquals('\\', settings.getEscapeChar());
+        settings = CsvSettings.fromOptions(null, List.of(new Option(QualifiedName.of("escapechar"), new LiteralNullExpression(ResolvedType.STRING))));
+        assertEquals('\\', settings.getEscapeChar());
+        settings = CsvSettings.fromOptions(null, List.of(new Option(QualifiedName.of("escapechar"), new LiteralStringExpression(";"))));
+        assertEquals(';', settings.getEscapeChar());
     }
 
     private Pair<StringWriter, CsvOutputWriter> writer(CsvSettings settings)

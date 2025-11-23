@@ -863,14 +863,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -926,14 +926,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -1553,14 +1553,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -1626,14 +1626,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -1693,14 +1693,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -1746,14 +1746,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -1799,14 +1799,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(Map.of(QualifiedName.of("tableB"), Set.of("col", "col2")))
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -1856,14 +1856,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(Map.of(QualifiedName.of("tableB"), Set.of("col", "col2")))
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, emptyList(), ColumnsType.WILDCARD)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -1913,14 +1913,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(Map.of(QualifiedName.of("tableB"), Set.of("col", "col2")))
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, List.of("COL"), ColumnsType.ALL)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -1972,14 +1972,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(Map.of(QualifiedName.of("tableB"), Set.of("col", "col2")))
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -2037,14 +2037,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(Map.of(QualifiedName.of("tableB"), Set.of("col", "col2")))
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(index));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -2098,14 +2098,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -2169,7 +2169,7 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
@@ -2181,7 +2181,7 @@ class QueryPlannerTest extends APhysicalPlanTest
                             new Index(table, asList("col", "active"), ColumnsType.ALL)));
                     //@formatter:on
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -2245,7 +2245,7 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
@@ -2255,7 +2255,7 @@ class QueryPlannerTest extends APhysicalPlanTest
                             new Index(table, asList(), ColumnsType.WILDCARD)));
                     //@formatter:on
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -2324,14 +2324,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col", "col2"), ColumnsType.ALL)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -2399,7 +2399,7 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 String tbl = table.toString();
                 if (tbl.equalsIgnoreCase("tableB"))
@@ -2410,7 +2410,7 @@ class QueryPlannerTest extends APhysicalPlanTest
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);
@@ -2516,14 +2516,14 @@ class QueryPlannerTest extends APhysicalPlanTest
         TestCatalog t = new TestCatalog(emptyMap())
         {
             @Override
-            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
             {
                 if (table.toString()
                         .equalsIgnoreCase("tableB"))
                 {
                     return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col", "col2"), ColumnsType.ANY_IN_ORDER)));
                 }
-                return super.getTableSchema(session, catalogAlias, table, options);
+                return super.getTableSchema(context, catalogAlias, table, options);
             }
         };
         catalogRegistry.registerCatalog("t", t);

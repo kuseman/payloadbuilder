@@ -601,7 +601,7 @@ class TestHarnessRunner
         }
 
         @Override
-        public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+        public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
         {
             // Verify that catalogAlias is provided and is not empty in case of session default catalog
             assertTrue(isNotBlank(catalogAlias), "catalogAlias should not be empty");

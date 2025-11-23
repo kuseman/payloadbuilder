@@ -1,6 +1,8 @@
 package se.kuseman.payloadbuilder.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.StringReader;
@@ -8,13 +10,19 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Test;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Option;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.core.JsonOutputWriter.JsonSettings;
+import se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralNullExpression;
 
 /** Test of {@link JsonOutputWriter} */
 class JsonOutputWriterTest
@@ -470,6 +478,19 @@ class JsonOutputWriterTest
 
         assertEquals("{\"col1\":1,\"col2\":\"value with, comma\",\"col3\":2,\"col4\":\"value with\",\"col5\":12.12,\"col6\":\"Hello\"}", p.getKey()
                 .toString());
+    }
+
+    @Test
+    void test_settings_from_options()
+    {
+        JsonSettings settings = JsonSettings.fromOptions(null, List.of());
+
+        settings = JsonSettings.fromOptions(null, List.of(new Option(QualifiedName.of("prettyPRINT"), LiteralBooleanExpression.FALSE)));
+        assertFalse(settings.isPrettyPrint());
+        settings = JsonSettings.fromOptions(null, List.of(new Option(QualifiedName.of("prettyPrint"), new LiteralNullExpression(ResolvedType.BOOLEAN))));
+        assertFalse(settings.isPrettyPrint());
+        settings = JsonSettings.fromOptions(null, List.of(new Option(QualifiedName.of("prettyprint"), LiteralBooleanExpression.TRUE)));
+        assertTrue(settings.isPrettyPrint());
     }
 
     private Pair<StringWriter, JsonOutputWriter> writer(JsonSettings settings)

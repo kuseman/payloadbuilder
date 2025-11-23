@@ -4,11 +4,15 @@ import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
+import java.io.OutputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.VectorWriter;
 import se.kuseman.payloadbuilder.api.execution.vector.IVectorFactory;
 import se.kuseman.payloadbuilder.api.expression.IExpressionFactory;
 import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
@@ -70,6 +74,31 @@ public class ExecutionContext implements IExecutionContext
         return expressionFactory;
     }
 
+    /** Get variable from context */
+    @Override
+    public ValueVector getVariableValue(String name)
+    {
+        return variables != null ? variables.get(name)
+                : null;
+    }
+
+    @Override
+    public StatementContext getStatementContext()
+    {
+        return statementContext;
+    }
+
+    @Override
+    public VectorWriter getVectorWriter(VectorWriterFormat format, OutputStream outputStream, List<Option> options)
+    {
+        return switch (format)
+        {
+            case CSV -> new CsvVectorWriter(this, outputStream, options);
+            case JSON -> new JsonVectorWriter(this, outputStream, options);
+            case TEXT -> new TextVectorWriter(this, outputStream, options);
+        };
+    }
+
     public BufferAllocator getBufferAllocator()
     {
         return vectorFactory.getAllocator();
@@ -89,20 +118,6 @@ public class ExecutionContext implements IExecutionContext
             variables = new HashMap<>();
         }
         variables.put(name, value);
-    }
-
-    /** Get variable from context */
-    @Override
-    public ValueVector getVariableValue(String name)
-    {
-        return variables != null ? variables.get(name)
-                : null;
-    }
-
-    @Override
-    public StatementContext getStatementContext()
-    {
-        return statementContext;
     }
 
     public String getVersionString()
