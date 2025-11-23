@@ -9,6 +9,7 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals
 import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -95,6 +96,26 @@ abstract class ASqlServerTest extends BaseJDBCTest
             //@formatter:on
         }
         it.close();
+
+        // Test drop table non lenient
+        catalog.dropTable(context.getSession(), CATALOG_ALIAS, tableName, false);
+
+        try (Connection con = datasource.getConnection(); PreparedStatement stm = con.prepareStatement("""
+                SELECT COUNT(1)
+                FROM sys.tables
+                WHERE name = 'test_table'
+                """))
+        {
+            stm.execute();
+            try (ResultSet rs = stm.getResultSet())
+            {
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1));
+            }
+        }
+
+        // Test drop table with lenient, should not crash
+        catalog.dropTable(context.getSession(), CATALOG_ALIAS, tableName, true);
     }
 
     @Override

@@ -288,6 +288,8 @@ public interface SqlDialect
             case DateTimeOffset -> "TIMESTAMP WITH TIME ZONE";
             case String -> "VARCHAR(%s)".formatted(precision < 0 ? "MAX"
                     : precision);
+            // Convert all any values to max varchars
+            case Any -> "VARCHAR(MAX)";
             default -> throw new IllegalArgumentException("Type: " + type + " is not supported.");
         };
     }

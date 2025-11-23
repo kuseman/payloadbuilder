@@ -64,6 +64,10 @@ class PostgreDialect implements SqlDialect
         {
             return "TEXT";
         }
+        else if (type == Type.Any)
+        {
+            return "TEXT";
+        }
         else if (type == Type.DateTimeOffset)
         {
             return TIMESTAMPTZ;

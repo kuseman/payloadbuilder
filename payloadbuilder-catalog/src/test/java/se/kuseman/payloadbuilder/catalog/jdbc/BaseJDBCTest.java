@@ -91,6 +91,7 @@ abstract class BaseJDBCTest
     private static final String DECIMAL_COL = "decimalCol";
     private static final String DATETIME_COL = "dateTimeCol";
     private static final String DATETIMEOFFSET_COL = "dateTimeOffsetCol";
+    private static final String ANY_COL = "anyCol";
 
     protected final DataSource datasource;
     private final String jdbcUrl;
@@ -170,6 +171,11 @@ abstract class BaseJDBCTest
         return getColumn(Type.String, name, precision, 0);
     }
 
+    protected Column getAnyColumn(String name)
+    {
+        return getColumn(Type.Any, name, -1, 0);
+    }
+
     protected Column getColumn(Type type, String name, int precision, int scale)
     {
         switch (type)
@@ -183,6 +189,7 @@ abstract class BaseJDBCTest
             case DateTime:
             case DateTimeOffset:
             case String:
+            case Any:
                 return Column.of(name, type, new Column.MetaData(Map.of(PRECISION, precision, NULLABLE, true, SCALE, scale)));
             default:
                 throw new IllegalArgumentException("Unsupported type: " + type);
@@ -211,7 +218,9 @@ abstract class BaseJDBCTest
                 getDecimalColumn(DECIMAL_COL),
                 getDateTimeColumn(DATETIME_COL),
                 getDateTimeOffsetColumn(DATETIMEOFFSET_COL),
-                getStringColumn(STRINGMAX_COL, -1)
+                getStringColumn(STRINGMAX_COL, -1),
+                // NOTE! Since ANY are converted to VARCHAR(MAX) we need to set correct type here
+                getStringColumn(ANY_COL, -1)
                 );
 
         expectedFullSchema = new Schema(columns);
@@ -236,7 +245,8 @@ abstract class BaseJDBCTest
                 Column.of(DECIMAL_COL, Type.Decimal, new Column.MetaData(Map.of(MetaData.PRECISION, 19, MetaData.SCALE, 4))),
                 Column.of(DATETIME_COL, Type.DateTime),
                 Column.of(DATETIMEOFFSET_COL, Type.DateTimeOffset),
-                Column.of(STRINGMAX_COL, Type.String, new Column.MetaData(Map.of(MetaData.PRECISION, -1)))
+                Column.of(STRINGMAX_COL, Type.String, new Column.MetaData(Map.of(MetaData.PRECISION, -1))),
+                Column.of(ANY_COL, Type.Any, new Column.MetaData(Map.of(MetaData.PRECISION, -1)))
                 );
 
         TupleVector testData = TupleVector.of(testDataSchema, List.of(
@@ -249,7 +259,8 @@ abstract class BaseJDBCTest
                 VectorTestUtils.vv(Type.Decimal, bd("1000.1111"), bd("2000.2222"), bd("3000.3333"), bd("4000.4444"), bd("5000.5555")),
                 VectorTestUtils.vv(Type.DateTime, ldt("2010-07-10T10:10:10"), ldt("2011-08-11T11:11:11"), ldt("2012-09-12T12:12:12"), ldt("2013-10-13T13:13:13"), ldt("2014-11-14T14:14:14")),
                 VectorTestUtils.vv(Type.DateTimeOffset, zdt("2010-07-10T10:10:10+00:00"), zdt("2011-08-11T11:11:11+01:00"), zdt("2012-09-12T12:12:12+02:00"), zdt("2013-10-13T13:13:13+03:00"), zdt("2014-11-14T14:14:14+04:00")),
-                VectorTestUtils.vv(Type.String, "m_oöe", "m_two", "m_three", "m_four", "m_five")
+                VectorTestUtils.vv(Type.String, "m_oöe", "m_two", "m_three", "m_four", "m_five"),
+                VectorTestUtils.vv(Type.Any, 1, true, "three", 4.0F, bd("5.55"))
                 ));
         //@formatter:on
         // CSON
@@ -484,6 +495,7 @@ abstract class BaseJDBCTest
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(8), zdt("2010-07-10T10:10:10+00:00"), zdt("2011-08-11T11:11:11+01:00"), zdt("2012-09-12T12:12:12+02:00"),
                     zdt("2013-10-13T13:13:13+03:00"), zdt("2014-11-14T14:14:14+04:00")), v.getColumn(8));
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(9), "m_oöe", "m_two", "m_three", "m_four", "m_five"), v.getColumn(9));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(10), "1", "true", "three", "4.0", "5.55"), v.getColumn(10));
             // CSON
             rowCount += v.getRowCount();
         }
@@ -532,6 +544,7 @@ abstract class BaseJDBCTest
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(8), zdt("2010-07-10T10:10:10+00:00"), zdt("2011-08-11T11:11:11+01:00"), zdt("2012-09-12T12:12:12+02:00"),
                     zdt("2013-10-13T13:13:13+03:00"), zdt("2014-11-14T14:14:14+04:00"), null, null, null), v.getColumn(8));
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(9), "m_oöe", "m_two", "m_three", "m_four", "m_five", null, null, null), v.getColumn(9));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(10), "1", "true", "three", "4.0", "5.55", null, null, null), v.getColumn(10));
             // CSON
             rowCount += v.getRowCount();
         }
@@ -622,6 +635,7 @@ abstract class BaseJDBCTest
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(8), zdt("2014-11-14T14:14:14+04:00"), zdt("2013-10-13T13:13:13+03:00"), zdt("2012-09-12T12:12:12+02:00"),
                     zdt("2011-08-11T11:11:11+01:00"), zdt("2010-07-10T10:10:10+00:00")), v.getColumn(8));
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(9), "m_five", "m_four", "m_three", "m_two", "m_oöe"), v.getColumn(9));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(10), "5.55", "4.0", "three", "true", "1"), v.getColumn(10));
             // CSON
             rowCount += v.getRowCount();
         }
@@ -660,6 +674,7 @@ abstract class BaseJDBCTest
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(7), "2013-10-13T13:13:13", "2010-07-10T10:10:10"), v.getColumn(7));
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(8), zdt("2013-10-13T13:13:13+03:00"), zdt("2010-07-10T10:10:10+00:00")), v.getColumn(8));
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(9), "m_four", "m_oöe"), v.getColumn(9));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(10), "4.0", "1"), v.getColumn(10));
             rowCount += v.getRowCount();
         }
         it.close();
@@ -697,6 +712,7 @@ abstract class BaseJDBCTest
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(8), zdt("2014-11-14T14:14:14+04:00"), zdt("2012-09-12T12:12:12+02:00"), zdt("2010-07-10T10:10:10+00:00")),
                     v.getColumn(8));
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(9), "m_five", "m_three", "m_oöe"), v.getColumn(9));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(10), "5.55", "three", "1"), v.getColumn(10));
             rowCount += v.getRowCount();
         }
         it.close();
@@ -733,6 +749,7 @@ abstract class BaseJDBCTest
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(7), "2010-07-10T10:10:10"), v.getColumn(7));
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(8), zdt("2010-07-10T10:10:10+00:00")), v.getColumn(8));
             assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(9), "m_oöe"), v.getColumn(9));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(10), "1"), v.getColumn(10));
             rowCount += v.getRowCount();
         }
         it.close();

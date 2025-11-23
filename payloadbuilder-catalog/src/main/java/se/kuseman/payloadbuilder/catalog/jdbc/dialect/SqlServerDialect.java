@@ -62,6 +62,10 @@ class SqlServerDialect implements SqlDialect
                     : precision)
                    + ")";
         }
+        else if (type == Type.Any)
+        {
+            return "NVARCHAR(MAX)";
+        }
         return SqlDialect.super.getColumnDeclaration(type, scale, precision);
     }
 
