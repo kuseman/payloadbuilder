@@ -29,6 +29,7 @@ import se.kuseman.payloadbuilder.api.execution.NodeData;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
+import se.kuseman.payloadbuilder.core.execution.ExpressionFactory;
 import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
 import se.kuseman.payloadbuilder.core.execution.vector.VectorFactory;
 
@@ -76,6 +77,7 @@ public final class TestUtils
         when(context.getSession()).thenReturn(session);
         when(context.getStatementContext()).thenReturn(statementContext);
         when(context.getVectorFactory()).thenReturn(new VectorFactory(new BufferAllocator()));
+        when(context.getExpressionFactory()).thenReturn(new ExpressionFactory());
         when(statementContext.getOrCreateNodeData(eq(nodeId), any(Supplier.class))).thenReturn(data);
 
         when(session.getGenericCache()).thenReturn(new GenericCache()

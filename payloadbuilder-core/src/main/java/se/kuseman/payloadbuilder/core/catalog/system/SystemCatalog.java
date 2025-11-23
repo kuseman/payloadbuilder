@@ -504,14 +504,14 @@ public class SystemCatalog extends Catalog
     }
 
     @Override
-    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+    public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
     {
         // Temporary table
         if ("#".equals(table.getFirst()))
         {
             table = table.extract(1)
                     .toLowerCase();
-            TableSchema tableSchema = ((QuerySession) session).getTemporaryTableSchema(table);
+            TableSchema tableSchema = ((QuerySession) context.getSession()).getTemporaryTableSchema(table);
             if (tableSchema == null)
             {
                 throw new QueryException("No temporary table found with name #" + table);
@@ -526,7 +526,7 @@ public class SystemCatalog extends Catalog
         }
 
         int size = table.size();
-        QuerySession querySession = (QuerySession) session;
+        QuerySession querySession = (QuerySession) context.getSession();
         String targetCatalogAlias;
         Catalog catalog;
         if (size == 1)

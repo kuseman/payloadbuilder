@@ -70,7 +70,7 @@ public abstract class Catalog
      * @deprecated Use {@link #getTableSchema(IExecutionContext, String, QualifiedName, List)} instead
      */
     @Deprecated
-    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
+    public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table)
     {
         return TableSchema.EMPTY;
     }
@@ -78,9 +78,9 @@ public abstract class Catalog
     /**
      * Return the table schema information for provided table.
      */
-    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+    public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
     {
-        return getTableSchema(session, catalogAlias, table);
+        return getTableSchema(context, catalogAlias, table);
     }
 
     /** Create a scan {@link IDatasource} for provided table */
