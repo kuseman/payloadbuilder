@@ -46,6 +46,10 @@ class MySqlMariaDbDialect implements SqlDialect
             return precision < 0 ? "LONGTEXT"
                     : "VARCHAR(%s)".formatted(precision);
         }
+        else if (type == Type.Any)
+        {
+            return "LONGTEXT";
+        }
         // These dialects doesn't have any support for offset timestamps
         // so use plain datetime with UTC
         else if (type == Type.DateTimeOffset)

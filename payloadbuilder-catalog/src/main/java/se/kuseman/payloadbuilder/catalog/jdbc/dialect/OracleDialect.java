@@ -90,6 +90,10 @@ class OracleDialect implements SqlDialect
             return precision < 0 ? "CLOB"
                     : "VARCHAR2(" + precision + ")";
         }
+        else if (type == Type.Any)
+        {
+            return "CLOB";
+        }
         return SqlDialect.super.getColumnDeclaration(type, scale, precision);
     }
 
