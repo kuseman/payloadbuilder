@@ -124,11 +124,11 @@ public class ESCatalog extends Catalog
     }
 
     @Override
-    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+    public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
     {
-        ESType esType = ESType.of(session, catalogAlias, table);
+        ESType esType = ESType.of(context.getSession(), catalogAlias, table);
         // All indexed non-free-text fields are index candidates
-        Map<String, MappedType> mappedTypes = getMeta(session, catalogAlias, esType.endpoint, esType.index).getMappedTypes();
+        Map<String, MappedType> mappedTypes = getMeta(context.getSession(), catalogAlias, esType.endpoint, esType.index).getMappedTypes();
         Map<QualifiedName, MappedProperty> properties = Optional.ofNullable(mappedTypes.get(esType.type))
                 .map(m -> m.properties)
                 .orElse(emptyMap());

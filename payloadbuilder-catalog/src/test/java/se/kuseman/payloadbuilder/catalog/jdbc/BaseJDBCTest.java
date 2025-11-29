@@ -795,7 +795,7 @@ abstract class BaseJDBCTest
     private ISeekPredicate mockSeekPrecidate(IExecutionContext context, List<String> columns, List<Object[]> values)
     {
         // Fetch indices and extract the one on key field
-        TableSchema tableSchema = catalog.getTableSchema(context.getSession(), CATALOG_ALIAS, TEST_TABLE, emptyList());
+        TableSchema tableSchema = catalog.getTableSchema(context, CATALOG_ALIAS, TEST_TABLE, emptyList());
         Index index = tableSchema.getIndices()
                 .get(0);
 

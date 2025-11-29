@@ -55,6 +55,7 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.SelectIntoData;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
@@ -99,7 +100,7 @@ public class JdbcCatalog extends Catalog
     }
 
     @Override
-    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+    public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
     {
         Schema schema = Schema.EMPTY;
         Projection projection = getOptionProjection(options);

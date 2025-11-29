@@ -1,369 +1,311 @@
 package se.kuseman.payloadbuilder.catalog.fs;
 
+import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.upperCase;
+
 import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystems;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Arrays;
 import java.util.List;
-import java.util.NoSuchElementException;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
-import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.CompileException;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
+import se.kuseman.payloadbuilder.api.catalog.IDatasink;
+import se.kuseman.payloadbuilder.api.catalog.IDatasource;
+import se.kuseman.payloadbuilder.api.catalog.InsertIntoData;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.SelectIntoData;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
-import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo.FunctionData;
+import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext.VectorWriterFormat;
+import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 
 /** Catalog providing file system functionality */
 public class FilesystemCatalog extends Catalog
 {
-    //@formatter:off
-    private static final Schema SCHEMA = Schema.of(
-            Column.of("name", ResolvedType.of(Type.String)),
-            Column.of("path", ResolvedType.of(Type.String)),
-            Column.of("size", ResolvedType.of(Type.Long)),
-            Column.of("exists", ResolvedType.of(Type.Boolean)),
-            Column.of("creationTime", ResolvedType.of(Type.DateTime)),
-            Column.of("lastAccessTime", ResolvedType.of(Type.DateTime)),
-            Column.of("lastModifiedTime", ResolvedType.of(Type.DateTime)),
-            Column.of("isDirectory", ResolvedType.of(Type.Boolean)));
-    //@formatter:on
+    private static final String NAME = "Filesystem";
+
+    /** Table option to force file format if filename is not enough. */
+    static final QualifiedName FORMAT = QualifiedName.of("format");
 
     /** Construct a new file system catalog */
     public FilesystemCatalog()
     {
-        super("Filesystem");
+        super(NAME);
         registerFunction(new ListFunction());
         registerFunction(new FileFunction());
         registerFunction(new ContentsFunction());
     }
 
-    /** File function */
-    private static class FileFunction extends TableFunctionInfo
+    @Override
+    public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
     {
-        FileFunction()
+        if (table.size() != 1)
         {
-            super("file");
+            throw new CompileException("Tables qualifiers for " + NAME + " only supports one part.");
         }
 
-        @Override
-        public Schema getSchema(List<IExpression> arguments)
-        {
-            return SCHEMA;
-        }
+        ReadResolveResult resolveResult = resolveForRead(context, catalogAlias, table, options);
 
-        @Override
-        public Arity arity()
-        {
-            return Arity.ONE;
-        }
-
-        @Override
-        public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
-        {
-            ValueVector value = arguments.get(0)
-                    .eval(context);
-            if (value.isNull(0))
-            {
-                return TupleIterator.EMPTY;
-            }
-            String strPath = value.valueAsString(0);
-            Path path = FileSystems.getDefault()
-                    .getPath(strPath);
-            Object[] values = ListFunction.fromPath(path);
-            return TupleIterator.singleton(new ObjectTupleVector(SCHEMA, 1, (row, col) -> values[col]));
-        }
+        // NOTE! We send in the filename as the argument here which is wrong but ok for the get schema function
+        // that should never have the actual contents anyways.
+        Schema schema = resolveResult.tableFunction.getSchema(context, catalogAlias, List.of(context.getExpressionFactory()
+                .createStringExpression(UTF8String.from(resolveResult.filename))), resolveResult.options);
+        return new TableSchema(schema);
     }
 
-    /** Contents function, outputs path contents as string */
-    private static class ContentsFunction extends ScalarFunctionInfo
+    @Override
+    public void dropTable(IQuerySession session, String catalogAlias, QualifiedName table, boolean lenient)
     {
-        ContentsFunction()
+        if (table.size() != 1)
         {
-            super("contents", FunctionType.SCALAR);
+            throw new IllegalArgumentException("Tables qualifiers for " + NAME + " only supports one part.");
         }
 
-        @Override
-        public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+        String filename = getFilename(session, catalogAlias, table);
+        Path path = Paths.get(filename);
+        boolean exists = Files.exists(path);
+        if (lenient
+                && !exists)
         {
-            final ValueVector value = arguments.get(0)
-                    .eval(input, context);
-            final int size = input.getRowCount();
-            return new ValueVector()
-            {
-                @Override
-                public ResolvedType type()
-                {
-                    return ResolvedType.of(Type.Any);
-                }
-
-                @Override
-                public int size()
-                {
-                    return size;
-                }
-
-                @Override
-                public boolean isNull(int row)
-                {
-                    return value.isNull(row);
-                }
-
-                @Override
-                public Object getAny(int row)
-                {
-                    String strPath = String.valueOf(value.getString(row)
-                            .toString());
-                    try
-                    {
-                        Path path = FileSystems.getDefault()
-                                .getPath(strPath);
-                        return new FSInputStream(path.toFile());
-                    }
-                    catch (IOException e)
-                    {
-                        throw new RuntimeException("Error reading contents from: " + strPath, e);
-                    }
-                }
-            };
+            return;
         }
+        else if (!exists
+                || !Files.isRegularFile(path))
+        {
+            throw new IllegalArgumentException("Path does not exists or is not a file: " + path);
+        }
+
+        FileUtils.deleteQuietly(path.toFile());
     }
 
-    static class FSInputStream extends BufferedInputStream
+    @Override
+    public IDatasource getScanDataSource(IQuerySession session, String catalogAlias, QualifiedName table, DatasourceData data)
     {
-        private final File file;
-
-        public FSInputStream(File file) throws FileNotFoundException
+        if (table.size() != 1)
         {
-            super(new FileInputStream(file));
-            this.file = file;
+            throw new IllegalArgumentException("Tables qualifiers for " + NAME + " only supports one part.");
         }
 
-        @Override
-        public String toString()
+        return new IDatasource()
         {
-            // Fallback to read the file to string for operators and functions not supporting a reader
-            try
+            @Override
+            public TupleIterator execute(IExecutionContext context)
             {
-                return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
-            }
-            catch (IOException e)
-            {
-                throw new RuntimeException("Error reading file contents to string", e);
-            }
-        }
-    }
+                ReadResolveResult resolveResult = resolveForRead(context, catalogAlias, table, data.getOptions());
 
-    /** List function. Traverses a path */
-    private static class ListFunction extends TableFunctionInfo
-    {
-        ListFunction()
-        {
-            super("list");
-        }
-
-        @Override
-        public Schema getSchema(List<IExpression> arguments)
-        {
-            return SCHEMA;
-        }
-
-        @Override
-        public TupleIterator execute(IExecutionContext context, String catalogAlias, List<IExpression> arguments, FunctionData data)
-        {
-            ValueVector value = arguments.get(0)
-                    .eval(context);
-            if (value.isNull(0))
-            {
-                return TupleIterator.EMPTY;
-            }
-
-            String path = String.valueOf(value.getString(0)
-                    .toString());
-
-            boolean recursive = false;
-            if (arguments.size() > 1)
-            {
-                value = arguments.get(1)
-                        .eval(context);
-                // We treat null as false here
-                recursive = value.getPredicateBoolean(0);
-            }
-
-            final Iterator<Path> it = getIterator(path, recursive);
-
-            final int batchSize = context.getBatchSize(data.getOptions());
-
-            return new TupleIterator()
-            {
-                TupleVector next;
-                int count = 0;
-
-                @Override
-                public TupleVector next()
+                InputStream fis = getFileInputStream(resolveResult.filename);
+                IExpression arg = new IExpression()
                 {
-                    if (next == null)
+                    @Override
+                    public ResolvedType getType()
                     {
-                        throw new NoSuchElementException();
+                        return ResolvedType.ANY;
                     }
-                    TupleVector result = next;
-                    next = null;
-                    count = 0;
-                    return result;
-                }
 
-                @Override
-                public boolean hasNext()
-                {
-                    return setNext();
-                }
-
-                private boolean setNext()
-                {
-                    while (next == null)
+                    @Override
+                    public ValueVector eval(TupleVector input, IExecutionContext context)
                     {
-                        List<Object[]> batch = new ArrayList<>(batchSize);
-                        while (it.hasNext()
-                                && count < batchSize)
+                        return ValueVector.literalAny(1, fis);
+                    }
+
+                    @Override
+                    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+                    {
+                        throw new RuntimeException("Cannot be visited");
+                    }
+                };
+
+                TupleIterator iterator = resolveResult.tableFunction.execute(context, catalogAlias, List.of(arg), new FunctionData(-1, resolveResult.options));
+                return new TupleIterator()
+                {
+                    @Override
+                    public TupleVector next()
+                    {
+                        return iterator.next();
+                    }
+
+                    @Override
+                    public boolean hasNext()
+                    {
+                        return iterator.hasNext();
+                    }
+
+                    @Override
+                    public void close()
+                    {
+                        iterator.close();
+                        try
                         {
-                            batch.add(fromPath(it.next()));
-                            count++;
+                            fis.close();
                         }
-
-                        if (batch.isEmpty())
+                        catch (IOException e)
                         {
-                            return false;
+                            throw new RuntimeException("Error closing file input stream", e);
                         }
-
-                        next = new TupleVector()
-                        {
-                            @Override
-                            public Schema getSchema()
-                            {
-                                return SCHEMA;
-                            }
-
-                            @Override
-                            public int getRowCount()
-                            {
-                                return batch.size();
-                            }
-
-                            @Override
-                            public ValueVector getColumn(int column)
-                            {
-                                return new ValueVector()
-                                {
-                                    @Override
-                                    public ResolvedType type()
-                                    {
-                                        return SCHEMA.getColumns()
-                                                .get(column)
-                                                .getType();
-                                    }
-
-                                    @Override
-                                    public int size()
-                                    {
-                                        return batch.size();
-                                    }
-
-                                    @Override
-                                    public boolean isNull(int row)
-                                    {
-                                        return batch.get(row)[column] == null;
-                                    }
-
-                                    @Override
-                                    public Object getAny(int row)
-                                    {
-                                        return batch.get(row)[column];
-                                    }
-                                };
-                            }
-                        };
                     }
-                    return true;
-                }
-            };
+                };
+
+            }
+        };
+    }
+
+    @Override
+    public IDatasink getSelectIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, SelectIntoData data)
+    {
+        return new InsertSink(this, catalogAlias, table, data.getOptions(), emptyList());
+    }
+
+    @Override
+    public IDatasink getInsertIntoSink(IQuerySession session, String catalogAlias, QualifiedName table, InsertIntoData data)
+    {
+        return new InsertSink(this, catalogAlias, table, data.getOptions(), data.getInsertColumns());
+    }
+
+    private InputStream getFileInputStream(String filename)
+    {
+        try
+        {
+            return new BufferedInputStream(Files.newInputStream(Path.of(filename)));
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error creating file input stream", e);
+        }
+    }
+
+    record ReadResolveResult(String filename, Format format, TableFunctionInfo tableFunction, List<Option> options)
+    {
+    }
+
+    record WriteResolveResult(String filename, IExecutionContext.VectorWriterFormat format, List<Option> options)
+    {
+    }
+
+    private String getFilename(IQuerySession session, String catalogAlias, QualifiedName table)
+    {
+        String filename = table.getFirst();
+        // First try to see if there is a catalog property for the table (file)
+        // this to be able to use files without hard coding
+        ValueVector vector = session.getCatalogProperty(catalogAlias, filename);
+        if (vector != null
+                && !vector.isNull(0))
+        {
+            filename = vector.valueAsString(0);
+        }
+        return filename;
+    }
+
+    WriteResolveResult resolveForWrite(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
+    {
+        String filename = getFilename(context.getSession(), catalogAlias, table);
+        IExecutionContext.VectorWriterFormat type;
+        ValueVector format = context.getOption(FORMAT, options);
+        if (format != null
+                && !format.isNull(0))
+        {
+            type = IExecutionContext.VectorWriterFormat.valueOf(upperCase(format.valueAsString(0)));
+        }
+        else
+        {
+            String extension = FilenameUtils.getExtension(filename);
+            if ("CSV".equalsIgnoreCase(extension))
+            {
+                type = VectorWriterFormat.CSV;
+            }
+            else if ("JSON".equalsIgnoreCase(extension))
+            {
+                type = VectorWriterFormat.JSON;
+            }
+            else if ("TXT".equalsIgnoreCase(extension))
+            {
+                type = VectorWriterFormat.TEXT;
+            }
+            else
+            {
+                // Write as text as fallback
+                type = VectorWriterFormat.TEXT;
+            }
         }
 
-        static Object[] fromPath(Path path)
-        {
-            long creationTime = 0;
-            long lastAccessTime = 0;
-            long lastModifiedTime = 0;
-            boolean isDirectory = false;
-            long size = 0;
-            try
-            {
-                BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
-                creationTime = attr.creationTime()
-                        .toMillis();
-                lastAccessTime = attr.lastAccessTime()
-                        .toMillis();
-                lastModifiedTime = attr.lastModifiedTime()
-                        .toMillis();
-                isDirectory = attr.isDirectory();
-                size = attr.size();
-            }
-            catch (IOException e)
-            {
-                e.printStackTrace();
-            }
+        return new WriteResolveResult(filename, type, options);
+    }
 
-            //@formatter:off
-            Object[] values = new Object[] {
-                    UTF8String.from(path.getFileName().toString()),
-                    path.getParent() != null ? UTF8String.from(path.getParent().toString()): null,
-                    size,
-                    Files.exists(path),
-                    EpochDateTime.from(creationTime),
-                    EpochDateTime.from(lastAccessTime),
-                    EpochDateTime.from(lastModifiedTime),
-                    isDirectory };
-            //@formatter:on
-            return values;
+    ReadResolveResult resolveForRead(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
+    {
+        String filename = getFilename(context.getSession(), catalogAlias, table);
+        Format type;
+        ValueVector format = context.getOption(FORMAT, options);
+        if (format != null
+                && !format.isNull(0))
+        {
+            type = Format.valueOf(upperCase(format.valueAsString(0)));
+        }
+        else
+        {
+            type = Format.from(FilenameUtils.getExtension(filename));
+            if (type == null)
+            {
+                // Fallback to CSV with a value column, this will return the file row by row
+                type = Format.CSV;
+                options = new ArrayList<>(options);
+                // NOTE! This is a hard coded string from opencsv function that is kind of magic here but will do.
+                options.add(0, new Option(QualifiedName.of("columnHeaders"), context.getExpressionFactory()
+                        .createStringExpression(UTF8String.from("value"))));
+                options.add(0, new Option(QualifiedName.of("columnSeparator"), context.getExpressionFactory()
+                        .createStringExpression(UTF8String.from("\0"))));
+            }
         }
 
-        private Iterator<Path> getIterator(String strPath, boolean recursive)
-        {
-            try
-            {
-                Path path = FileSystems.getDefault()
-                        .getPath(strPath);
-                if (recursive)
-                {
-                    return Files.walk(path)
-                            .iterator();
-                }
+        TableFunctionInfo tableFunction = context.getSession()
+                .getSystemCatalog()
+                .getTableFunction(type.systemFunction);
 
-                return Files.newDirectoryStream(path)
-                        .iterator();
-            }
-            catch (IOException e)
-            {
-                throw new RuntimeException("Error streaming directory " + strPath, e);
-            }
+        return new ReadResolveResult(filename, type, tableFunction, options);
+    }
+
+    enum Format
+    {
+        JSON("OPENJSON"),
+        CSV("OPENCSV"),
+        XML("OPENXML");
+
+        private static final Format[] VALUES = Format.values();
+        private final String systemFunction;
+
+        Format(String systemFunction)
+        {
+            this.systemFunction = requireNonNull(systemFunction);
+        }
+
+        private static Format from(String value)
+        {
+            return Arrays.stream(VALUES)
+                    .filter(v -> v.name()
+                            .equalsIgnoreCase(value))
+                    .findFirst()
+                    .orElse(null);
         }
     }
 }

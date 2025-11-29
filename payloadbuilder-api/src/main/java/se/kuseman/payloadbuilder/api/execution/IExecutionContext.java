@@ -1,5 +1,7 @@
 package se.kuseman.payloadbuilder.api.execution;
 
+import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -28,6 +30,15 @@ public interface IExecutionContext
     /** Return value of provided variable name. */
     ValueVector getVariableValue(String name);
 
+    /**
+     * Returns a vector writer for provided format and stream
+     *
+     * @param format VectorWriterFormat of vector writer.
+     * @param outputStream Stream to write to. NOTE! Closing of the stream is responsibility of caller.
+     * @param options Options to provide to the writer.
+     */
+    VectorWriter getVectorWriter(VectorWriterFormat format, OutputStream outputStream, List<Option> options);
+
     /** Return the vector batch size. This is simply a convenience method for {@link #getOption(String, IExecutionContext)} with option name batch_size */
     default int getBatchSize(List<Option> options)
     {
@@ -55,5 +66,25 @@ public interface IExecutionContext
             }
         }
         return null;
+    }
+
+    /** Vector writer format. */
+    enum VectorWriterFormat
+    {
+        CSV,
+        JSON,
+        TEXT;
+
+        private static final VectorWriterFormat[] VALUES = values();
+
+        /** Return format from provided value. */
+        public static VectorWriterFormat from(String value)
+        {
+            return Arrays.stream(VALUES)
+                    .filter(v -> v.name()
+                            .equalsIgnoreCase(value))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Unsupported format: " + value));
+        }
     }
 }

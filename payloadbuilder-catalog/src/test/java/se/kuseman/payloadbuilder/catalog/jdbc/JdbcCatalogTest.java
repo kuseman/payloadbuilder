@@ -15,7 +15,7 @@ import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.execution.IQuerySession;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 
 /** Test of {@link JdbcCatalog}. */
@@ -28,11 +28,11 @@ class JdbcCatalogTest
 
         QualifiedName tableName = QualifiedName.of("schema", "table");
 
-        TableSchema actual = c.getTableSchema(mock(IQuerySession.class), "jdbc", tableName, List.of());
+        TableSchema actual = c.getTableSchema(mock(IExecutionContext.class), "jdbc", tableName, List.of());
         assertEquals(Schema.EMPTY, actual.getSchema());
         assertEquals(List.of(new Index(tableName, emptyList(), Index.ColumnsType.WILDCARD)), actual.getIndices());
 
-        actual = c.getTableSchema(mock(IQuerySession.class), "jdbc", tableName, List.of(new Option(JdbcCatalog.PROJECTION, new LiteralStringExpression("col1,col2, col3"))));
+        actual = c.getTableSchema(mock(IExecutionContext.class), "jdbc", tableName, List.of(new Option(JdbcCatalog.PROJECTION, new LiteralStringExpression("col1,col2, col3"))));
         assertEquals(Schema.of(Column.of("col1", Type.Any), Column.of("col2", Type.Any), Column.of("col3", Type.Any)), actual.getSchema());
         assertEquals(List.of(new Index(tableName, emptyList(), Index.ColumnsType.WILDCARD)), actual.getIndices());
     }

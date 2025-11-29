@@ -13,7 +13,7 @@ import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.execution.IQuerySession;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
@@ -83,7 +83,7 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
     private final Catalog asteriskCatalog = new Catalog(TEST)
     {
         @Override
-        public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+        public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
         {
             Integer stableDId = (Integer) session.getCatalogProperty(catalogAlias, STABLE_D_ID)
                     .valueAsObject(0);

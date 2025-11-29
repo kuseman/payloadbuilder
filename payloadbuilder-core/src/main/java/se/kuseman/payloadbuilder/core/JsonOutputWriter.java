@@ -10,6 +10,7 @@ import java.io.Writer;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -19,6 +20,9 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import se.kuseman.payloadbuilder.api.OutputWriter;
+import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Option;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 
 /** Json output writer */
@@ -539,6 +543,25 @@ public class JsonOutputWriter implements OutputWriter
         public void setPrettyPrint(boolean prettyPrint)
         {
             this.prettyPrint = prettyPrint;
+        }
+
+        /** Construct settings from a list of options. */
+        public static JsonSettings fromOptions(IExecutionContext context, List<Option> options)
+        {
+            JsonSettings settings = new JsonSettings();
+            for (Option option : options)
+            {
+                if (QualifiedName.of("prettyprint")
+                        .equalsIgnoreCase(option.getOption()))
+                {
+                    boolean prettyPrint = option.getValueExpression()
+                            .eval(context)
+                            .getPredicateBoolean(0);
+                    settings.prettyPrint = prettyPrint;
+                }
+            }
+
+            return settings;
         }
     }
 }

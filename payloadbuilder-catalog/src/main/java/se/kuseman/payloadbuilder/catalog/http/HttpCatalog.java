@@ -33,6 +33,7 @@ import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
@@ -196,7 +197,7 @@ public class HttpCatalog extends Catalog
     }
 
     @Override
-    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+    public TableSchema getTableSchema(IExecutionContext context, String catalogAlias, QualifiedName table, List<Option> options)
     {
         // Collect fields from option expressions
         Map<String, String> fields = new HashMap<>();
@@ -237,7 +238,7 @@ public class HttpCatalog extends Catalog
     {
         if (table.size() != 1)
         {
-            throw new CompileException("Tables qualifiers for " + NAME + " only supportes one part.");
+            throw new CompileException("Tables qualifiers for " + NAME + " only supports one part.");
         }
 
         Map<String, String> fields = new HashMap<>();

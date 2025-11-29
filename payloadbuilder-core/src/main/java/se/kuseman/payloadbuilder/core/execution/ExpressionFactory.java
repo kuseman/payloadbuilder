@@ -22,7 +22,7 @@ import se.kuseman.payloadbuilder.core.expression.LiteralObjectExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 
 /** Implementation of {@link IExpressionFactory} */
-class ExpressionFactory implements IExpressionFactory
+public class ExpressionFactory implements IExpressionFactory
 {
     @Override
     public ILiteralBooleanExpression createBooleanExpression(boolean value)

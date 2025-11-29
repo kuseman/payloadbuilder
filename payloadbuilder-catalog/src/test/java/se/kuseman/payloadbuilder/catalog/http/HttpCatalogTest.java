@@ -80,20 +80,20 @@ class HttpCatalogTest
         QualifiedName table = QualifiedName.of("http://www.service.com/");
         TableSchema actual;
         // No place holders
-        actual = catalog.getTableSchema(context.getSession(), "http", table, emptyList());
+        actual = catalog.getTableSchema(context, "http", table, emptyList());
         assertEquals(new TableSchema(Schema.EMPTY, emptyList()), actual);
 
         // Query
-        actual = catalog.getTableSchema(context.getSession(), "http", table, List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}"))));
+        actual = catalog.getTableSchema(context, "http", table, List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}"))));
         assertEquals(new TableSchema(Schema.EMPTY, List.of(new Index(table, asList("id"), ColumnsType.ANY))), actual);
 
         // Body
-        actual = catalog.getTableSchema(context.getSession(), "http", table,
+        actual = catalog.getTableSchema(context, "http", table,
                 List.of(new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{ \"keys\": [{{bodyId}}] }"))));
         assertEquals(new TableSchema(Schema.EMPTY, List.of(new Index(table, asList("bodyId"), ColumnsType.ANY))), actual);
 
         // Query + body
-        actual = catalog.getTableSchema(context.getSession(), "http", table, List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}")),
+        actual = catalog.getTableSchema(context, "http", table, List.of(new Option(QualifiedName.of(HttpCatalog.QUERY_PATTERN), ExpressionTestUtils.createStringExpression("/{{id}}")),
                 new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{ \"keys\": [{{bodyId}}] }"))));
         assertEquals(new TableSchema(Schema.EMPTY, List.of(new Index(table, asList("id", "bodyId"), ColumnsType.ANY))), actual);
     }
@@ -268,7 +268,7 @@ class HttpCatalogTest
         catch (CompileException e)
         {
             assertTrue(e.getMessage()
-                    .contains("Tables qualifiers for HttpCatalog only supportes one part."), e.getMessage());
+                    .contains("Tables qualifiers for HttpCatalog only supports one part."), e.getMessage());
         }
     }
 

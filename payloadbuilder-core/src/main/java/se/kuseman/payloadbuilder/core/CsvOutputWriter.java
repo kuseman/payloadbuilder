@@ -9,11 +9,15 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
+import java.util.List;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.OutputWriter;
+import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Option;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 
 /** Output writer that writes CSV */
 public class CsvOutputWriter implements OutputWriter
@@ -447,6 +451,41 @@ public class CsvOutputWriter implements OutputWriter
         public void setResultSetSeparator(String resultSetSeparator)
         {
             this.resultSetSeparator = resultSetSeparator;
+        }
+
+        /** Construct settings from a list of options. */
+        public static CsvSettings fromOptions(IExecutionContext context, List<Option> options)
+        {
+            CsvSettings settings = new CsvSettings();
+
+            String str;
+            for (Option option : options)
+            {
+                if (QualifiedName.of("separatorChar")
+                        .equalsIgnoreCase(option.getOption())
+                        || QualifiedName.of("columnSeparator")
+                                .equalsIgnoreCase(option.getOption()))
+                {
+                    str = option.getValueExpression()
+                            .eval(context)
+                            .valueAsString(0);
+                    settings.separatorChar = str != null
+                            && str.length() >= 1 ? str.charAt(0)
+                                    : settings.separatorChar;
+                }
+                else if (QualifiedName.of("escapeChar")
+                        .equalsIgnoreCase(option.getOption()))
+                {
+                    str = option.getValueExpression()
+                            .eval(context)
+                            .valueAsString(0);
+                    settings.escapeChar = str != null
+                            && str.length() >= 1 ? str.charAt(0)
+                                    : settings.escapeChar;
+                }
+            }
+
+            return settings;
         }
     }
 }

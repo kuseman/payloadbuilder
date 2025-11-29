@@ -139,7 +139,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
         Catalog catalog = context.getSession()
                 .getCatalog(catalogAlias);
 
-        TableSchema tableSchema = catalog.getTableSchema(context.getSession(), catalogAlias, plan.getTableSource()
+        TableSchema tableSchema = catalog.getTableSchema(context.context, catalogAlias, plan.getTableSource()
                 .getName(), plan.getOptions());
 
         Schema schema = tableSchema.getSchema();
