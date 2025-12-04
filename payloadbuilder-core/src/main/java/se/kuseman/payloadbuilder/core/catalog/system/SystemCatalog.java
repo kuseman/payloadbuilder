@@ -31,7 +31,6 @@ import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.cache.Cache;
 import se.kuseman.payloadbuilder.core.cache.CacheProvider;
 import se.kuseman.payloadbuilder.core.cache.CacheType;
@@ -512,11 +511,6 @@ public class SystemCatalog extends Catalog
             table = table.extract(1)
                     .toLowerCase();
             TableSchema tableSchema = ((QuerySession) context.getSession()).getTemporaryTableSchema(table);
-            if (tableSchema == null)
-            {
-                throw new QueryException("No temporary table found with name #" + table);
-            }
-
             if (SchemaUtils.isAsterisk(tableSchema.getSchema()))
             {
                 return new TableSchema(Schema.EMPTY, tableSchema.getIndices());

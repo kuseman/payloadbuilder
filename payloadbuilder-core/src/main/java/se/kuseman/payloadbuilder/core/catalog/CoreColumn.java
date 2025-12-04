@@ -156,7 +156,7 @@ public class CoreColumn extends Column
     public static CoreColumn asterisk(String alias, ResolvedType type, TableSourceReference tableSourceReference)
     {
         requireNonNull(tableSourceReference);
-        ColumnReference cr = new ColumnReference("*", tableSourceReference, Column.MetaData.EMPTY);
+        ColumnReference cr = new ColumnReference("*", tableSourceReference, MetaData.EMPTY);
         return new CoreColumn(alias, type, MetaData.EMPTY, "", false, cr, Type.ASTERISK);
     }
 

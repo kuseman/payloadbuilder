@@ -141,58 +141,40 @@ public interface TupleVector
     /** Construct a {@link TupleVector} from provided columns and schema */
     static TupleVector of(final Schema schema, final List<? extends ValueVector> columns)
     {
+        if (columns.isEmpty())
+        {
+            return TupleVector.of(schema);
+        }
+
         final int rowCount = columns.isEmpty() ? 0
                 : columns.get(0)
                         .size();
         // Validate the vectors against the schema
-        if (!columns.isEmpty())
+        final int columnSize = columns.size();
+        for (ValueVector vv : columns)
         {
-            final int columnSize = columns.size();
-            for (ValueVector vv : columns)
+            if (vv.size() != rowCount)
             {
-                if (vv.size() != rowCount)
-                {
-                    throw new IllegalArgumentException("All vectors must equal in size");
-                }
+                throw new IllegalArgumentException("All vectors must equal in size");
             }
-            if (schema.getColumns()
-                    .size() != columnSize)
-            {
-                throw new IllegalArgumentException("Schema column count doesn't match vector count. Schema: " + schema.getSize() + ", vectors: " + columnSize);
-            }
+        }
+        if (schema.getColumns()
+                .size() != columnSize)
+        {
+            throw new IllegalArgumentException("Schema column count doesn't match vector count. Schema: " + schema.getSize() + ", vectors: " + columnSize);
+        }
 
-            for (int i = 0; i < columnSize; i++)
-            {
-                ResolvedType schemaType = schema.getColumns()
-                        .get(i)
-                        .getType();
+        for (int i = 0; i < columnSize; i++)
+        {
+            ResolvedType schemaType = schema.getColumns()
+                    .get(i)
+                    .getType();
+            ResolvedType vectorType = columns.get(i)
+                    .type();
 
-                // Don't validate any types, they can differ, implicit cast will kick in
-                if (schemaType.getType() == Type.Any)
-                {
-                    continue;
-                }
-
-                Schema innerSchema = columns.get(i)
-                        .type()
-                        .getSchema();
-
-                // Skip validation of empty schemas
-                if (Schema.EMPTY.equals(innerSchema))
-                {
-                    continue;
-                }
-
-                if (!schemaType.equals(columns.get(i)
-                        .type()))
-                {
-                    throw new IllegalArgumentException("Schema type for column: " + schema.getColumns()
-                            .get(i)
-                                                       + " doesn't match value vectors type "
-                                                       + columns.get(i)
-                                                               .type());
-                }
-            }
+            validate(schema.getColumns()
+                    .get(i)
+                    .getName(), schemaType, vectorType);
         }
 
         return new TupleVector()
@@ -212,13 +194,6 @@ public interface TupleVector
             @Override
             public ValueVector getColumn(int column)
             {
-                // Empty type vector, then return an empty vector with the column type
-                if (columns.isEmpty())
-                {
-                    return ValueVector.empty(schema.getColumns()
-                            .get(column)
-                            .getType());
-                }
                 return columns.get(column);
             }
 
@@ -362,4 +337,48 @@ public interface TupleVector
         return sb.toString();
     }
 
+    private static void validate(String columnPath, ResolvedType schemaType, ResolvedType vectorType)
+    {
+        // Don't validate any types, they can differ, reflection will be used runtime
+        if (schemaType.getType() == Type.Any)
+        {
+            return;
+        }
+
+        if (schemaType.getType() != vectorType.getType())
+        {
+            throw new IllegalArgumentException("Schema type: " + schemaType.getType() + " for column: " + columnPath + " doesn't match value vectors type " + vectorType);
+        }
+
+        // If this is not a complex type we're done
+        if (schemaType.getSchema() == null)
+        {
+            return;
+        }
+
+        Schema vectorSchema = vectorType.getSchema();
+
+        // Skip validation of empty vector schemas
+        if (Schema.EMPTY.equals(vectorSchema))
+        {
+            return;
+        }
+
+        Schema schemaSchema = schemaType.getSchema();
+        int size = schemaSchema.getSize();
+
+        if (size != vectorSchema.getSize())
+        {
+            throw new IllegalArgumentException("Schema size: " + size + " for column: " + columnPath + " doesn't match value vectors size: " + vectorSchema.getSize());
+        }
+
+        for (int i = 0; i < size; i++)
+        {
+            Column schemaColumn = schemaSchema.getColumns()
+                    .get(i);
+            Column vectorColumn = vectorSchema.getColumns()
+                    .get(i);
+            validate(columnPath + "/" + schemaColumn, schemaColumn.getType(), vectorColumn.getType());
+        }
+    }
 }
