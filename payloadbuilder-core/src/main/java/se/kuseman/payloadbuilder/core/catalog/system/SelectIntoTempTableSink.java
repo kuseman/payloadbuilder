@@ -110,7 +110,8 @@ public class SelectIntoTempTableSink implements IDatasink
             temporaryTable = tempTableSupplier.get();
         }
 
-        ((QuerySession) context.getSession()).setTemporaryTable(table, temporaryTable);
+        // Lenient when we have cache, then we overwrite
+        ((QuerySession) context.getSession()).setTemporaryTable(table, temporaryTable, cacheTtl != null);
     }
 
     public List<Index> getIndices()

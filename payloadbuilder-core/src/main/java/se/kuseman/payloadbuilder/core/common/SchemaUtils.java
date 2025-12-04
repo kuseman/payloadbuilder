@@ -103,10 +103,6 @@ public final class SchemaUtils
     /** Returns true if this schema contains asterisk columns */
     public static boolean isAsterisk(Schema schema, boolean includeNamedAsterisks)
     {
-        if (schema == null)
-        {
-            return false;
-        }
         int size = schema.getSize();
         if (size == 0)
         {
@@ -147,11 +143,12 @@ public final class SchemaUtils
                 return true;
             }
 
-            // A populated column who's schema is asterisk counts as asterisk
-            if (cc.getColumnType() == CoreColumn.Type.POPULATED)
+            // Dig down into complex type schema
+            if (cc.getType()
+                    .getSchema() != null)
             {
                 return isAsterisk(cc.getType()
-                        .getSchema());
+                        .getSchema(), includeNamedAsterisks);
             }
         }
         return false;

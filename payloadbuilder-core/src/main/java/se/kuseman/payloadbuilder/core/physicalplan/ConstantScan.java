@@ -154,8 +154,8 @@ public class ConstantScan implements IPhysicalPlan
         if (vector != null
                 && Schema.EMPTY.equals(vector.getSchema()))
         {
-            return vector.getRowCount() == 1 ? "Constant Scan (Single row)"
-                    : "Constant Scan (No rows)";
+            return vector.getRowCount() == 1 ? "Constant Scan (" + nodeId + "): (Single row)"
+                    : "Constant Scan (" + nodeId + "):  (No rows)";
         }
         return "Constant scan (" + nodeId + ")";
     }

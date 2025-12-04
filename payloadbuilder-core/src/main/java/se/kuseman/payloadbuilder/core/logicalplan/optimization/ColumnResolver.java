@@ -294,31 +294,61 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         ILogicalPlan inner = plan.getInner()
                 .accept(this, context);
 
-        // Outer references to this join is all collected outer references that references any of
-        // the outer plans table sources or columns that doesn't have a table source (computed columns)
-        // that is present in the outer plan
-        context.outerReferences.removeIf(or ->
+        /* Outer references to this join is all collected outer references that references any of
+         * the outer plans table sources or columns that doesn't have a table source (computed columns)
+         * that is present in the outer plan
+         * Remove all the outer references from this join that is not references to the outer plan
+         * and re-add those to the prev. set (they belong to a plan higher up in hierarchy)
+         * ie.
+         * @formatter:off
+         *
+         * select
+         * (
+         *   select
+         *   (
+         *      select a.col                <-- a.col does not belong to tableB b but parent parent tableA
+         *                                      then this join is correlated but join wise it's not correlated
+         *                                      and could be cached for all rows in tableB since it's constant
+         *   ) nestedNested
+         *   from tableB b
+         * ) nested
+         * from tableA a
+         *
+         * @formatter:on
+         */
+        if (!outerTableSources.isEmpty())
         {
-            Set<Integer> tableSources = SchemaUtils.getTableSources(or)
-                    .stream()
-                    .map(TableSourceReference::getId)
-                    .collect(toSet());
-            if (tableSources.isEmpty())
+            context.outerReferences.removeIf(or ->
             {
-                // TODO: Find out when this happens
-                return false;
-            }
-            boolean result = !CollectionUtils.containsAny(outerTableSources, tableSources);
+                Set<Integer> tableSources = SchemaUtils.getTableSources(or)
+                        .stream()
+                        .map(TableSourceReference::getId)
+                        .collect(toSet());
+                if (tableSources.isEmpty())
+                {
+                    // TODO: Find out when this happens
+                    return false;
+                }
+                boolean result = !CollectionUtils.containsAny(outerTableSources, tableSources);
 
-            // Add the removed outer references to the prev list to bubble up
-            if (result
-                    && prevOuterReferences != null)
-            {
-                prevOuterReferences.add(or);
-            }
+                // Add the to be removed outer references to the prev list to bubble up and let
+                // parent plan know about it's outer references
+                if (result
+                        && prevOuterReferences != null)
+                {
+                    prevOuterReferences.add(or);
+                }
 
-            return result;
-        });
+                return result;
+            });
+        }
+        else if (prevOuterReferences != null)
+        {
+            // If outerTableSources is empty and we had outer references that means
+            // that all outer references belongs to the parent parent or above and not the outer plan
+            // then we need to re-add all the outer references to the prev. set to properly bubble up
+            prevOuterReferences.addAll(context.outerReferences);
+        }
 
         // If this join can have outer references but didn't have any, recreate the inner plan without
         // this joins outer context (but instead use the previous outer context which is perfectly fine to reference).

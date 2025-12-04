@@ -104,6 +104,196 @@ class QueryPlannerTest extends APhysicalPlanTest
         session.setDefaultCatalogAlias("t");
     }
 
+    /** Regression test for a nested loop that got cached when it shouldn't have. */
+    @Test
+    void test_cache_inner_plan_regression()
+    {
+        //@formatter:off
+        String query = """
+               select
+               (
+                   SELECT
+                   (
+                       select *
+                       from (v.campaign) x
+                       FOR OBJECT_ARRAY
+                   ) camps
+                   FOR OBJECT
+                ) price
+                from variant v
+               """;
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
+
+        TableSourceReference variant = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("variant"), "v");
+        TableSourceReference v_campaign = new TableSourceReference(1, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("v.campaign"), "x");
+
+        //@formatter:off
+        Schema variantSchema = Schema.of(ast("v", variant));
+        Schema campsSchema = Schema.of(
+                ast("x", v_campaign)
+                );
+        Schema priceSchema = Schema.of(
+                col("camps", ResolvedType.table(campsSchema))
+                );
+        IPhysicalPlan expected = new Projection(
+                8,
+                NestedLoop.leftJoin(
+                    7,
+                    new TableScan(
+                        0,
+                        variantSchema,
+                        variant,
+                        "test",
+                        t.scanDataSources.get(0),
+                        emptyList()),
+                    new OperatorFunctionScan(
+                        6,
+                        new Projection(
+                            5,
+                            NestedLoop.leftJoin(
+                                4,
+                                new ConstantScan(1, TupleVector.CONSTANT),
+                                new OperatorFunctionScan(
+                                    3,
+                                    new ExpressionScan(
+                                        2,
+                                        v_campaign,
+                                        campsSchema,
+                                        ocre("campaign", variant, CoreColumn.Type.NAMED_ASTERISK)),
+                                    SystemCatalog.get().getOperatorFunction("object_array"),
+                                    "sys",
+                                    Schema.of(ast("__expr1", ResolvedType.table(campsSchema), true))),
+                                Set.of(nast("campaign", ResolvedType.ANY, variant)),
+                                null,
+                                Schema.of(ast("v", ResolvedType.ANY, variant))),
+                            Schema.of(col("camps", ResolvedType.table(campsSchema))),
+                            List.of(new AliasExpression(ce("__expr1", 0, ResolvedType.table(campsSchema)), "camps")),
+                            null),
+                        SystemCatalog.get().getOperatorFunction("object"),
+                        "sys",
+                        Schema.of(ast("__expr0", ResolvedType.object(priceSchema), true))),
+                    Set.of(nast("campaign", ResolvedType.ANY, variant)),
+                    null,
+                    Schema.of(ast("v", variant))),
+                Schema.of(col("price", ResolvedType.object(priceSchema))),
+                List.of(new AliasExpression(ce("__expr0", ResolvedType.object(priceSchema)), "price")),
+                null);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    void test_cache_inner_plan_with_nested_complex_structure()
+    {
+        //@formatter:off
+        String query = """
+               select
+               (
+                   SELECT
+                   (
+                       select *
+                       from (values(1,2,3)) x(col1,col2,col3)
+                       FOR OBJECT_ARRAY
+                   ) camps
+                   FOR OBJECT
+                ) price
+                from variant v
+               """;
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
+                .get(0)).getPlan();
+
+        TableSourceReference variant = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("variant"), "v");
+        TableSourceReference x = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
+
+        //@formatter:off
+        Schema variantSchema = Schema.of(ast("v", variant));
+        Schema constantSchema = Schema.of(
+                col("col1", Type.Int, x),
+                col("col2", Type.Int, x),
+                col("col3", Type.Int, x));
+        Schema priceSchema = Schema.of(
+                col("camps", ResolvedType.table(constantSchema))
+                );
+        IPhysicalPlan expected = new Projection(
+                10,
+                NestedLoop.leftJoin(
+                    9,
+                    new TableScan(
+                        0,
+                        variantSchema,
+                        variant,
+                        "test",
+                        t.scanDataSources.get(0),
+                        emptyList()),
+                    new CachePlan(
+                        8,
+                        new OperatorFunctionScan(
+                            7,
+                            new Projection(
+                                6,
+                                NestedLoop.leftJoin(
+                                    5,
+                                    new ConstantScan(1, TupleVector.CONSTANT),
+                                        new CachePlan(
+                                        4,
+                                            new OperatorFunctionScan(
+                                                3,
+                                                new ConstantScan(2, TupleVector.of(constantSchema)),
+                                                SystemCatalog.get().getOperatorFunction("object_array"),
+                                                "sys",
+                                                Schema.of(col("__expr1", ResolvedType.table(constantSchema), true)))
+                                        ),
+                                    null,
+                                    false),
+                                Schema.of(col("camps", ResolvedType.table(constantSchema))),
+                                List.of(new AliasExpression(ce("__expr1", 0, ResolvedType.table(constantSchema)), "camps")),
+                                null),
+                            SystemCatalog.get().getOperatorFunction("object"),
+                            "sys",
+                            Schema.of(col("__expr0", ResolvedType.object(priceSchema), true)))
+                    ),
+                    null,
+                    false),
+                Schema.of(col("price", ResolvedType.object(priceSchema))),
+                List.of(new AliasExpression(ce("__expr0", ResolvedType.object(priceSchema)), "price")),
+                null);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
     @Test
     void test_sub_query_filter_elimination()
     {

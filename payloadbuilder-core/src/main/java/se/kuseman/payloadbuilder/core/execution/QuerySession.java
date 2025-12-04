@@ -83,9 +83,7 @@ public class QuerySession implements IQuerySession
     private ExceptionHandler exceptionHandler;
     private BooleanSupplier abortSupplier;
     private WeakListenerList abortQueryListeners;
-    private Map<QualifiedName, TemporaryTable> temporaryTables;
-    /** Compile time schemas for temporary tables. */
-    private Map<QualifiedName, TableSchema> temporaryTableSchemas;
+    private Map<QualifiedName, TemporaryTableEntry> temporaryTables;
 
     private TempTableCache tempTableCache = new InMemoryTempTableCache();
     private GenericCache genericCache = new InMemoryGenericCache("QuerySession");
@@ -105,6 +103,22 @@ public class QuerySession implements IQuerySession
                 .stream()
                 .collect(toMap(e -> e.getKey()
                         .toLowerCase(), v -> ValueVector.literalAny(1, v.getValue())));
+    }
+
+    private static class TemporaryTableEntry
+    {
+        TableSchema tableSchema;
+        TemporaryTable temporaryTable;
+
+        TemporaryTableEntry(TemporaryTable temporaryTable)
+        {
+            this.temporaryTable = temporaryTable;
+        }
+
+        TemporaryTableEntry(TableSchema tableSchema)
+        {
+            this.tableSchema = tableSchema;
+        }
     }
 
     @Override
@@ -329,15 +343,34 @@ public class QuerySession implements IQuerySession
     /** Get temporary table with provided qualifier */
     public TemporaryTable getTemporaryTable(QualifiedName table)
     {
-        TemporaryTable result;
-        // CSOFF
-        if (temporaryTables == null
-                || (result = temporaryTables.get(table)) == null)
-        // CSON
+        TemporaryTable result = null;
+        if (temporaryTables != null)
         {
-            throw new QueryException("No temporary table found with name #" + table);
+            TemporaryTableEntry entry = temporaryTables.get(table);
+            result = entry != null ? entry.temporaryTable
+                    : null;
         }
+        if (result == null)
+        {
+            throw getNoTempTableFoundException(table);
+        }
+        return result;
+    }
 
+    /** Get temporary table with provided qualifier */
+    public TableSchema getTemporaryTableSchema(QualifiedName table)
+    {
+        TableSchema result = null;
+        if (temporaryTables != null)
+        {
+            TemporaryTableEntry entry = temporaryTables.get(table);
+            result = entry != null ? entry.tableSchema
+                    : null;
+        }
+        if (result == null)
+        {
+            throw getNoTempTableFoundException(table);
+        }
         return result;
     }
 
@@ -346,44 +379,41 @@ public class QuerySession implements IQuerySession
      *
      * @param table The temporary table
      */
-    public void setTemporaryTable(QualifiedName name, TemporaryTable table)
+    public void setTemporaryTable(QualifiedName name, TemporaryTable table, boolean lenient)
     {
         requireNonNull(table);
         if (temporaryTables == null)
         {
             temporaryTables = new HashMap<>();
         }
-        if (temporaryTables.containsKey(name))
+        TemporaryTableEntry entry = temporaryTables.get(name);
+        if (entry != null
+                && entry.temporaryTable != null
+                && !lenient)
         {
             throw new QueryException("Temporary table #" + name + " already exists in session");
         }
-        temporaryTables.put(name, table);
-    }
-
-    /** Get temporary table with provided qualifier */
-    public TableSchema getTemporaryTableSchema(QualifiedName table)
-    {
-        if (temporaryTableSchemas == null)
+        if (entry == null)
         {
-            return null;
+            entry = new TemporaryTableEntry(table);
         }
-
-        return temporaryTableSchemas.get(table);
+        else
+        {
+            entry.temporaryTable = table;
+        }
+        temporaryTables.put(name, entry);
     }
 
     /** Set a temporary table schema into context. */
     public void setTemporaryTableSchema(QualifiedName name, TableSchema tableSchema)
     {
         requireNonNull(tableSchema);
-        if (temporaryTableSchemas == null)
+        if (temporaryTables == null)
         {
-            temporaryTableSchemas = new HashMap<>();
+            temporaryTables = new HashMap<>();
         }
-        if (temporaryTableSchemas.containsKey(name))
-        {
-            throw new QueryException("Temporary table #" + name + " already exists in session");
-        }
-        temporaryTableSchemas.put(name, tableSchema);
+        // Note! We allow that a table already exists in session when setting the schema
+        temporaryTables.computeIfAbsent(name, k -> new TemporaryTableEntry(tableSchema)).tableSchema = tableSchema;
     }
 
     /** Drop temporary table */
@@ -393,7 +423,7 @@ public class QuerySession implements IQuerySession
                 && (temporaryTables == null
                         || !temporaryTables.containsKey(table)))
         {
-            throw new QueryException("No temporary table found with name #" + table);
+            throw getNoTempTableFoundException(table);
         }
         else if (temporaryTables != null)
         {
@@ -408,7 +438,16 @@ public class QuerySession implements IQuerySession
         {
             return emptyList();
         }
-        return temporaryTables.entrySet();
+        return temporaryTables.entrySet()
+                .stream()
+                .filter(t -> t.getValue().temporaryTable != null)
+                .map(e -> Map.entry(e.getKey(), e.getValue().temporaryTable))
+                .toList();
+    }
+
+    private QueryException getNoTempTableFoundException(QualifiedName table)
+    {
+        return new QueryException("No temporary table found with name #" + table);
     }
 
     /** Set catalog property */

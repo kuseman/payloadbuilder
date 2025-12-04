@@ -128,6 +128,6 @@ public class ExpressionScan implements IPhysicalPlan
     @Override
     public String toString()
     {
-        return "Scan expression: " + expression.toVerboseString() + " " + tableSource;
+        return "Scan expression (" + nodeId + "): " + expression.toVerboseString() + " " + tableSource;
     }
 }

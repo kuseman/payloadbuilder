@@ -86,28 +86,8 @@ public class OperatorFunctionScan implements IPhysicalPlan
         {
             schema = this.schema;
         }
+        return TupleIterator.singleton(TupleVector.of(schema, vv));
 
-        TupleVector result = new TupleVector()
-        {
-            @Override
-            public Schema getSchema()
-            {
-                return schema;
-            }
-
-            @Override
-            public int getRowCount()
-            {
-                return vv.size();
-            }
-
-            @Override
-            public ValueVector getColumn(int column)
-            {
-                return vv;
-            }
-        };
-        return TupleIterator.singleton(result);
     }
 
     @Override

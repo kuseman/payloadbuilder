@@ -88,7 +88,6 @@ class InsertSink implements IDatasink
 
         return new TupleVector()
         {
-
             @Override
             public Schema getSchema()
             {

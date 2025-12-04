@@ -110,11 +110,16 @@
       "tables": [
         {
           "name": "table",
-          "columns": [ "id", "table", "object" ],
-          "types": [ {"type": "String"}, { "type": "String" }, { "type": "Object", "schema": [ { "name": "key", "type": { "type": "Int" } } ] } ],
+          "columns": [ "id", "table", "object", "table2" ],
+          "types": [
+            {"type": "String"},
+            { "type": "String" },
+            { "type": "Object", "schema": [ { "name": "key", "type": { "type": "Int" } } ] },
+            { "type": "Table", "schema": [ { "name": "key", "type": { "type": "Int" } }, { "name": "key2", "type": { "type": "Boolean" } } ] }
+          ],
           "rows": [
-            [ "1", "[{ \"key\": 123, \"value\": 456 },{ \"key\": 789, \"value\": 101112 }]", { "key": 666 } ],
-            [ "2", "[]", null ]
+            [ "1", "[{ \"key\": 123, \"value\": 456 },{ \"key\": 789, \"value\": 101112 }]", { "key": 666 },  [{ "key": 4567, "key2": true },{ "key": 891011, "key2": false }] ],
+            [ "2", "[]", null, [{ "key": 666, "key2": false },{ "key": 1337, "key2": true }] ]
           ]
         }
       ]
@@ -2586,6 +2591,35 @@
       ],
       "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
       "expectedMessageContains": "Insert column count doesn't match input column count"
+    },
+    {
+      "name": "Nested complex subquery",
+      "typedVectors": true,
+      "description": [
+        "Regression test of two failures: ",
+        "1. Caching of a correlated sub query expression ",
+        "2. Mismatch of tuplevector schema and runtime vector schemas "
+      ],
+      "query": [
+        "use complexColumns ",
+        "SELECT                            ",
+        "(                                 ",
+        "   SELECT                         ",
+        "   (                              ",
+        "     SELECT *                     ",
+        "     FROM (v.table2) x            ",
+        "     FOR OBJECT_ARRAY             ",
+        "   )  _inner                      ",
+        "   FOR OBJECT                     ",
+        ") _outer                          ",
+        "FROM \"table\" v "
+      ],
+       "expectedResultSets": [
+        [
+          [ { "key": "_outer", "value": { "_inner": [ { "key": 4567, "key2": true  }, { "key": 891011, "key2": false } ] } } ],
+          [ { "key": "_outer", "value": { "_inner": [ { "key": 666,  "key2": false }, { "key": 1337,   "key2": true  } ] } } ]
+        ]
+      ]
     }
   ]
 }
