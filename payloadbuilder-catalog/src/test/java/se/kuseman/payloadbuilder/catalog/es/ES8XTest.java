@@ -46,7 +46,17 @@ class ES8XTest extends BaseESTest
         private static final String IMAGE_NAME = "docker.elastic.co/elasticsearch/elasticsearch:8.7.1";
         @SuppressWarnings("resource")
         private static final GenericContainer<?> ES_CONTAINER = new GenericContainer<>(DockerImageName.parse(IMAGE_NAME)).withExposedPorts(PORT)
-                .withEnv(Map.of("xpack.security.enabled", "false", "discovery.type", "single-node"));
+        //@formatter:off
+                .withEnv(Map.of(
+                        "xpack.security.enabled", "false",
+                        "discovery.type", "single-node",
+                        "cluster.routing.allocation.disk.watermark.high", "99%",
+                        "cluster.routing.allocation.disk.watermark.flood_stage", "99%",
+                        "cluster.routing.allocation.disk.watermark.high.max_headroom", "20GB",
+                        "cluster.routing.allocation.disk.watermark.low.max_headroom", "20GB",
+                        "cluster.routing.allocation.disk.watermark.flood_stage.max_headroom", "20GB"
+                        ));
+        //@formatter:on
 
         static final String ES_ENDPOINT;
 
