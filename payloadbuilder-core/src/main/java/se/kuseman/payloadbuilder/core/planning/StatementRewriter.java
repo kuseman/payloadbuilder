@@ -11,11 +11,9 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
-import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.IDatasink;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
-import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.InsertIntoData;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -26,7 +24,6 @@ import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.core.catalog.system.SelectIntoTempTableSink;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
@@ -242,16 +239,16 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
         Schema schema = input.getPlan()
                 .getSchema();
         boolean isAsteriskSchema = SchemaUtils.isAsterisk(schema);
-        List<Column> columns = isAsteriskSchema ? emptyList()
-                : schema.getColumns();
+        schema = isAsteriskSchema ? Schema.EMPTY
+                : schema;
 
         // Validate the Insert Into
         if (insertColumns != null
                 && !isAsteriskSchema)
         {
-            if (insertColumns.size() != columns.size())
+            if (insertColumns.size() != schema.getSize())
             {
-                throw new ParseException("Insert column count doesn't match input column count. Insert columns: " + insertColumns + ", input columns: " + columns, statement.getLocation());
+                throw new ParseException("Insert column count doesn't match input column count. Insert columns: " + insertColumns + ", input columns: " + schema.getColumns(), statement.getLocation());
             }
         }
 
@@ -263,30 +260,9 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
         int nodeId = context.getNextNodeId();
         //@formatter:off
         IDatasink sink = insertColumns == null
-                ? catalog.getSelectIntoSink(context.getSession(), catalogAlias, statement.getTable(), new SelectIntoData(nodeId, columns, options))
-                : catalog.getInsertIntoSink(context.getSession(), catalogAlias, statement.getTable(), new InsertIntoData(nodeId, columns, options, insertColumns));
+                ? catalog.getSelectIntoSink(context.getSession(), catalogAlias, statement.getTable(), new SelectIntoData(nodeId, schema, options))
+                : catalog.getInsertIntoSink(context.getSession(), catalogAlias, statement.getTable(), new InsertIntoData(nodeId, schema, options, insertColumns));
         //@formatter:on
-
-        // If this is a temporary table select into then we need to extract table schema + indices into context to let the rest of the query
-        // know about them
-        if (Catalog.SYSTEM_CATALOG_ALIAS.equalsIgnoreCase(statement.getCatalogAlias())
-                && insertColumns == null // -> SelectInto
-                && "#".equals(statement.getTable()
-                        .getFirst()))
-        {
-            // We need to extract the generated indices from the sink and hence need this ugly cast
-            if (!(sink instanceof SelectIntoTempTableSink))
-            {
-                throw new IllegalArgumentException("Expected temporary table sink to be of type: " + SelectIntoTempTableSink.class.getName());
-            }
-
-            List<Index> indices = ((SelectIntoTempTableSink) sink).getIndices();
-            TableSchema tableSchema = new TableSchema(context.currentLogicalPlan.getSchema(), indices);
-            context.context.getSession()
-                    .setTemporaryTableSchema(statement.getTable()
-                            .extract(1)
-                            .toLowerCase(), tableSchema);
-        }
 
         return new PhysicalStatement(QueryPlanner.wrapWithAnalyze(context, new InsertInto(nodeId, input.getPlan(), insertColumns, sink)));
     }

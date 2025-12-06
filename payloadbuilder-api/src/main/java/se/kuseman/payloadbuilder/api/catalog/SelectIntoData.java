@@ -11,13 +11,13 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 public class SelectIntoData
 {
     private final int nodeId;
-    private final List<Column> inputColumns;
+    private final Schema inputSchema;
     private final List<Option> options;
 
-    public SelectIntoData(int nodeId, List<Column> inputColumns, List<Option> options)
+    public SelectIntoData(int nodeId, Schema inputSchema, List<Option> options)
     {
         this.nodeId = nodeId;
-        this.inputColumns = requireNonNull(inputColumns, "inputColumns");
+        this.inputSchema = requireNonNull(inputSchema, "inputSchema");
         this.options = requireNonNull(options, "options");
     }
 
@@ -30,12 +30,12 @@ public class SelectIntoData
     }
 
     /**
-     * Return the columns from the input that is the source of the insert. If empty then this is an insert from an asterisk / schema-less query where the column is unknown at compile time, then the
+     * Return the schema of the input that is the source of the insert. If empty then this is an insert from an asterisk / schema-less query where the column is unknown at compile time, then the
      * actual columns are available from {@link TupleIterator} obtained in {@link IDatasink#execute} call.
      */
-    public List<Column> getInputColumns()
+    public Schema getInputSchema()
     {
-        return inputColumns;
+        return inputSchema;
     }
 
     /** Return defined options for this sink */

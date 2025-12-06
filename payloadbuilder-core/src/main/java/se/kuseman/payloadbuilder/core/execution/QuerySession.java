@@ -26,6 +26,7 @@ import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
@@ -412,8 +413,16 @@ public class QuerySession implements IQuerySession
         {
             temporaryTables = new HashMap<>();
         }
+
+        // Erase all CoreColumns here
+        TableSchema newTableSchema = new TableSchema(new Schema(tableSchema.getSchema()
+                .getColumns()
+                .stream()
+                .map(c -> Column.of(c.getName(), c.getType(), c.getMetaData()))
+                .toList()), tableSchema.getIndices());
+
         // Note! We allow that a table already exists in session when setting the schema
-        temporaryTables.computeIfAbsent(name, k -> new TemporaryTableEntry(tableSchema)).tableSchema = tableSchema;
+        temporaryTables.computeIfAbsent(name, k -> new TemporaryTableEntry(newTableSchema)).tableSchema = newTableSchema;
     }
 
     /** Drop temporary table */

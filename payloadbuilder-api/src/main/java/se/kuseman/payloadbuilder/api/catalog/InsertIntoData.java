@@ -9,9 +9,9 @@ public class InsertIntoData extends SelectIntoData
 {
     private final List<String> insertColumns;
 
-    public InsertIntoData(int nodeId, List<Column> inputColumns, List<Option> options, List<String> insertColumns)
+    public InsertIntoData(int nodeId, Schema inputSchema, List<Option> options, List<String> insertColumns)
     {
-        super(nodeId, inputColumns, options);
+        super(nodeId, inputSchema, options);
         this.insertColumns = requireNonNull(insertColumns, "insertColumns");
     }
 

@@ -666,11 +666,13 @@ class TestHarnessRunner
             // Insert a shell of the new table that will be accessible during planning before execution
             TestTable testTable = new TestTable();
             testTable.setName(table.getLast());
-            testTable.setColumns(data.getInputColumns()
+            testTable.setColumns(data.getInputSchema()
+                    .getColumns()
                     .stream()
                     .map(c -> c.getName())
                     .toList());
-            testTable.setTypes(data.getInputColumns()
+            testTable.setTypes(data.getInputSchema()
+                    .getColumns()
                     .stream()
                     .map(c -> c.getType())
                     .toList());
