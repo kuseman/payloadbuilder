@@ -2,21 +2,45 @@ package se.kuseman.payloadbuilder.core.execution;
 
 import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.logicalplan.ALogicalPlanTest;
 
 /** Test of {@link QuerySession}. */
-class QuerySessionTest
+class QuerySessionTest extends ALogicalPlanTest
 {
     private QuerySession session = new QuerySession(new CatalogRegistry());
+
+    @Test
+    void test_temporary_tables_verify_that_core_columns_are_erased()
+    {
+        QualifiedName table = QualifiedName.of("table");
+        TableSchema tableSchema = new TableSchema(Schema.of(col("col1", Type.Int)));
+        assertTrue(tableSchema.getSchema()
+                .getColumns()
+                .get(0) instanceof CoreColumn);
+        session.setTemporaryTableSchema(table, tableSchema);
+
+        TableSchema actual = session.getTemporaryTableSchema(table);
+        assertEquals(actual.getSchema(), Schema.of(Column.of("col1", Type.Int)));
+        assertFalse(actual.getSchema()
+                .getColumns()
+                .get(0) instanceof CoreColumn);
+    }
 
     @Test
     void test_temporary_tables()
@@ -32,11 +56,11 @@ class QuerySessionTest
         assertThrows(QueryException.class, () -> session.getTemporaryTable(table));
 
         session.setTemporaryTableSchema(table, TableSchema.EMPTY);
-        assertSame(TableSchema.EMPTY, session.getTemporaryTableSchema(table));
+        assertEquals(TableSchema.EMPTY, session.getTemporaryTableSchema(table));
         // This should not fail, we overwrite the schema
         TableSchema tableSchema = new TableSchema();
         session.setTemporaryTableSchema(table, tableSchema);
-        assertSame(tableSchema, session.getTemporaryTableSchema(table));
+        assertEquals(tableSchema, session.getTemporaryTableSchema(table));
 
         assertEquals(TableSchema.EMPTY, session.getTemporaryTableSchema(table));
 

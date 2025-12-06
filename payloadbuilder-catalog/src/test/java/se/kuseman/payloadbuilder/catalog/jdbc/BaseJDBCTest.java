@@ -229,7 +229,7 @@ abstract class BaseJDBCTest
         // Create test data
 
         IExecutionContext context = mockExecutionContext();
-        IDatasink selectIntoSink = catalog.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, TEST_TABLE, new SelectIntoData(0, emptyList(), emptyList()));
+        IDatasink selectIntoSink = catalog.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, TEST_TABLE, new SelectIntoData(0, Schema.EMPTY, emptyList()));
 
         IExecutionContext executionContext = mockExecutionContext();
 
@@ -503,7 +503,7 @@ abstract class BaseJDBCTest
         assertEquals(5, rowCount);
 
         // Insert some new rows
-        IDatasink insertIntoSink = catalog.getInsertIntoSink(context.getSession(), CATALOG_ALIAS, TEST_TABLE, new InsertIntoData(0, emptyList(), emptyList(), List.of(INT_COL, DECIMAL_COL)));
+        IDatasink insertIntoSink = catalog.getInsertIntoSink(context.getSession(), CATALOG_ALIAS, TEST_TABLE, new InsertIntoData(0, Schema.EMPTY, emptyList(), List.of(INT_COL, DECIMAL_COL)));
 
         // CSOFF
         //@formatter:off
