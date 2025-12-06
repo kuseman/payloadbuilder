@@ -27,7 +27,7 @@ import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
 import se.kuseman.payloadbuilder.core.physicalplan.PlanUtils;
 
 /** Sink for inserting into temporary tables. */
-public class SelectIntoTempTableSink implements IDatasink
+class SelectIntoTempTableSink implements IDatasink
 {
     private static final QualifiedName INDICES = QualifiedName.of("indices");
     private static final QualifiedName CACHEPREFIX = QualifiedName.of("cacheprefix");

@@ -220,7 +220,7 @@ class FilesystemCatalogTest
         Files.deleteIfExists(tempFile);
         QualifiedName tableName = QualifiedName.of(tempFile.toAbsolutePath()
                 .toString());
-        IDatasink sink = c.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, emptyList(), emptyList(), emptyList()));
+        IDatasink sink = c.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, Schema.EMPTY, emptyList(), emptyList()));
         // @format:off
         TupleVector vector1 = TupleVector.of(Schema.of(Column.of("intCol", Type.Int), Column.of("stringCol", Type.String)),
                 List.of(VectorTestUtils.vv(Type.Int, 10, 20, 30), VectorTestUtils.vv(Type.String, "ten", "twenty", "thirty åäö")));
@@ -275,7 +275,7 @@ class FilesystemCatalogTest
         Files.deleteIfExists(tempFile);
         QualifiedName tableName = QualifiedName.of(tempFile.toAbsolutePath()
                 .toString());
-        IDatasink sink = c.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, emptyList(), emptyList(), emptyList()));
+        IDatasink sink = c.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, Schema.EMPTY, emptyList(), emptyList()));
         // @format:off
         TupleVector vector1 = TupleVector.of(Schema.of(Column.of("intCol", Type.Int), Column.of("stringCol", Type.String)),
                 List.of(VectorTestUtils.vv(Type.Int, 10, 20, 30), VectorTestUtils.vv(Type.String, "ten", "twenty", "thirty åäö")));
@@ -331,7 +331,7 @@ class FilesystemCatalogTest
         Files.deleteIfExists(tempFile);
         QualifiedName tableName = QualifiedName.of(tempFile.toAbsolutePath()
                 .toString());
-        IDatasink sink = c.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, emptyList(), emptyList(), emptyList()));
+        IDatasink sink = c.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, Schema.EMPTY, emptyList(), emptyList()));
         // @format:off
         TupleVector vector1 = TupleVector.of(Schema.of(Column.of("intCol", Type.Int), Column.of("stringCol", Type.String)),
                 List.of(VectorTestUtils.vv(Type.Int, 10, 20, 30), VectorTestUtils.vv(Type.String, "ten", "twenty", "thirty åäö")));
@@ -388,7 +388,7 @@ class FilesystemCatalogTest
         QualifiedName tableName = QualifiedName.of(tempFile.toAbsolutePath()
                 .toString());
         IDatasink sink = c.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, tableName,
-                new InsertIntoData(0, emptyList(), List.of(new Option(FilesystemCatalog.FORMAT, new LiteralStringExpression("text"))), emptyList()));
+                new InsertIntoData(0, Schema.EMPTY, List.of(new Option(FilesystemCatalog.FORMAT, new LiteralStringExpression("text"))), emptyList()));
         // @format:off
         TupleVector vector1 = TupleVector.of(Schema.of(Column.of("intCol", Type.Int), Column.of("stringCol", Type.String)),
                 List.of(VectorTestUtils.vv(Type.Int, 10, 20, 30), VectorTestUtils.vv(Type.String, "ten", "twenty", "thirty åäö")));
@@ -443,7 +443,7 @@ class FilesystemCatalogTest
         Files.deleteIfExists(tempFile);
         QualifiedName tableName = QualifiedName.of(tempFile.toAbsolutePath()
                 .toString());
-        IDatasink sink = c.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, emptyList(), emptyList(), emptyList()));
+        IDatasink sink = c.getSelectIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, Schema.EMPTY, emptyList(), emptyList()));
 
         // @format:off
         TupleVector vector1 = TupleVector.of(Schema.of(Column.of("intCol", Type.Int), Column.of("stringCol", Type.String)),
@@ -494,7 +494,7 @@ class FilesystemCatalogTest
         Files.deleteIfExists(tempFile);
         QualifiedName tableName = QualifiedName.of(tempFile.toAbsolutePath()
                 .toString());
-        IDatasink sink = c.getInsertIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, emptyList(), emptyList(), List.of("newIntCol", "newStringCol")));
+        IDatasink sink = c.getInsertIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, Schema.EMPTY, emptyList(), List.of("newIntCol", "newStringCol")));
 
         // @format:off
         TupleVector vector1 = TupleVector.of(Schema.of(Column.of("intCol", Type.Int), Column.of("stringCol", Type.String)),
@@ -505,7 +505,7 @@ class FilesystemCatalogTest
 
         // Insert into again but with json
         //@formatter:off
-        sink = c.getInsertIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, emptyList(),
+        sink = c.getInsertIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, Schema.EMPTY,
                 List.of(
                     new Option(FilesystemCatalog.FORMAT, new LiteralStringExpression("JSON")),
                     new Option(QualifiedName.of("prettyPrint"), LiteralBooleanExpression.TRUE)

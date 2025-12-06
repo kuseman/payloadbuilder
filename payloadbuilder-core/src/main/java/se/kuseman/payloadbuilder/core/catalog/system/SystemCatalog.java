@@ -19,6 +19,7 @@ import se.kuseman.payloadbuilder.api.catalog.CompileException;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.IDatasink;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
+import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -433,7 +434,15 @@ public class SystemCatalog extends Catalog
             throw new CompileException("Can only insert into temp tables (prefixed with '#'). Table: " + table);
         }
 
-        return new SelectIntoTempTableSink(table, data.getOptions(), true);
+        SelectIntoTempTableSink sink = new SelectIntoTempTableSink(table, data.getOptions(), true);
+
+        // Put info about the temp table into session to let statements further down know about schemas etc.
+        List<Index> indices = sink.getIndices();
+        TableSchema tableSchema = new TableSchema(data.getInputSchema(), indices);
+        ((QuerySession) session).setTemporaryTableSchema(table.extract(1)
+                .toLowerCase(), tableSchema);
+
+        return sink;
     }
 
     @Override

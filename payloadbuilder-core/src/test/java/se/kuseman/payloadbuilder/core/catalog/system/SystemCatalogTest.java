@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -17,6 +18,11 @@ import java.util.TimeZone;
 
 import org.junit.jupiter.api.Test;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.CompileException;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.SelectIntoData;
 import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
@@ -30,6 +36,14 @@ import se.kuseman.payloadbuilder.core.expression.AExpressionTest;
 /** Tests functions etc. in built in catalog */
 class SystemCatalogTest extends AExpressionTest
 {
+    @Test
+    void test_selectInto_only_works_with_temp_tables()
+    {
+        QuerySession session = new QuerySession(new CatalogRegistry());
+        assertThrows(CompileException.class, () -> SystemCatalog.get()
+                .getSelectIntoSink(session, Catalog.SYSTEM_CATALOG_ALIAS, QualifiedName.of("table"), new SelectIntoData(0, Schema.EMPTY, emptyList())));
+    }
+
     @Test
     void test_parseduration() throws Exception
     {
