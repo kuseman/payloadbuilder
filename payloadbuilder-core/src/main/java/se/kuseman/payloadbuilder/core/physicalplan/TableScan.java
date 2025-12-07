@@ -212,10 +212,25 @@ public class TableScan implements IPhysicalPlan
                 Column vectorColumn = actual.getColumns()
                         .get(i);
 
-                if (!schemaColumn.getType()
-                        .equals(vectorColumn.getType())
+                if ((schemaColumn.getType()
+                        .getType() != vectorColumn.getType()
+                                .getType())
                         || !schemaColumn.getName()
                                 .equals(vectorColumn.getName()))
+                {
+                    return false;
+                }
+
+                Schema schemaSchema = schemaColumn.getType()
+                        .getSchema();
+                if (schemaSchema == null)
+                {
+                    continue;
+                }
+
+                // Dig down into nested schemas
+                if (!schemaEqualsRegardingTypeAndName(schemaSchema, vectorColumn.getType()
+                        .getSchema()))
                 {
                     return false;
                 }

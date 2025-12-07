@@ -93,11 +93,13 @@ public class NestedLoop implements IPhysicalPlan
     private final boolean switchedInputs;
     /** The outer schema if this join is a correlated type */
     private final Schema outerSchema;
-    private final boolean isAsteriskOuterSchema;
 
     private final Schema schema;
     private final Schema cartesianSchema;
     private final boolean isAsteriskSchema;
+
+    private final boolean outerSchemaOriginatesFromAsteriskInput;
+    private final boolean schemaOriginatesFromAsteriskInput;
 
     //@formatter:off
     private NestedLoop(
@@ -124,7 +126,7 @@ public class NestedLoop implements IPhysicalPlan
         this.emitEmptyOuterRows = emitEmptyOuterRows;
         this.switchedInputs = switchedInputs;
         this.outerSchema = requireNonNull(outerSchema, "outerSchema");
-        this.isAsteriskOuterSchema = SchemaUtils.isAsterisk(outerSchema);
+        this.outerSchemaOriginatesFromAsteriskInput = SchemaUtils.originatesFromAsteriskInput(outerSchema);
 
         if (switchedInputs
                 && (condition != null
@@ -143,6 +145,7 @@ public class NestedLoop implements IPhysicalPlan
         this.schema = getSchema();
         this.cartesianSchema = getSchema(true);
         this.isAsteriskSchema = SchemaUtils.isAsterisk(schema);
+        this.schemaOriginatesFromAsteriskInput = SchemaUtils.originatesFromAsteriskInput(schema);
     }
 
     /** Create an inner join. Logical operations: INNER JOIN */
@@ -318,7 +321,7 @@ public class NestedLoop implements IPhysicalPlan
             private TupleVector next;
             /** Bit set to keep track of outer matches. Used in left joins to know what outer indices to return */
             private BitSet outerMatches;
-            private CartesianTupleVector cartesian = new CartesianTupleVector(cartesianSchema, isAsteriskSchema);
+            private CartesianTupleVector cartesian = new CartesianTupleVector(cartesianSchema, schemaOriginatesFromAsteriskInput);
 
             // The inner schema used when emitting empty outer row, will be the plan schema from start
             // but if there are inner matches before the un matched ones we switch
@@ -593,7 +596,7 @@ public class NestedLoop implements IPhysicalPlan
         private TupleVector next;
         /** Bit set to keep track of outer matches. Used in left joins to know what outer indices to return */
         private BitSet outerMatches;
-        private CartesianTupleVector cartesian = new CartesianTupleVector(cartesianSchema, isAsteriskSchema);
+        private CartesianTupleVector cartesian = new CartesianTupleVector(cartesianSchema, schemaOriginatesFromAsteriskInput);
 
         // The inner schema used when emitting empty outer row, will be the plan schema from start
         // but if there are inner matches before the un matched ones we switch
@@ -800,7 +803,7 @@ public class NestedLoop implements IPhysicalPlan
          */
         private final OuterTupleVector outerTupleVector;
         private final RowTupleVector rowTupleVector = new RowTupleVector();
-        private final CartesianTupleVector cartesian = new CartesianTupleVector(cartesianSchema, isAsteriskSchema);
+        private final CartesianTupleVector cartesian = new CartesianTupleVector(cartesianSchema, schemaOriginatesFromAsteriskInput);
 
         private TupleVector currentOuter;
         private TupleVector next;
@@ -816,7 +819,7 @@ public class NestedLoop implements IPhysicalPlan
             this.context = context;
             this.iterator = iterator;
             this.nodeData = nodeData;
-            this.outerTupleVector = new OuterTupleVector(contextOuterTupleVector, outerSchema, isAsteriskOuterSchema);
+            this.outerTupleVector = new OuterTupleVector(contextOuterTupleVector, outerSchema, outerSchemaOriginatesFromAsteriskInput);
         }
 
         @Override
@@ -1091,7 +1094,7 @@ public class NestedLoop implements IPhysicalPlan
 
             s = SchemaUtils.joinSchema(outer.getSchema(), innerSchema, populateAlias);
         }
-        Schema schema = s;
+        final Schema schema = s;
         final int outerSize = outer.getSchema()
                 .getSize();
         return new TupleVector()
@@ -1207,33 +1210,7 @@ public class NestedLoop implements IPhysicalPlan
             // We only assert that they are equal
             if (!outerSchemaIsAsterisk)
             {
-                assert (planOuterSchema.equals(this.schema)) : "Planned outer schema should match actual outer schema. Planned: " + planOuterSchema.getColumns()
-                        .stream()
-                        .map(o ->
-                        {
-                            String str = o.toString();
-                            TableSourceReference tableSource = SchemaUtils.getTableSource(o);
-                            if (tableSource != null)
-                            {
-                                str += " (" + tableSource + ")";
-                            }
-                            return str;
-                        })
-                        .collect(joining(", "))
-                                                               + ", actual: "
-                                                               + this.schema.getColumns()
-                                                                       .stream()
-                                                                       .map(o ->
-                                                                       {
-                                                                           String str = o.toString();
-                                                                           TableSourceReference tableSource = SchemaUtils.getTableSource(o);
-                                                                           if (tableSource != null)
-                                                                           {
-                                                                               str += " (" + tableSource + ")";
-                                                                           }
-                                                                           return str;
-                                                                       })
-                                                                       .collect(joining(", "));
+                CartesianTupleVector.assertSchemas(planOuterSchema, schema, "outer");
             }
         }
 
@@ -1267,7 +1244,7 @@ public class NestedLoop implements IPhysicalPlan
     private static class CartesianTupleVector implements TupleVector
     {
         private final Schema cartesianSchema;
-        private final boolean isAsteriskSchema;
+        private final boolean schemaOriginatesFromAsteriskInput;
 
         private TupleVector outer;
         private TupleVector inner;
@@ -1279,13 +1256,12 @@ public class NestedLoop implements IPhysicalPlan
         private CartesianColumn[] columns;
         private int rowCount;
         private int outerSize;
-        // private int innerSize;
         private int innerRowCount;
 
-        CartesianTupleVector(Schema cartesianSchema, boolean isAsteriskSchema)
+        CartesianTupleVector(Schema cartesianSchema, boolean schemaOriginatesFromAsteriskInput)
         {
             this.cartesianSchema = cartesianSchema;
-            this.isAsteriskSchema = isAsteriskSchema;
+            this.schemaOriginatesFromAsteriskInput = schemaOriginatesFromAsteriskInput;
         }
 
         /** Inits this vector with new outer/inner vectors. Calculates new schemas etc. */
@@ -1306,35 +1282,9 @@ public class NestedLoop implements IPhysicalPlan
             }
 
             // We only assert that they are equal
-            if (!isAsteriskSchema)
+            if (!schemaOriginatesFromAsteriskInput)
             {
-                assert (cartesianSchema.equals(this.schema)) : "Planned cartesian schema should match actual schema. Planned: " + cartesianSchema.getColumns()
-                        .stream()
-                        .map(o ->
-                        {
-                            String str = o.toString();
-                            TableSourceReference tableSource = SchemaUtils.getTableSource(o);
-                            if (tableSource != null)
-                            {
-                                str += " (" + tableSource + ")";
-                            }
-                            return str;
-                        })
-                        .collect(joining(", "))
-                                                               + ", actual: "
-                                                               + this.schema.getColumns()
-                                                                       .stream()
-                                                                       .map(o ->
-                                                                       {
-                                                                           String str = o.toString();
-                                                                           TableSourceReference tableSource = SchemaUtils.getTableSource(o);
-                                                                           if (tableSource != null)
-                                                                           {
-                                                                               str += " (" + tableSource + ")";
-                                                                           }
-                                                                           return str;
-                                                                       })
-                                                                       .collect(joining(", "));
+                assertSchemas(cartesianSchema, schema, "cartesian");
             }
             this.outerSize = outerSchema.getSize();
 
@@ -1417,6 +1367,40 @@ public class NestedLoop implements IPhysicalPlan
                 }
                 return row % innerRowCount;
             }
+        }
+
+        // Validates that schemas are equal. Used in assert to catch errors in tests
+        static void assertSchemas(Schema plannedSchema, Schema runtimeSchema, String type)
+        {
+            assert (plannedSchema.equals(runtimeSchema)) : "Planned " + type
+                                                           + " schema should match actual schema. Planned: "
+                                                           + plannedSchema.getColumns()
+                                                                   .stream()
+                                                                   .map(o ->
+                                                                   {
+                                                                       String str = o.toString();
+                                                                       TableSourceReference tableSource = SchemaUtils.getTableSource(o);
+                                                                       if (tableSource != null)
+                                                                       {
+                                                                           str += " (" + tableSource + ")";
+                                                                       }
+                                                                       return str;
+                                                                   })
+                                                                   .collect(joining(", "))
+                                                           + ", actual: "
+                                                           + runtimeSchema.getColumns()
+                                                                   .stream()
+                                                                   .map(o ->
+                                                                   {
+                                                                       String str = o.toString();
+                                                                       TableSourceReference tableSource = SchemaUtils.getTableSource(o);
+                                                                       if (tableSource != null)
+                                                                       {
+                                                                           str += " (" + tableSource + ")";
+                                                                       }
+                                                                       return str;
+                                                                   })
+                                                                   .collect(joining(", "));
         }
     }
 

@@ -35,7 +35,7 @@ public class OperatorFunctionScan implements IPhysicalPlan
         this.function = requireNonNull(function, "function");
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.schema = requireNonNull(schema, "schema");
-        this.hasAsteriskSchemaOrInput = SchemaUtils.isAsterisk(schema, true);
+        this.hasAsteriskSchemaOrInput = SchemaUtils.originatesFromAsteriskInput(schema);
         if (schema.getColumns()
                 .size() != 1)
         {

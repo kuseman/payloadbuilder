@@ -112,14 +112,14 @@
           "name": "table",
           "columns": [ "id", "table", "object", "table2" ],
           "types": [
-            {"type": "String"},
+            { "type": "String"},
             { "type": "String" },
             { "type": "Object", "schema": [ { "name": "key", "type": { "type": "Int" } } ] },
             { "type": "Table", "schema": [ { "name": "key", "type": { "type": "Int" } }, { "name": "key2", "type": { "type": "Boolean" } } ] }
           ],
           "rows": [
-            [ "1", "[{ \"key\": 123, \"value\": 456 },{ \"key\": 789, \"value\": 101112 }]", { "key": 666 },  [{ "key": 4567, "key2": true },{ "key": 891011, "key2": false }] ],
-            [ "2", "[]", null, [{ "key": 666, "key2": false },{ "key": 1337, "key2": true }] ]
+            [ "1", "[{ \"key\": 123, \"value\": 456 },{ \"key\": 789, \"value\": 101112 }]", { "key": 666 }, [ { "key": 4567, "key2": true } , { "key": 891011, "key2": false } ] ],
+            [ "2", "[]",                                                                     null,           [ { "key": 666, "key2": false } , { "key": 1337,   "key2": true  } ] ]
           ]
         }
       ]
@@ -2618,6 +2618,44 @@
         [
           [ { "key": "_outer", "value": { "_inner": [ { "key": 4567, "key2": true  }, { "key": 891011, "key2": false } ] } } ],
           [ { "key": "_outer", "value": { "_inner": [ { "key": 666,  "key2": false }, { "key": 1337,   "key2": true  } ] } } ]
+        ]
+      ]
+    },
+    {
+      "name": "Sub query expressions with no rows",
+      "description": [
+        "Regression test of a query with sub query expressions that returned no rows along with ordinal resolved columns ",
+        "that got mismatch schemas compile time vs runtime"
+      ],
+      "query": [
+        "--set @@printplan=true               ",
+        "use complexColumns                   ",
+        "SELECT                               ",
+        "(                                    ",
+        "   SELECT                            ",
+        "   (                                 ",
+        "      SELECT *                       ",
+        "      FROM (totable(v.table2)) x     ",
+        "      WHERE x.key = 666              ",
+        "      FOR OBJECT_ARRAY               ",
+        "   ) _outer                          ",
+        "   ,(                                ",
+        "      SELECT key * 2 newKey          ",
+        "      FROM (totable(v.table2)) x     ",
+        "      FOR OBJECT_ARRAY               ",
+        "   ) _outer2                         ",
+        "   , v.id                            ",
+        "   FOR OBJECT                        ",
+        ") x                                  ",
+        "FROM (                               ",
+        "   select x.table2, x.id             ",
+        "   from \"table\" x                  ",
+        ") v                                  "
+      ],
+      "expectedResultSets": [
+        [
+          [ { "key": "x", "value": { "_outer":  null,                              "_outer2": [ { "newKey": 9134}, { "newKey": 1782022 } ], "id": "1" } } ],
+          [ { "key": "x", "value": { "_outer":  [ { "key": 666, "key2": false } ], "_outer2": [ { "newKey": 1332}, { "newKey": 2674    } ], "id": "2" } } ]
         ]
       ]
     }

@@ -699,19 +699,9 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         ResolvedType type = pair.getValue()
                 .getType(input.getSchema());
 
-        // If the function type has a sub schema which is asterisk then we treat this column as asterisk
-        // to easier detect if a schema is asterisk without the need to dig into the sub schema
-        CoreColumn.Type columnType = CoreColumn.Type.REGULAR;
-        if (type.getSchema() != null
-                && SchemaUtils.isAsterisk(type.getSchema(), true))
-        {
-            columnType = CoreColumn.Type.ASTERISK;
-        }
-
         // Recreate the operator schema
         // Use type from the resolved input and name from the plans schema
         Schema schema = Schema.of(CoreColumn.Builder.from(name, type)
-                .withColumnType(columnType)
                 .withInternal(isInternal)
                 .build());
 
@@ -1371,15 +1361,6 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 Column schemaColumn = p.getValue();
                 // We only look for direct asterisk columns here
                 boolean isAsterisk = SchemaUtils.getColumnType(schemaColumn) == CoreColumn.Type.ASTERISK;
-
-                // We treat internal columns as non asterisk when resolving even if their schema is asterisk due
-                // to it's input.
-                // This happens when a subquery expression is pushed down to a join and is getting a generated name (__expr0 etc.)
-                // and we hit that column, if that one is asterisk we must treat it like a non asterisk match
-                if (SchemaUtils.isInternal(schemaColumn))
-                {
-                    isAsterisk = false;
-                }
 
                 String schemaAlias = p.getKey();
                 // If the schema doesn't have an alias check to see if the column has a TableSourceReference

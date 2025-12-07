@@ -64,7 +64,6 @@ import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableSource;
 import se.kuseman.payloadbuilder.core.logicalplan.optimization.ProjectionMerger;
 import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeInterceptor;
-import se.kuseman.payloadbuilder.core.physicalplan.CachePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionPredicate;
 import se.kuseman.payloadbuilder.core.physicalplan.HashAggregate;
 import se.kuseman.payloadbuilder.core.physicalplan.HashMatch;
@@ -415,8 +414,10 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             throw new IllegalArgumentException("RIGHT joins are not supported");
         }
 
+        // CSOFF
         IPhysicalPlan outer = plan.getOuter()
                 .accept(this, context);
+        // CSON
 
         IExpression condition = plan.getCondition();
 
@@ -501,19 +502,23 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         }
         else
         {
-            ValueVector forceNoInnerCacheProperty = context.context.getSession()
-                    .getSystemProperty(QuerySession.FORCE_NO_INNER_CACHE);
-            boolean forceNoInnerCache = !forceNoInnerCacheProperty.isNull(0)
-                    && forceNoInnerCacheProperty.getBoolean(0);
-
-            // We can cache the inner plan if we have a non correlated plain nested loop
-            if (!pushOuterReference
-                    && !forceNoInnerCache
-                    && !correlated
-                    && !plan.isSwitchedInputs())
-            {
-                inner = wrapWithAnalyze(context, new CachePlan(context.getNextNodeId(), inner));
-            }
+            // Turned off since cache is broken by design atm.
+            // It's never reset during a statement and this is not correct
+            // in many cases when there are nested sub query expressions that is cached when they shouldn't
+            //
+            // ValueVector forceNoInnerCacheProperty = context.context.getSession()
+            // .getSystemProperty(QuerySession.FORCE_NO_INNER_CACHE);
+            // boolean forceNoInnerCache = !forceNoInnerCacheProperty.isNull(0)
+            // && forceNoInnerCacheProperty.getBoolean(0);
+            //
+            // // We can cache the inner plan if we have a non correlated plain nested loop
+            // if (!pushOuterReference
+            // && !forceNoInnerCache
+            // && !correlated
+            // && !plan.isSwitchedInputs())
+            // {
+            // inner = wrapWithAnalyze(context, new CachePlan(context.getNextNodeId(), inner));
+            // }
 
             join = createNestedLoop(plan, context.getNextNodeId(), outer, inner, predicate, pushOuterReference);
         }

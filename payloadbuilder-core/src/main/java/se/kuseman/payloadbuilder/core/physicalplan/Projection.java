@@ -45,7 +45,7 @@ public class Projection implements IPhysicalPlan
         this.hasAsteriskProjection = expressions.stream()
                 .anyMatch(e -> e instanceof AsteriskExpression);
         this.hasAsteriskSchemaOrInput = hasAsteriskProjection
-                || SchemaUtils.isAsterisk(schema, true);
+                || SchemaUtils.originatesFromAsteriskInput(schema);
         this.parentTableSource = parentTableSource;
 
         if (expressions.size() != schema.getSize())
