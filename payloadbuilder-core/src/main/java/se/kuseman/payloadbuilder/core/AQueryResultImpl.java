@@ -222,7 +222,7 @@ abstract class AQueryResultImpl implements BaseQueryResult, StatementVisitor<Voi
         Schema schema = currentPlan.getSchema();
         boolean currentPlanIsAsterisk = SchemaUtils.isAsterisk(schema);
         boolean currentPlanHasAsteriskInput = currentPlanIsAsterisk
-                || SchemaUtils.isAsterisk(schema, true);
+                || SchemaUtils.originatesFromAsteriskInput(schema);
         if (resultConsumer != null)
         {
             resultConsumer.schema(currentPlanIsAsterisk ? Schema.EMPTY
