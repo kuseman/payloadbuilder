@@ -38,7 +38,7 @@ public class ConstantScan implements IPhysicalPlan
         this.schema = schema;
         this.rowsExpressions = requireNonNull(rowsExpressions);
         this.vector = null;
-        this.hasAsteriskSchemaOrInput = SchemaUtils.isAsterisk(schema, true);
+        this.hasAsteriskSchemaOrInput = SchemaUtils.originatesFromAsteriskInput(schema);
     }
 
     public ConstantScan(int nodeId, TupleVector vector)

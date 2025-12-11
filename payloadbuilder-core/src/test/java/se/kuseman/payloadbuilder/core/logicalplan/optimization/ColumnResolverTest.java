@@ -548,7 +548,7 @@ class ColumnResolverTest extends ALogicalPlanOptimizerTest
                             false,
                             Schema.EMPTY),
                         new OperatorFunctionScan(
-                            Schema.of(ast("__expr0", ResolvedType.table(Schema.of(ast("", "b.*", tableB))), "", null, true)),
+                            Schema.of(col("__expr0", ResolvedType.table(Schema.of(ast("", "b.*", tableB))), true)),
                             projection(
                                 ConstantScan.ONE_ROW_EMPTY_SCHEMA,
                                 List.of(new AsteriskExpression(QualifiedName.of("b"), null, Set.of(tableB)))),
@@ -1020,7 +1020,7 @@ class ColumnResolverTest extends ALogicalPlanOptimizerTest
                             false,
                             Schema.EMPTY),
                         new OperatorFunctionScan(
-                                Schema.of(ast("__expr0", ResolvedType.table(objectArraySchema), true)),
+                                Schema.of(col("__expr0", ResolvedType.table(objectArraySchema), true)),
                                 projection(
                                     new ExpressionScan(
                                         e_b.withParent(tableB),
@@ -1759,7 +1759,7 @@ class ColumnResolverTest extends ALogicalPlanOptimizerTest
                         false,
                         Schema.EMPTY),
                     new OperatorFunctionScan(
-                        Schema.of(ast("__expr0", ResolvedType.table(subQuerySchema), true)),
+                        Schema.of(col("__expr0", ResolvedType.table(subQuerySchema), true)),
                         projection(
                             new ExpressionScan(
                                 e_b.withParent(tableB),
@@ -2026,7 +2026,7 @@ class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     new Join(
                         tableScan(schemaSTableA, sTableA),
                         new OperatorFunctionScan(
-                            Schema.of(ast("__expr0", ResolvedType.object(Schema.of(nast("col1", ResolvedType.ANY, tableB), col("col3", Type.Float, sTableA))), true)),
+                            Schema.of(col("__expr0", ResolvedType.object(Schema.of(nast("col1", ResolvedType.ANY, tableB), col("col3", Type.Float, sTableA))), true)),
                             projection(
                                 tableScan(schemaB, tableB),
                                 List.of(
