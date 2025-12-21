@@ -70,10 +70,8 @@ import se.kuseman.payloadbuilder.core.expression.NullPredicateExpression;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
-import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeInterceptor;
 import se.kuseman.payloadbuilder.core.physicalplan.Assert;
 import se.kuseman.payloadbuilder.core.physicalplan.ConstantScan;
-import se.kuseman.payloadbuilder.core.physicalplan.DescribePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionPredicate;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.physicalplan.Filter;
@@ -336,63 +334,6 @@ class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    void test_sub_query_filter_elimination_analyze()
-    {
-        // Verify that the nested filters are merged when the subquery are eliminated
-        //@formatter:off
-        String query = """
-               analyze
-               select *
-               from
-               (
-                 select *
-                 from tableA a
-                 where a.col1 > 10
-               ) x
-               where x.col > 20
-               """;
-        //@formatter:on
-
-        TestCatalog t = new TestCatalog(emptyMap());
-        catalogRegistry.registerCatalog("t", t);
-
-        QueryStatement queryStatement = parse(query);
-        queryStatement = StatementPlanner.plan(session, queryStatement);
-
-        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
-                .get(0)).getPlan();
-
-        TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
-
-        Schema expectedSchemaA = Schema.of(ast("a", tableA));
-
-        //@formatter:off
-        IPhysicalPlan expected = new DescribePlan(4,
-                    new AnalyzeInterceptor(
-                        3,
-                        new Filter(
-                            2,
-                            new AnalyzeInterceptor(
-                                1,
-                                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList())
-                            ),
-                            new ExpressionPredicate(and(gt(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(10)),
-                                    gt(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(20))))
-                        )),
-                    true);
-        //@formatter:on
-
-        // System.out.println(actual.print(0));
-        // System.out.println(expected.print(0));
-
-        Assertions.assertThat(actual)
-                .usingRecursiveComparison()
-                .isEqualTo(expected);
-
-        assertEquals(expected, actual);
-    }
-
-    @Test
     void test_nested_sub_query_projection_elimination()
     {
         // Verify that the nested projections are merged when the subquery are eliminated
@@ -493,70 +434,6 @@ class QueryPlannerTest extends APhysicalPlanTest
                         add(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK))),
                 subQueryX
                 );
-        //@formatter:on
-
-        // System.out.println(actual.print(0));
-        // System.out.println(expected.print(0));
-
-        Assertions.assertThat(actual)
-                .usingRecursiveComparison()
-                .isEqualTo(expected);
-
-        assertEquals(expected, actual);
-    }
-
-    @Test
-    void test_sub_query_projection_elimination_analyze()
-    {
-        // Verify that the nested projections are merged when the subquery are eliminated
-        //@formatter:off
-        String query = """
-                analyze
-                select x.col1, x.col2, x.col3 + x.col2
-                from
-                (
-                  select col1, col2, col3
-                  from tableA
-                ) x
-                """;
-        //@formatter:on
-
-        TestCatalog t = new TestCatalog(emptyMap());
-        catalogRegistry.registerCatalog("t", t);
-
-        QueryStatement queryStatement = parse(query);
-        queryStatement = StatementPlanner.plan(session, queryStatement);
-
-        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
-                .get(0)).getPlan();
-
-        TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
-        TableSourceReference subQueryX = new TableSourceReference(0, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
-        Schema expectedSchemaA = Schema.of(ast("", tableA));
-
-        //@formatter:off
-        IPhysicalPlan expected =
-                new DescribePlan(
-                    6,
-                    new AnalyzeInterceptor(
-                        5,
-                        new Projection(
-                            4,
-                            new AnalyzeInterceptor(
-                                1,
-                                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList())
-                            ),
-                            Schema.of(
-                              nast("col1", ResolvedType.ANY, tableA),
-                              nast("col2", ResolvedType.ANY, tableA),
-                              col("", Type.Any, "col3 + col2")
-                            ),
-                            List.of(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK),
-                                    add(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK))),
-                            subQueryX
-                        )
-                    ),
-                    true);
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -1112,7 +989,7 @@ class QueryPlannerTest extends APhysicalPlanTest
         };
         catalogRegistry.registerCatalog("t", t);
 
-        session.setSystemProperty(QuerySession.FORCE_NO_INNER_CACHE, ValueVector.literalBoolean(true, 1));
+        // session.setSystemProperty(QuerySession.FORCE_NO_INNER_CACHE, ValueVector.literalBoolean(true, 1));
 
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
@@ -2999,84 +2876,6 @@ class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    void test_predicate_pushdown_with_analyze()
-    {
-        //@formatter:off
-        String query = ""
-                + "analyze select * "
-                + "from \"table\" "
-                + "where col = 10 "         // Comparison  
-                + "and col2 in (10,20) "    // In
-                + "and col3 like 'string' " // Like
-                + "and col4 is null "       // Null
-                + "and someFunc() ";        // Function call
-                
-        //@formatter:on
-
-        // Capture col and "" (someFunc)
-        ScalarFunctionInfo someFunc = new ScalarFunctionInfo("someFunc", FunctionInfo.FunctionType.SCALAR)
-        {
-        };
-        TestCatalog catalog = new TestCatalog(ofEntries(entry(QualifiedName.of("table"), CollectionUtils.asSet("col", ""))))
-        {
-            {
-                registerFunction(someFunc);
-            }
-        };
-
-        catalogRegistry.registerCatalog("t", catalog);
-
-        QueryStatement queryStatement = parse(query);
-        queryStatement = StatementPlanner.plan(session, queryStatement);
-
-        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
-                .get(0)).getPlan();
-
-        TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
-
-        //@formatter:off
-        Schema expectedSchema = Schema.of(ast("", table));
-        
-        IPhysicalPlan expected = new DescribePlan(
-                4,
-                new AnalyzeInterceptor(
-                    3,
-                    new Filter(
-                        2,
-                        new AnalyzeInterceptor(
-                            1,
-                            new TableScan(0, expectedSchema, table, "test", catalog.scanDataSources.get(0), emptyList())
-                        ),
-                        new ExpressionPredicate(
-                            and(
-                                and(
-                                    new InExpression(cre("col2", table, CoreColumn.Type.NAMED_ASTERISK), asList(intLit(10), intLit(20)), false),
-                                    new LikeExpression(cre("col3", table, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("string"), false, null)
-                                ),
-                                new NullPredicateExpression(cre("col4", table, CoreColumn.Type.NAMED_ASTERISK), false)))
-                        )),
-                true);
-        //@formatter:on
-
-        //@formatter:off
-        assertEquals(1, catalog.consumedPredicate.size());
-        assertEquals(asList(
-                Triple.of(null, IPredicate.Type.FUNCTION_CALL, asList(new FunctionCallExpression("t", someFunc, null, asList()))),
-                Triple.of(QualifiedName.of("col"), IPredicate.Type.COMPARISION, asList(intLit(10)))
-                ), catalog.consumedPredicate.get(QualifiedName.of("table")));
-        //@formatter:on
-
-        // System.out.println(actual.print(0));
-        // System.out.println(expected.print(0));
-
-        Assertions.assertThat(actual)
-                .usingRecursiveComparison()
-                .isEqualTo(expected);
-
-        assertEquals(expected, actual);
-    }
-
-    @Test
     void test_predicate_pushdown_all_filters_consumed()
     {
         //@formatter:off
@@ -3126,7 +2925,7 @@ class QueryPlannerTest extends APhysicalPlanTest
         assertEquals(expected, actual);
     }
 
-    private QueryStatement parse(String query)
+    static QueryStatement parse(String query)
     {
         return PARSER.parseQuery(query, null);
     }

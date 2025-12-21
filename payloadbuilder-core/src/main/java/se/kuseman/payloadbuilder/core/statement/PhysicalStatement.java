@@ -2,21 +2,29 @@ package se.kuseman.payloadbuilder.core.statement;
 
 import static java.util.Objects.requireNonNull;
 
+import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.physicalplan.IPhysicalPlan;
 
 /** Physical statement that wraps a {@link IPhysicalPlan}. */
 public class PhysicalStatement extends Statement
 {
     private final IPhysicalPlan plan;
+    private final Location location;
 
-    public PhysicalStatement(IPhysicalPlan plan)
+    public PhysicalStatement(IPhysicalPlan plan, Location location)
     {
         this.plan = requireNonNull(plan, "plan");
+        this.location = location;
     }
 
     public IPhysicalPlan getPlan()
     {
         return plan;
+    }
+
+    public Location getLocation()
+    {
+        return location;
     }
 
     @Override

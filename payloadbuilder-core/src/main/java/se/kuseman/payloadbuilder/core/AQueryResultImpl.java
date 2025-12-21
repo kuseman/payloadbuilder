@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.time.StopWatch;
 
 import se.kuseman.payloadbuilder.api.OutputWriter;
@@ -25,6 +26,11 @@ import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.OutputWriterUtils;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
+import se.kuseman.payloadbuilder.core.parser.Location;
+import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeVisitor;
+import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeVisitor.AnalyzeData;
+import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeVisitor.AnlayzeType;
+import se.kuseman.payloadbuilder.core.physicalplan.DescribePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.IPhysicalPlan;
 import se.kuseman.payloadbuilder.core.statement.CacheFlushRemoveStatement;
 import se.kuseman.payloadbuilder.core.statement.DescribeSelectStatement;
@@ -166,6 +172,27 @@ abstract class AQueryResultImpl implements BaseQueryResult, StatementVisitor<Voi
     public Void visit(PhysicalStatement statement, Void ctx)
     {
         currentPlan = statement.getPlan();
+
+        if (!(currentPlan instanceof DescribePlan))
+        {
+            AnalyzeData analyzeData = AnalyzeVisitor.AnalyzeData.fromSession(session);
+            if (analyzeData.type() != AnlayzeType.NONE)
+            {
+                String queryText = ObjectUtils.getIfNull(statement.getLocation(), Location.EMPTY)
+                        .text();
+                IPhysicalPlan analyzePlan = AnalyzeVisitor.describe(currentPlan, analyzeData.type(), analyzeData.format(), queryText);
+                if (analyzeData.extendOutput())
+                {
+                    // Run currentPlan as usual and the add the analyze on top on queue
+                    queue.add(0, new PhysicalStatement(analyzePlan, null));
+                }
+                else
+                {
+                    currentPlan = analyzePlan;
+                }
+            }
+        }
+
         return null;
     }
 

@@ -23,6 +23,7 @@ import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.OutputWriterUtils;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
+import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeVisitor.AnalyzeFormat;
 
 /** Plan for describing another physical plan and return describable output */
 public class DescribePlan implements IPhysicalPlan
@@ -31,18 +32,42 @@ public class DescribePlan implements IPhysicalPlan
     private final int nodeId;
     private final IPhysicalPlan input;
     private final boolean analyze;
+    private final String queryText;
+    private final AnalyzeFormat format;
 
-    public DescribePlan(int nodeId, IPhysicalPlan input, boolean analyze)
+    public DescribePlan(int nodeId, IPhysicalPlan input, boolean analyze, AnalyzeFormat format, String queryText)
     {
         this.nodeId = nodeId;
         this.input = requireNonNull(input, "input");
         this.analyze = analyze;
+        this.format = requireNonNull(format, "format");
+        this.queryText = queryText;
     }
 
     @Override
     public int getNodeId()
     {
         return nodeId;
+    }
+
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
+    public boolean isAnalyze()
+    {
+        return analyze;
+    }
+
+    public AnalyzeFormat getAnalyzeFormat()
+    {
+        return format;
+    }
+
+    public String getQueryText()
+    {
+        return queryText;
     }
 
     @Override
@@ -58,46 +83,53 @@ public class DescribePlan implements IPhysicalPlan
     }
 
     @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
+    @Override
     public Map<String, Object> getDescribeProperties(IExecutionContext context)
     {
         Map<String, Object> properties = new LinkedHashMap<>();
-        NodeData data = context.getStatementContext()
-                .getNodeData(nodeId);
-        AnalyzeInterceptor.populateTimings(context, data, this, properties);
-        properties.put("Allocations", ((ExecutionContext) context).getBufferAllocator()
-                .getStatistics()
-                .asObject());
+        properties.put("Query Text", queryText);
 
-        Map<String, Map<String, Object>> catalogStatistics = new HashMap<>();
-        QuerySession session = (QuerySession) context.getSession();
-        session.getCatalogRegistry()
-                .getCatalogs()
-                .forEach(e ->
-                {
-                    Map<String, Object> statistics = e.getValue()
-                            .getExecutionStatistics(context);
-                    if (statistics.isEmpty())
+        if (analyze)
+        {
+            NodeData data = context.getStatementContext()
+                    .getNodeData(nodeId);
+            AnalyzeInterceptor.populateTimings(context, data, this, properties);
+            properties.put("Allocations", ((ExecutionContext) context).getBufferAllocator()
+                    .getStatistics()
+                    .asObject());
+
+            Map<String, Map<String, Object>> catalogStatistics = new HashMap<>();
+            QuerySession session = (QuerySession) context.getSession();
+            session.getCatalogRegistry()
+                    .getCatalogs()
+                    .forEach(e ->
                     {
-                        return;
-                    }
-                    catalogStatistics.put(e.getValue()
-                            .getName(), statistics);
-                });
+                        Map<String, Object> statistics = e.getValue()
+                                .getExecutionStatistics(context);
+                        if (statistics.isEmpty())
+                        {
+                            return;
+                        }
+                        catalogStatistics.put(e.getValue()
+                                .getName(), statistics);
+                    });
 
-        properties.put("Catalog Statistics", catalogStatistics);
+            properties.put("Catalog Statistics", catalogStatistics);
+        }
         return properties;
     }
 
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
-        IPhysicalPlan describePlan = input;
-
         // Execute and traverse query in analyze mode before gathering describe data
         if (analyze)
         {
-            describePlan = this;
-
             // Trigger creation of node data to get this nodes timing in output
             NodeData data = context.getStatementContext()
                     .getOrCreateNodeData(nodeId);
@@ -118,20 +150,20 @@ public class DescribePlan implements IPhysicalPlan
             }
             finally
             {
+                it.close();
+
                 data.suspenNodeTime();
                 data.increaseRowCount(rowCount);
 
                 // Populate total query time on every node data
                 long total = TimeUnit.MILLISECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS);
                 ((StatementContext) context.getStatementContext()).forEachNodeData((i, n) -> n.setTotalQueryTime(total));
-
-                it.close();
             }
         }
 
         ((ExecutionContext) context).getStatementContext()
                 .setOuterTupleVector(new DescribeTupleVector());
-        return TupleIterator.singleton(DescribeUtils.getDescribeVector(context, describePlan));
+        return TupleIterator.singleton(DescribeUtils.getDescribeVector(context, format, this));
     }
 
     @Override
@@ -163,9 +195,8 @@ public class DescribePlan implements IPhysicalPlan
         {
             return true;
         }
-        else if (obj instanceof DescribePlan)
+        else if (obj instanceof DescribePlan that)
         {
-            DescribePlan that = (DescribePlan) obj;
             return nodeId == that.nodeId
                     && input.equals(that.input)
                     && analyze == that.analyze;

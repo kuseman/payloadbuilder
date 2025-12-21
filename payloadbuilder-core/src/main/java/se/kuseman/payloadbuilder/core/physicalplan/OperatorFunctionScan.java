@@ -49,6 +49,33 @@ public class OperatorFunctionScan implements IPhysicalPlan
         return nodeId;
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
+    public OperatorFunctionInfo getFunction()
+    {
+        return function;
+    }
+
+    public String getCatalogAlias()
+    {
+        return catalogAlias;
+    }
+
+    @Override
+    public String getName()
+    {
+        return "Operator Function Scan";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
     @Override
     public Schema getSchema()
     {

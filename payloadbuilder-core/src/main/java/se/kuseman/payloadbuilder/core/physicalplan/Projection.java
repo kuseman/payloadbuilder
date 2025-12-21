@@ -82,6 +82,12 @@ public class Projection implements IPhysicalPlan
     }
 
     @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
+    @Override
     public Map<String, Object> getDescribeProperties(IExecutionContext context)
     {
         return ofEntries(true, entry(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(getSchema())), entry(IDatasource.DEFINED_VALUES, expressions.stream()

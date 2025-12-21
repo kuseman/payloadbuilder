@@ -228,7 +228,7 @@ public class QueryParser
                     }
                 }
 
-                Location location = new Location(line, startIndex, stopIndex);
+                Location location = new Location(line, startIndex, stopIndex, "");
                 throw new ParseException(msg, location);
             }
         };
@@ -469,10 +469,10 @@ public class QueryParser
                     inputInput = limit.getInput();
                 }
 
-                input = new LogicalSelectStatement(new Limit(inputInput, topCount), false);
+                input = new LogicalSelectStatement(new Limit(inputInput, topCount), false, Location.withText(ctx));
             }
             TableName tableName = tableName(ctx.tableName(), ctx.intoOptions);
-            return new LogicalInsertIntoStatement(input, tableName.catalogAlias, tableName.table, columns, tableName.options, Location.from(ctx));
+            return new LogicalInsertIntoStatement(input, tableName.catalogAlias, tableName.table, columns, tableName.options, Location.withText(ctx));
         }
 
         @Override
@@ -490,7 +490,7 @@ public class QueryParser
                     .toList();
 
             ConstantScan constantScan = ConstantScan.createFromRows(expressions, Location.from(ctx.tableValueConstructor()));
-            return new LogicalSelectStatement(constantScan, false);
+            return new LogicalSelectStatement(constantScan, false, Location.withText(ctx));
         }
 
         @Override
@@ -531,7 +531,7 @@ public class QueryParser
             plan = wrapTop(plan, ctx);
             plan = wrapOperatorFunction(plan, ctx);
 
-            Statement statement = new LogicalSelectStatement(plan, assignmentSelect);
+            Statement statement = new LogicalSelectStatement(plan, assignmentSelect, Location.withText(ctx));
 
             if (ctx.into != null)
             {
@@ -541,7 +541,7 @@ public class QueryParser
                 }
 
                 TableName tableName = tableName(ctx.into, ctx.intoOptions);
-                statement = new LogicalSelectIntoStatement((LogicalSelectStatement) statement, tableName.catalogAlias, tableName.table, tableName.options, Location.from(ctx.into));
+                statement = new LogicalSelectIntoStatement((LogicalSelectStatement) statement, tableName.catalogAlias, tableName.table, tableName.options, Location.withText(ctx));
             }
 
             return statement;

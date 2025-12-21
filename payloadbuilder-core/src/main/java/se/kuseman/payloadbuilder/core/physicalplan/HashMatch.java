@@ -106,16 +106,38 @@ public class HashMatch implements IPhysicalPlan
         this.isAsteriskInnerSchema = SchemaUtils.isAsterisk(inner.getSchema());
     }
 
+    /** Copy ctor with new inputs */
+    public HashMatch(HashMatch source, IPhysicalPlan outer, IPhysicalPlan inner)
+    {
+        this(source.nodeId, outer, inner, source.outerHashFunction, source.innerHashFunction, source.condition, source.populateAlias, source.emitEmptyOuterRows, source.pushOuterReference);
+    }
+
     @Override
     public int getNodeId()
     {
         return nodeId;
     }
 
+    public IPhysicalPlan getOuter()
+    {
+        return outer;
+    }
+
+    public IPhysicalPlan getInner()
+    {
+        return inner;
+    }
+
     @Override
     public String getName()
     {
         return "Hash Match";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override

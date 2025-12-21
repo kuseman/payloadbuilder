@@ -152,6 +152,12 @@ class ProjectionTest extends APhysicalPlanTest
             }
 
             @Override
+            public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+            {
+                throw new RuntimeException("Cannot be visited");
+            }
+
+            @Override
             public List<IPhysicalPlan> getChildren()
             {
                 return emptyList();

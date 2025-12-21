@@ -60,6 +60,12 @@ public class TableScan implements IPhysicalPlan
     }
 
     @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
+    @Override
     public Map<String, Object> getDescribeProperties(IExecutionContext context)
     {
         Map<String, Object> properties = new LinkedHashMap<>();

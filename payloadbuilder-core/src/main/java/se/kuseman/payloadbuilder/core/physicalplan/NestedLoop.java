@@ -148,6 +148,13 @@ public class NestedLoop implements IPhysicalPlan
         this.schemaOriginatesFromAsteriskInput = SchemaUtils.originatesFromAsteriskInput(schema);
     }
 
+    /** Copy source with new inputs */
+    public static NestedLoop copy(NestedLoop source, IPhysicalPlan outer, IPhysicalPlan inner)
+    {
+        return new NestedLoop(source.nodeId, outer, inner, source.condition, source.populateAlias, source.outerReferences, source.emitEmptyOuterRows, source.switchedInputs, source.pushOuterReference,
+                source.outerSchema);
+    }
+
     /** Create an inner join. Logical operations: INNER JOIN */
     public static NestedLoop innerJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> condition, String populateAlias,
             boolean pushOuterReference)
@@ -226,10 +233,26 @@ public class NestedLoop implements IPhysicalPlan
         return nodeId;
     }
 
+    public IPhysicalPlan getOuter()
+    {
+        return outer;
+    }
+
+    public IPhysicalPlan getInner()
+    {
+        return inner;
+    }
+
     @Override
     public String getName()
     {
         return "Nested Loop";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override

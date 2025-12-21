@@ -39,10 +39,31 @@ public class InsertInto implements IPhysicalPlan
         return nodeId;
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
+    public List<String> getInsertColumns()
+    {
+        return insertColumns;
+    }
+
+    public IDatasink getDatasink()
+    {
+        return datasink;
+    }
+
     @Override
     public String getName()
     {
         return "Insert Into";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override

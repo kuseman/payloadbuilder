@@ -42,6 +42,18 @@ public class ExpressionScan implements IPhysicalPlan
     }
 
     @Override
+    public String getName()
+    {
+        return "Expression Scan";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
+    @Override
     public Schema getSchema()
     {
         return schema;
