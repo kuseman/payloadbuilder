@@ -9,6 +9,8 @@ import static se.kuseman.payloadbuilder.core.logicalplan.optimization.LogicalPla
 
 import java.util.List;
 
+import org.apache.commons.lang3.ObjectUtils;
+
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.IDatasink;
@@ -36,9 +38,12 @@ import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 import se.kuseman.payloadbuilder.core.logicalplan.optimization.LogicalPlanOptimizer;
+import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
+import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeVisitor;
+import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeVisitor.AnalyzeFormat;
+import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeVisitor.AnlayzeType;
 import se.kuseman.payloadbuilder.core.physicalplan.AssignmentPlan;
-import se.kuseman.payloadbuilder.core.physicalplan.DescribePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.IPhysicalPlan;
 import se.kuseman.payloadbuilder.core.physicalplan.InsertInto;
 import se.kuseman.payloadbuilder.core.planning.StatementPlanner.Context;
@@ -115,11 +120,15 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
     @Override
     public Statement visit(DescribeSelectStatement statement, Context context)
     {
-        context.analyze = statement.isAnalyze();
         PhysicalStatement physicalStatement = (PhysicalStatement) statement.getStatement()
                 .accept(this, context);
-        context.analyze = false;
-        return new PhysicalStatement(new DescribePlan(context.getNextNodeId(), physicalStatement.getPlan(), statement.isAnalyze()));
+
+        IPhysicalPlan plan = physicalStatement.getPlan();
+        AnalyzeVisitor.AnlayzeType type = statement.isAnalyze() ? AnlayzeType.ANALYZE
+                : AnlayzeType.DESCRIBE;
+        String queryText = ObjectUtils.getIfNull(physicalStatement.getLocation(), Location.EMPTY)
+                .text();
+        return new PhysicalStatement(AnalyzeVisitor.describe(plan, type, AnalyzeFormat.TABLE, queryText), null);
     }
 
     @Override
@@ -164,7 +173,7 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
                                                    new LiteralStringExpression(UTF8String.EMPTY),
                                                    new LiteralStringExpression(UTF8String.EMPTY)),
                                             null),
-                                    new Sort(systemFunctionsScan, sortItems)), null), false).accept(this, context);
+                                    new Sort(systemFunctionsScan, sortItems)), null), false, Location.EMPTY).accept(this, context);
                     //@formatter:on
 
                 }
@@ -183,8 +192,8 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
         QualifiedName qname = isBlank(catalog) ? QualifiedName.of(tableName)
                 : QualifiedName.of(catalog, tableName);
         TableSourceReference tableSourceRef = new TableSourceReference(2, TableSourceReference.Type.TABLE, "sys", qname, "t");
-        return new LogicalSelectStatement(new TableScan(TableSchema.EMPTY, tableSourceRef, se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, emptyList(), null), false).accept(this,
-                context);
+        return new LogicalSelectStatement(new TableScan(TableSchema.EMPTY, tableSourceRef, se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection.ALL, emptyList(), Location.EMPTY), false,
+                null).accept(this, context);
     }
 
     @Override
@@ -264,7 +273,7 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
                 : catalog.getInsertIntoSink(context.getSession(), catalogAlias, statement.getTable(), new InsertIntoData(nodeId, schema, options, insertColumns));
         //@formatter:on
 
-        return new PhysicalStatement(QueryPlanner.wrapWithAnalyze(context, new InsertInto(nodeId, input.getPlan(), insertColumns, sink)));
+        return new PhysicalStatement(new InsertInto(nodeId, input.getPlan(), insertColumns, sink), statement.getLocation());
     }
 
     private PhysicalStatement createPhysicalPlan(LogicalSelectStatement statement, Context context)
@@ -304,6 +313,6 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
         }
 
         // Create a physical plan from the logical
-        return new PhysicalStatement(physicalPlan);
+        return new PhysicalStatement(physicalPlan, statement.getLocation());
     }
 }

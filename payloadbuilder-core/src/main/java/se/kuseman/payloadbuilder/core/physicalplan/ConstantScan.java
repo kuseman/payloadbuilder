@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.stream.IntStream;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
@@ -38,7 +39,7 @@ public class ConstantScan implements IPhysicalPlan
         this.schema = schema;
         this.rowsExpressions = requireNonNull(rowsExpressions);
         this.vector = null;
-        this.hasAsteriskSchemaOrInput = SchemaUtils.isAsterisk(schema, true);
+        this.hasAsteriskSchemaOrInput = SchemaUtils.originatesFromAsteriskInput(schema);
     }
 
     public ConstantScan(int nodeId, TupleVector vector)
@@ -63,6 +64,12 @@ public class ConstantScan implements IPhysicalPlan
     }
 
     @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
+    @Override
     public Map<String, Object> getDescribeProperties(IExecutionContext context)
     {
         Map<String, Object> properties = new LinkedHashMap<>();
@@ -70,6 +77,7 @@ public class ConstantScan implements IPhysicalPlan
         {
             if (!Schema.EMPTY.equals(vector.getSchema()))
             {
+                properties.put(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(vector.getSchema()));
                 properties.put("Rows", IntStream.range(0, vector.getRowCount())
                         .mapToObj(i -> "Row " + i
                                        + ": "

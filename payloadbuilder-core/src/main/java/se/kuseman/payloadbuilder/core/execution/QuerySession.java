@@ -55,17 +55,26 @@ import se.kuseman.payloadbuilder.core.utils.WeakListenerList;
  **/
 public class QuerySession implements IQuerySession
 {
-    /* System properties */
+    /* Compile time System properties */
     /** Enable to print logical and physical plans to session print writer */
     public static final String PRINT_PLAN = "printplan";
     /** Enable to print all logical plans for each optimisation rule. */
     public static final String DEBUG_PLAN = "debugplan";
-
     /** Force a nested loop where default would have been a hash match */
     public static final String FORCE_NESTED_LOOP = "force_nested_loop";
+    // ** Force no inner cache for non correlated nested loops */
+    // public static final String FORCE_NO_INNER_CACHE = "force_no_inner_cache";
 
-    /** Force no inner cache for non correlated nested loops */
-    public static final String FORCE_NO_INNER_CACHE = "force_no_inner_cache";
+    /* Runtime System properties */
+    /** Enable describe of all plans without explicit DESCRIBE key word. This dynamically injects a describe plan on top of all plans. */
+    public static final String PLAN_DESCRIBE = "plan_describe";
+    /** Enable analyze of all plans without explicit ANALYZE key word. This dynamically injects a analyze plan on top of all plans. */
+    public static final String PLAN_ANALYZE = "plan_analyze";
+    /** Format of plan output. Only applicable {@link #PLAN_ANALYZE}, {@link #PLAN_DESCRIBE} or explicit DESCRIBE/ANALYZE keyword is set. */
+    public static final String PLAN_FORMAT = "plan_format";
+    /** Flag that indicates that the query result should be returned along with the plan. Only applicable {@link #PLAN_ANALYZE}, {@link #PLAN_DESCRIBE} or explicit DESCRIBE/ANALYZE keyword is set. */
+    public static final String PLAN_EXTENDED_OUTPUT = "plan_extended_output";
+
     /* End system properties */
 
     /* Compile fields */

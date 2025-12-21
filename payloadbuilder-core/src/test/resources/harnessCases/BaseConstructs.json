@@ -112,14 +112,14 @@
           "name": "table",
           "columns": [ "id", "table", "object", "table2" ],
           "types": [
-            {"type": "String"},
+            { "type": "String"},
             { "type": "String" },
             { "type": "Object", "schema": [ { "name": "key", "type": { "type": "Int" } } ] },
             { "type": "Table", "schema": [ { "name": "key", "type": { "type": "Int" } }, { "name": "key2", "type": { "type": "Boolean" } } ] }
           ],
           "rows": [
-            [ "1", "[{ \"key\": 123, \"value\": 456 },{ \"key\": 789, \"value\": 101112 }]", { "key": 666 },  [{ "key": 4567, "key2": true },{ "key": 891011, "key2": false }] ],
-            [ "2", "[]", null, [{ "key": 666, "key2": false },{ "key": 1337, "key2": true }] ]
+            [ "1", "[{ \"key\": 123, \"value\": 456 },{ \"key\": 789, \"value\": 101112 }]", { "key": 666 }, [ { "key": 4567, "key2": true } , { "key": 891011, "key2": false } ] ],
+            [ "2", "[]",                                                                     null,           [ { "key": 666, "key2": false } , { "key": 1337,   "key2": true  } ] ]
           ]
         }
       ]
@@ -809,6 +809,7 @@
     },
     {
       "name": "Describe select, schema full, any vectors",
+      "onlyAssertExpectedColumns": true,
       "schemaLess": false,
       "typedVectors": false,
       "query": [
@@ -822,18 +823,19 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Node Id", "value": 3 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": 3 },    { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
-          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2 },    { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1 },    { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+          [{ "key": "Node Id", "value": 4 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Write Output"            }, { "key": "Output", "value": null                                 }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 3 }, { "key": "Parent Node Id", "value": 4 },    { "key": "Name", "value": "|  +- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": 3 },    { "key": "Name", "value": "|     +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2 },    { "key": "Name", "value": "|        +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1 },    { "key": "Name", "value": "|           +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
         ]
       ]
     },
     {
-      "name": "Analyze select, schema full",
-      "ignore": true,
-      "_todo": "Add support for regex assert columns, this query contains times that isn't deterministic",
-      "schemaLess": false,
+      "name": "Analyze select, schema less, any vectors",
+      "onlyAssertExpectedColumns": true,
+      "schemaLess": true,
+      "typedVectors": false,
       "query": [
         "analyze ",
         "select d.id ",
@@ -845,15 +847,129 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Node Id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
-          [{ "key": "Node Id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node Id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+          [{ "key": "Node Id", "value": 8 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Write Output"            }, { "key": "Output", "value": null                                 }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 3 }, { "key": "Parent Node Id", "value": 8    }, { "key": "Name", "value": "|  +- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": 3    }, { "key": "Name", "value": "|     +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|        +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1    }, { "key": "Name", "value": "|           +- Scan: data"  }, { "key": "Output", "value": "d (Any)"                            }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+        ]
+      ]
+    },
+    {
+      "name": "Analyze select 2, schema full, any vectors",
+      "onlyAssertExpectedColumns": true,
+      "schemaLess": false,
+      "typedVectors": false,
+      "query": [
+        "analyze ",
+        "select * ",
+        "from data d",
+        "inner join source s ",
+        "  on s.col1 = d.id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Node Id", "value": 6 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Write Output"       }, { "key": "Output", "value": null                                                         }, { "key": "Catalog", "value": null     }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": 6    }, { "key": "Name", "value": "|  +- Hash Match"      }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any), col1 (Any), col2 (Any)" }, { "key": "Catalog", "value": null     }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|     +- Scan: data"   }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)"                         }, { "key": "Catalog", "value": "Test#c" }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|     +- Scan: source" }, { "key": "Output", "value": "col1 (Any), col2 (Any)"                                     }, { "key": "Catalog", "value": "Test#c" }]
+        ]
+      ]
+    },
+    {
+      "name": "Analyze select 3, schema full, types vectors",
+      "onlyAssertExpectedColumns": true,
+      "schemaLess": false,
+      "typedVectors": true,
+      "query": [
+        "set @@force_nested_loop=true ",
+        "analyze ",
+        "select * ",
+        "from data d",
+        "inner join source s ",
+        "  on s.col1 = d.id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Node Id", "value": 6 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Write Output"       }, { "key": "Output", "value": null                                                            }, { "key": "Catalog", "value": null     }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": 6    }, { "key": "Name", "value": "|  +- Nested Loop"     }, { "key": "Output", "value": "id (Int), row_id (Int), data (String), col1 (Int), col2 (Int)" }, { "key": "Catalog", "value": null     }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|     +- Scan: data"   }, { "key": "Output", "value": "id (Int), row_id (Int), data (String)"                         }, { "key": "Catalog", "value": "Test#c" }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|     +- Scan: source" }, { "key": "Output", "value": "col1 (Int), col2 (Int)"                                        }, { "key": "Catalog", "value": "Test#c" }]
+        ]
+      ]
+    },
+    {
+      "name": "Analyze select 4, schema full, types vectors",
+      "onlyAssertExpectedColumns": true,
+      "schemaLess": false,
+      "typedVectors": true,
+      "query": [
+        "analyze ",
+        "select top 1 * ",
+        "from (",
+        " values (1,2), (3,4) ",
+        ") x (col1, col2) "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Node Id", "value": 4 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Write Output"        }, { "key": "Execution Count", "value": 1}, { "key": "Processed Rows", "value": 1}, { "key": "Output", "value": null                     } ],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 4    }, { "key": "Name", "value": "|  +- Limit"            }, { "key": "Execution Count", "value": 1}, { "key": "Processed Rows", "value": 1}, { "key": "Output", "value": "col1 (Int), col2 (Int)" } ],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1    }, { "key": "Name", "value": "|     +- Constant Scan" }, { "key": "Execution Count", "value": 1}, { "key": "Processed Rows", "value": 2}, { "key": "Output", "value": "col1 (Int), col2 (Int)" } ]
+        ]
+      ]
+    },
+    {
+      "name": "Analyze select 5, dynamic no extended output, schema full, types vectors",
+      "onlyAssertExpectedColumns": true,
+      "schemaLess": false,
+      "typedVectors": true,
+      "query": [
+        "set @@plan_analyze = true ",
+        "set @@plan_format = 'table' ",
+        "set @@plan_extended_output = false ",
+        
+        "",
+        "select top 1 * ",
+        "from (",
+        " values (1,2), (3,4) ",
+        ") x (col1, col2) "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Node Id", "value": 4 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Write Output"        }, { "key": "Execution Count", "value": 1}, { "key": "Processed Rows", "value": 1}, { "key": "Output", "value": null                     } ],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 4    }, { "key": "Name", "value": "|  +- Limit"            }, { "key": "Execution Count", "value": 1}, { "key": "Processed Rows", "value": 1}, { "key": "Output", "value": "col1 (Int), col2 (Int)" } ],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1    }, { "key": "Name", "value": "|     +- Constant Scan" }, { "key": "Execution Count", "value": 1}, { "key": "Processed Rows", "value": 2}, { "key": "Output", "value": "col1 (Int), col2 (Int)" } ]
+        ]
+      ]
+    },
+    {
+      "name": "Analyze select 6, dynamic extended output, schema full, types vectors",
+      "onlyAssertExpectedColumns": true,
+      "schemaLess": false,
+      "typedVectors": true,
+      "query": [
+        "set @@plan_analyze = true ",
+        "set @@plan_format = 'table' ",
+        "",
+        "select top 1 * ",
+        "from (",
+        " values (1,2), (3,4) ",
+        ") x (col1, col2) "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 } ]
+        ],
+        [
+          [{ "key": "Node Id", "value": 4 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Write Output"        }, { "key": "Execution Count", "value": 1}, { "key": "Processed Rows", "value": 1}, { "key": "Output", "value": null                     } ],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 4    }, { "key": "Name", "value": "|  +- Limit"            }, { "key": "Execution Count", "value": 1}, { "key": "Processed Rows", "value": 1}, { "key": "Output", "value": "col1 (Int), col2 (Int)" } ],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1    }, { "key": "Name", "value": "|     +- Constant Scan" }, { "key": "Execution Count", "value": 1}, { "key": "Processed Rows", "value": 2}, { "key": "Output", "value": "col1 (Int), col2 (Int)" } ]
         ]
       ]
     },
     {
       "name": "Describe select, schema less",
+      "onlyAssertExpectedColumns": true,
       "schemaLess": true,
       "query": [
         "describe ",
@@ -866,10 +982,36 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Node Id", "value": 3 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": 3 },    { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
-          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2 },    { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1 },    { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "d (Any)"                            }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+          [{ "key": "Node Id", "value": 4 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Write Output"            }, { "key": "Output", "value": null                                 }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     },  { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 3 }, { "key": "Parent Node Id", "value": 4 },    { "key": "Name", "value": "|  +- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     },  { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": 3 },    { "key": "Name", "value": "|     +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     },  { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2 },    { "key": "Name", "value": "|        +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" },  { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1 },    { "key": "Name", "value": "|           +- Scan: data"  }, { "key": "Output", "value": "d (Any)"                            }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     },  { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+        ]
+      ]
+    },
+    {
+      "name": "Describe select, dynamic no extended output, schema less",
+      "onlyAssertExpectedColumns": true,
+      "schemaLess": true,
+      "query": [
+        "set @@plan_describe = true ",
+        "set @@plan_extended_output = false ",
+        "",
+        "select d.id ",
+        ",      max(row_id) ",
+        "from data d",
+        "group by d.id ",
+        "having count(1) = 1 ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Node Id", "value": 4 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Write Output"            }, { "key": "Output", "value": null                                 }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     },  { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 3 }, { "key": "Parent Node Id", "value": 4 },    { "key": "Name", "value": "|  +- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     },  { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": 3 },    { "key": "Name", "value": "|     +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     },  { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2 },    { "key": "Name", "value": "|        +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" },  { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1 },    { "key": "Name", "value": "|           +- Scan: data"  }, { "key": "Output", "value": "d (Any)"                            }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     },  { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
         ]
       ]
     },
@@ -2618,6 +2760,44 @@
         [
           [ { "key": "_outer", "value": { "_inner": [ { "key": 4567, "key2": true  }, { "key": 891011, "key2": false } ] } } ],
           [ { "key": "_outer", "value": { "_inner": [ { "key": 666,  "key2": false }, { "key": 1337,   "key2": true  } ] } } ]
+        ]
+      ]
+    },
+    {
+      "name": "Sub query expressions with no rows",
+      "description": [
+        "Regression test of a query with sub query expressions that returned no rows along with ordinal resolved columns ",
+        "that got mismatch schemas compile time vs runtime"
+      ],
+      "query": [
+        "--set @@printplan=true               ",
+        "use complexColumns                   ",
+        "SELECT                               ",
+        "(                                    ",
+        "   SELECT                            ",
+        "   (                                 ",
+        "      SELECT *                       ",
+        "      FROM (totable(v.table2)) x     ",
+        "      WHERE x.key = 666              ",
+        "      FOR OBJECT_ARRAY               ",
+        "   ) _outer                          ",
+        "   ,(                                ",
+        "      SELECT key * 2 newKey          ",
+        "      FROM (totable(v.table2)) x     ",
+        "      FOR OBJECT_ARRAY               ",
+        "   ) _outer2                         ",
+        "   , v.id                            ",
+        "   FOR OBJECT                        ",
+        ") x                                  ",
+        "FROM (                               ",
+        "   select x.table2, x.id             ",
+        "   from \"table\" x                  ",
+        ") v                                  "
+      ],
+      "expectedResultSets": [
+        [
+          [ { "key": "x", "value": { "_outer":  null,                              "_outer2": [ { "newKey": 9134}, { "newKey": 1782022 } ], "id": "1" } } ],
+          [ { "key": "x", "value": { "_outer":  [ { "key": 666, "key2": false } ], "_outer2": [ { "newKey": 1332}, { "newKey": 2674    } ], "id": "2" } } ]
         ]
       ]
     }

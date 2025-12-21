@@ -304,7 +304,7 @@ class QueryParserTest
                                     null),
                                 null)),
                         null),
-                    false);
+                    false, null);
         //@formatter:on
         Statement actual = s("select a.col, (select a.* from open_table(a) a for objectarray) from \"table\" a where a.col > 10");
 
@@ -667,7 +667,7 @@ class QueryParserTest
     void test_select()
     {
         // Selects without table source
-        assertEquals(new LogicalSelectStatement(ConstantScan.create(asList(litInt(1)), null), false), assertSelect("select 1"));
+        assertEquals(new LogicalSelectStatement(ConstantScan.create(asList(litInt(1)), null), false, null), assertSelect("select 1"));
         assertSelect("select 1 where false");
         assertSelect("select 1 order by 1");
         assertSelect("select top 10 1");
@@ -682,7 +682,7 @@ class QueryParserTest
                         null),
                     List.of(new AsteriskExpression(null)),
                     null),
-                false), assertSelect("select * from (a.b) a"));
+                false, null), assertSelect("select * from (a.b) a"));
         //@formatter:on
 
         assertSelectFail(ParseException.class, "Expression scans cannot have options", "select * from (a.b) a with (a=123)");

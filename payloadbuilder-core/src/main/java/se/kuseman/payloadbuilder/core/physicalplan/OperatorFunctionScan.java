@@ -35,7 +35,7 @@ public class OperatorFunctionScan implements IPhysicalPlan
         this.function = requireNonNull(function, "function");
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.schema = requireNonNull(schema, "schema");
-        this.hasAsteriskSchemaOrInput = SchemaUtils.isAsterisk(schema, true);
+        this.hasAsteriskSchemaOrInput = SchemaUtils.originatesFromAsteriskInput(schema);
         if (schema.getColumns()
                 .size() != 1)
         {
@@ -47,6 +47,33 @@ public class OperatorFunctionScan implements IPhysicalPlan
     public int getNodeId()
     {
         return nodeId;
+    }
+
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
+    public OperatorFunctionInfo getFunction()
+    {
+        return function;
+    }
+
+    public String getCatalogAlias()
+    {
+        return catalogAlias;
+    }
+
+    @Override
+    public String getName()
+    {
+        return "Operator Function Scan";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override

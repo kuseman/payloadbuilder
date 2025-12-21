@@ -63,8 +63,6 @@ import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableSource;
 import se.kuseman.payloadbuilder.core.logicalplan.optimization.ProjectionMerger;
-import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeInterceptor;
-import se.kuseman.payloadbuilder.core.physicalplan.CachePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionPredicate;
 import se.kuseman.payloadbuilder.core.physicalplan.HashAggregate;
 import se.kuseman.payloadbuilder.core.physicalplan.HashMatch;
@@ -102,15 +100,8 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             input = p.getInput();
             parentTableSource = p.getParentTableSource();
         }
-        else if (input instanceof AnalyzeInterceptor ai
-                && ai.getInput() instanceof se.kuseman.payloadbuilder.core.physicalplan.Projection p)
-        {
-            expressions = ProjectionMerger.replace(plan.getExpressions(), p.getExpressions());
-            input = p.getInput();
-            parentTableSource = p.getParentTableSource();
-        }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, schema, expressions, parentTableSource));
+        return new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, schema, expressions, parentTableSource);
     }
 
     @Override
@@ -158,7 +149,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             return input;
         }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Sort(context.getNextNodeId(), input, plan.getSortItems()));
+        return new se.kuseman.payloadbuilder.core.physicalplan.Sort(context.getNextNodeId(), input, plan.getSortItems());
     }
 
     @Override
@@ -197,7 +188,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             input = filter.getInput();
         }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Filter(context.getNextNodeId(), input, new ExpressionPredicate(predicate)));
+        return new se.kuseman.payloadbuilder.core.physicalplan.Filter(context.getNextNodeId(), input, new ExpressionPredicate(predicate));
     }
 
     @Override
@@ -206,7 +197,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         IPhysicalPlan input = plan.getInput()
                 .accept(this, context);
 
-        return wrapWithAnalyze(context, new HashAggregate(context.getNextNodeId(), input, plan.getAggregateExpressions(), plan.getProjectionExpressions(), plan.getParentTableSource()));
+        return new HashAggregate(context.getNextNodeId(), input, plan.getAggregateExpressions(), plan.getProjectionExpressions(), plan.getParentTableSource());
     }
 
     @Override
@@ -303,10 +294,9 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         context.topTableScanVisited = true;
 
-        return wrapWithAnalyze(context,
-                seekPredicate != null
-                        ? new se.kuseman.payloadbuilder.core.physicalplan.IndexSeek(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), seekPredicate, dataSource, plan.getOptions())
-                        : new se.kuseman.payloadbuilder.core.physicalplan.TableScan(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), dataSource, plan.getOptions()));
+        return seekPredicate != null
+                ? new se.kuseman.payloadbuilder.core.physicalplan.IndexSeek(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), seekPredicate, dataSource, plan.getOptions())
+                : new se.kuseman.payloadbuilder.core.physicalplan.TableScan(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), dataSource, plan.getOptions());
     }
 
     @Override
@@ -325,14 +315,14 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                 .getCatalog(catalogAlias);
 
         TableFunctionInfo functionInfo = pair.getValue();
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.TableFunctionScan(context.getNextNodeId(), plan.getSchema(), plan.getTableSource(), catalogAlias,
-                catalog.getName(), functionInfo, plan.getArguments(), plan.getOptions()));
+        return new se.kuseman.payloadbuilder.core.physicalplan.TableFunctionScan(context.getNextNodeId(), plan.getSchema(), plan.getTableSource(), catalogAlias, catalog.getName(), functionInfo,
+                plan.getArguments(), plan.getOptions());
     }
 
     @Override
     public IPhysicalPlan visit(ExpressionScan plan, Context context)
     {
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ExpressionScan(context.getNextNodeId(), plan.getTableSource(), plan.getSchema(), plan.getExpression()));
+        return new se.kuseman.payloadbuilder.core.physicalplan.ExpressionScan(context.getNextNodeId(), plan.getTableSource(), plan.getSchema(), plan.getExpression());
     }
 
     @Override
@@ -415,8 +405,10 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             throw new IllegalArgumentException("RIGHT joins are not supported");
         }
 
+        // CSOFF
         IPhysicalPlan outer = plan.getOuter()
                 .accept(this, context);
+        // CSON
 
         IExpression condition = plan.getCondition();
 
@@ -501,24 +493,28 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         }
         else
         {
-            ValueVector forceNoInnerCacheProperty = context.context.getSession()
-                    .getSystemProperty(QuerySession.FORCE_NO_INNER_CACHE);
-            boolean forceNoInnerCache = !forceNoInnerCacheProperty.isNull(0)
-                    && forceNoInnerCacheProperty.getBoolean(0);
-
-            // We can cache the inner plan if we have a non correlated plain nested loop
-            if (!pushOuterReference
-                    && !forceNoInnerCache
-                    && !correlated
-                    && !plan.isSwitchedInputs())
-            {
-                inner = wrapWithAnalyze(context, new CachePlan(context.getNextNodeId(), inner));
-            }
+            // Turned off since cache is broken by design atm.
+            // It's never reset during a statement and this is not correct
+            // in many cases when there are nested sub query expressions that is cached when they shouldn't
+            //
+            // ValueVector forceNoInnerCacheProperty = context.context.getSession()
+            // .getSystemProperty(QuerySession.FORCE_NO_INNER_CACHE);
+            // boolean forceNoInnerCache = !forceNoInnerCacheProperty.isNull(0)
+            // && forceNoInnerCacheProperty.getBoolean(0);
+            //
+            // // We can cache the inner plan if we have a non correlated plain nested loop
+            // if (!pushOuterReference
+            // && !forceNoInnerCache
+            // && !correlated
+            // && !plan.isSwitchedInputs())
+            // {
+            // inner = wrapWithAnalyze(context, new CachePlan(context.getNextNodeId(), inner));
+            // }
 
             join = createNestedLoop(plan, context.getNextNodeId(), outer, inner, predicate, pushOuterReference);
         }
 
-        return wrapWithAnalyze(context, join);
+        return join;
     }
 
     @Override
@@ -532,7 +528,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         String catalogAlias = pair.getKey();
         OperatorFunctionInfo functionInfo = pair.getValue();
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.OperatorFunctionScan(context.getNextNodeId(), input, functionInfo, catalogAlias, plan.getSchema()));
+        return new se.kuseman.payloadbuilder.core.physicalplan.OperatorFunctionScan(context.getNextNodeId(), input, functionInfo, catalogAlias, plan.getSchema());
     }
 
     @Override
@@ -540,18 +536,18 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     {
         if (ConstantScan.ONE_ROW_EMPTY_SCHEMA.equals(plan))
         {
-            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.CONSTANT));
+            return new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.CONSTANT);
         }
         else if (ConstantScan.ZERO_ROWS_EMPTY_SCHEMA.equals(plan))
         {
-            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.EMPTY));
+            return new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.EMPTY);
         }
 
         // Zero row scan with a schema
         if (plan.getRowsExpressions()
                 .isEmpty())
         {
-            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.of(plan.getSchema())));
+            return new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.of(plan.getSchema()));
         }
 
         // Strip all alias expression here since they are not needed anymore
@@ -570,10 +566,10 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                         .allMatch(IExpression::isConstant)))
         {
             TupleVector vector = se.kuseman.payloadbuilder.core.physicalplan.ConstantScan.vectorize(plan.getSchema(), rowsExpressions, context.context, false);
-            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), vector));
+            return new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), vector);
         }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), plan.getSchema(), rowsExpressions));
+        return new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), plan.getSchema(), rowsExpressions);
     }
 
     @Override
@@ -581,7 +577,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     {
         IPhysicalPlan input = plan.getInput()
                 .accept(this, context);
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Limit(context.getNextNodeId(), input, plan.getLimitExpression()));
+        return new se.kuseman.payloadbuilder.core.physicalplan.Limit(context.getNextNodeId(), input, plan.getLimitExpression());
     }
 
     @Override
@@ -589,7 +585,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     {
         IPhysicalPlan input = plan.getInput()
                 .accept(this, context);
-        return wrapWithAnalyze(context, se.kuseman.payloadbuilder.core.physicalplan.Assert.maxRowCount(context.getNextNodeId(), input, plan.getMaxRowCount()));
+        return se.kuseman.payloadbuilder.core.physicalplan.Assert.maxRowCount(context.getNextNodeId(), input, plan.getMaxRowCount());
     }
 
     @Override
@@ -676,15 +672,6 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         }
 
         return null;
-    }
-
-    static IPhysicalPlan wrapWithAnalyze(Context context, IPhysicalPlan plan)
-    {
-        if (context.analyze)
-        {
-            return new AnalyzeInterceptor(context.getNextNodeId(), plan);
-        }
-        return plan;
     }
 
     /** Visitor that collects table source references */

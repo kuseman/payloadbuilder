@@ -33,6 +33,11 @@ public class CachePlan implements IPhysicalPlan
         return nodeId;
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
     @Override
     public Schema getSchema()
     {
@@ -43,6 +48,12 @@ public class CachePlan implements IPhysicalPlan
     public String getName()
     {
         return "Cache";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override

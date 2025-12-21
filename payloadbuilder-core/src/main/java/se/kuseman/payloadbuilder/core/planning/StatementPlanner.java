@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -34,12 +33,7 @@ public class StatementPlanner
         boolean joinPreserveOuterOrder;
         boolean topTableScanVisited;
 
-        Map<QualifiedName, TableSchema> schemaByTempTable = new HashMap<>();
-
         Map<TableSourceReference, TableSchema> schemaByTableSource = new HashMap<>();
-
-        /** Flag indicating that next plan to be generated is an analzye */
-        boolean analyze;
 
         /** Field with the last created logical plan. Used when holding schema information for temp tables etc. */
         ILogicalPlan currentLogicalPlan;
@@ -79,16 +73,6 @@ public class StatementPlanner
     {
         ExecutionContext context = new ExecutionContext(session);
         Context ctx = new Context(context);
-
-        // Add existing session tables into context
-        // This is used when working in a statefull session system like Queryeer
-        // where the session is reused across executions.
-        session.getTemporaryTables()
-                .forEach(e -> ctx.schemaByTempTable.put(e.getKey(), new TableSchema(e.getValue()
-                        .getTupleVector()
-                        .getSchema(),
-                        e.getValue()
-                                .getIndices())));
 
         return new QueryStatement(query.getStatements()
                 .stream()
