@@ -38,7 +38,11 @@ class JsonOutputWriterTest
         p.getValue().startRow();
         p.getValue().startObject();
         p.getValue().writeFieldName("key");
-        p.getValue().writeString(UTF8String.utf8(",\"#\\n".getBytes(StandardCharsets.UTF_8)));
+        p.getValue().writeString(UTF8String.utf8(",\"#\\nåäö".getBytes(StandardCharsets.UTF_8)));
+        p.getValue().writeFieldName("key2");
+        p.getValue().writeString(UTF8String.utf8(",\"#\\nåäö hello world".getBytes(StandardCharsets.UTF_8)));
+        p.getValue().writeFieldName("key3");
+        p.getValue().writeString(UTF8String.utf8("1".getBytes(StandardCharsets.UTF_8)));
         p.getValue().endObject();
         p.getValue().endResult();
         //@formatter:on
@@ -46,9 +50,35 @@ class JsonOutputWriterTest
         p.getValue()
                 .close();
 
-        assertEquals("{\"key\":\",\\\"#\\\\n\"}", p.getKey()
+        assertEquals("{\"key\":\",\\\"#\\\\nåäö\",\"key2\":\",\\\"#\\\\nåäö hello world\",\"key3\":\"1\"}", p.getKey()
                 .toString());
+    }
 
+    @Test
+    void test_outputstream_latin1_string()
+    {
+        Pair<ByteArrayOutputStream, JsonOutputWriter> p = outputstream(new JsonSettings());
+
+        //@formatter:off
+        // First result set
+        p.getValue().initResult(new String[0]);
+        p.getValue().startRow();
+        p.getValue().startObject();
+        p.getValue().writeFieldName("key");
+        p.getValue().writeString(UTF8String.latin(",\"#\\nåäö".getBytes(StandardCharsets.ISO_8859_1)));
+        p.getValue().writeFieldName("key2");
+        p.getValue().writeString(UTF8String.latin(",\"#\\nåäö hello world".getBytes(StandardCharsets.ISO_8859_1)));
+        p.getValue().writeFieldName("key3");
+        p.getValue().writeString(UTF8String.latin("1".getBytes(StandardCharsets.ISO_8859_1)));
+        p.getValue().endObject();
+        p.getValue().endResult();
+        //@formatter:on
+
+        p.getValue()
+                .close();
+
+        assertEquals("{\"key\":\",\\\"#\\\\nåäö\",\"key2\":\",\\\"#\\\\nåäö hello world\",\"key3\":\"1\"}", p.getKey()
+                .toString());
     }
 
     @Test

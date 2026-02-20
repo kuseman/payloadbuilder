@@ -108,6 +108,12 @@ class ObjectVectorWriter implements VectorWriter
         @Override
         public boolean isNull(int row)
         {
+            // The whole object at this row can itself be null (not just one of its fields) - guard against that
+            // before dereferencing it, otherwise writing a null row throws instead of encoding it as null
+            if (wrapped.isNull(row))
+            {
+                return true;
+            }
             ObjectVector object = wrapped.getObject(row);
             ValueVector value = object.getValue(column);
             return value.isNull(object.getRow());

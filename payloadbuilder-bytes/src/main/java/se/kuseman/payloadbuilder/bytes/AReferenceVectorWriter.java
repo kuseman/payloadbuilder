@@ -15,7 +15,7 @@ abstract class AReferenceVectorWriter implements VectorWriter
 
             if (literal)
             {
-                writer.putByte(PayloadReader.LITERAL_ENCODING);
+                writer.putByte(PayloadReader.REGULAR_LITERAL_ENCODING);
 
                 int valueOffset = writer.position();
 
@@ -43,7 +43,7 @@ abstract class AReferenceVectorWriter implements VectorWriter
 
         for (int i = from; i < to; i++)
         {
-            int headerOffset = headerPosition + (i * AVector.REFERENCE_HEADER_SIZE);
+            int headerOffset = headerPosition + ((i - from) * AVector.REFERENCE_HEADER_SIZE);
 
             boolean isNull = vector.isNull(i);
             if (isNull)

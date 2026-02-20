@@ -169,6 +169,12 @@ public class Column
         public static final String NULLABLE = "nullable";
         /** Precision of column. Size of string etc. */
         public static final String PRECISION = "precision";
+        /**
+         * Stable, caller-assigned identifier for a column. Used by catalogs/serializers (eg. payloadbuilder-bytes) that need to resolve a column across schema changes without relying on its position
+         * or name. Once assigned to a column, an id must never be reused for a different column. See payloadbuilder-bytes' {@code PayloadReader#readTupleVector} javadoc for the full column-id based
+         * schema evolution scheme (which columns need one, what happens when only one side of a read has ids, etc).
+         */
+        public static final String COLUMN_ID = "columnId";
 
         public MetaData(Map<String, Object> properties)
         {
@@ -191,6 +197,12 @@ public class Column
         public int getPrecision()
         {
             return (int) properties.getOrDefault(PRECISION, -1);
+        }
+
+        /** Return column id of column or -1 if not set. */
+        public int getColumnId()
+        {
+            return (int) properties.getOrDefault(COLUMN_ID, -1);
         }
 
         /** Return metadata for provided key. */
