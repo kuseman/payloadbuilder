@@ -5,8 +5,8 @@ import java.nio.ByteBuffer;
 /** Null buffer that reads null bits from bytes */
 class NullBuffer
 {
-    private static final NullBuffer NO_NULL = new NoNullBuffer();
-    private static final NullBuffer ALL_NULL = new AllNullBuffer();
+    static final NullBuffer NO_NULL = new NoNullBuffer();
+    static final NullBuffer ALL_NULL = new AllNullBuffer();
     private final ByteBuffer buffer;
     private final int startPosition;
 

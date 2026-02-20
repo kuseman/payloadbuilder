@@ -57,7 +57,7 @@ class NullBufferWriter
 
             index++;
             if (index >= 8
-                    || i == rowCount - 1)
+                    || i == to - 1)
             {
                 writer.putByte(current);
                 current = 0;

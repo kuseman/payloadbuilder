@@ -116,12 +116,29 @@ class BytesWriter
     {
         if (buffer.capacity() < desiredCapacity)
         {
-            ByteBuffer newBuffer = ByteBuffer.allocate((int) desiredCapacity * 2);
+            ByteBuffer newBuffer = ByteBuffer.allocate(growCapacity(desiredCapacity));
             int position = buffer.position();
             buffer.position(0);
             newBuffer.put(buffer);
             newBuffer.position(position);
             buffer = newBuffer;
         }
+    }
+
+    /**
+     * Compute the capacity to grow to for the given desired capacity. Doubles the desired capacity to amortize future growth, clamped to {@link Integer#MAX_VALUE} since a single buffer/array can't be
+     * bigger than that - all arithmetic here is done in {@code long} precision specifically so that doubling a desired capacity close to {@link Integer#MAX_VALUE} doesn't silently wrap around to a
+     * negative number, which used to make {@link ByteBuffer#allocate(int)} throw for payloads well under the actual size limit.
+     */
+    static int growCapacity(long desiredCapacity)
+    {
+        if (desiredCapacity > Integer.MAX_VALUE)
+        {
+            throw new IllegalStateException("Cannot grow payload buffer beyond " + Integer.MAX_VALUE + " bytes, requested capacity: " + desiredCapacity);
+        }
+
+        long doubledCapacity = desiredCapacity * 2;
+        return doubledCapacity > Integer.MAX_VALUE ? Integer.MAX_VALUE
+                : (int) doubledCapacity;
     }
 }
