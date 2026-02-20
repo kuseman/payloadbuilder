@@ -2,8 +2,6 @@ package se.kuseman.payloadbuilder.api.execution;
 
 import static java.util.Objects.requireNonNull;
 
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -11,10 +9,10 @@ import java.util.List;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 
 /**
- * A bytes reference used for data types that supports operations directly on under laying byte structures like Strings etc. NOTE! {@link ValueVector} is implemented here to let a single string become
- * a literal value vector of it self to avoid creating a literal
+ * A string implementation that works directly on an under laying byte-array without realizing a java.lang.String. Equals/hash/comparision/concats etc. can be performed on byte level. Instance can be
+ * created from both UTF8 bytes aswell as Latin1 (ISO_8859_1) encoded byte arrays. A java.lang.String can also be used to instantiate then all operations are performed via java.lang.String.
  */
-public class UTF8String implements Comparable<UTF8String>, ValueVector
+public class UTF8String implements Comparable<UTF8String>, ValueVector, CharSequence
 {
     private static final ThreadLocal<StringBuilder> BUILDER = new ThreadLocal<>();
 
@@ -30,38 +28,44 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
     private static final int START = 17;
     private static final int CONSTANT = 37;
 
+    private final boolean latin1;
     private String string;
-
+    private int charLength = -1;
     private boolean hashIsZero;
     private int hash;
     private byte[] bytes;
     private int offset;
-    private int length;
+    private int byteLength;
 
     private UTF8String(String string)
     {
+        requireNonNull(string);
         this.string = string;
+        this.charLength = string.length();
+        this.latin1 = false;
     }
 
-    private UTF8String(byte[] bytes, int offset, int length)
+    private UTF8String(byte[] bytes, int offset, int length, boolean latin1)
     {
+        requireNonNull(bytes);
         this.bytes = requireNonNull(bytes, "bytes");
         this.offset = offset;
-        this.length = length;
+        this.byteLength = length;
+        this.latin1 = latin1;
     }
 
     /** Return a copy of the underlying utf8 bytes for this string */
     public byte[] getBytes()
     {
         getBytesInternal();
-        return Arrays.copyOfRange(bytes, offset, offset + length);
+        return Arrays.copyOfRange(bytes, offset, offset + byteLength);
     }
 
     /** Return the bytes of this instance into destination byte array. Caller is responsible for correct length */
     public void getBytes(byte[] destination)
     {
         getBytesInternal();
-        System.arraycopy(this.bytes, offset, destination, 0, length);
+        System.arraycopy(this.bytes, offset, destination, 0, byteLength);
     }
 
     // ValueVector
@@ -113,27 +117,191 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
             return string.compareTo(that.string);
         }
 
-        // UTF8 can be compared lexicographically by unsigned byte comparison
-        byte[] thisBytes = getBytesInternal();
-        int thisOffset = this.offset;
-        byte[] thatBytes = that.getBytesInternal();
-        int thatOffset = that.offset;
-
-        int size = thisOffset + Math.min(this.length, that.length);
-
-        while (thisOffset < size)
+        // Same encoding => compare bytes
+        if (latin1 == that.latin1)
         {
-            int a = thisBytes[thisOffset++] & 0xff;
-            int b = thatBytes[thatOffset++] & 0xff;
+            // UTF8 can be compared lexicographically by unsigned byte comparison
+            byte[] thisBytes = getBytesInternal();
+            int thisOffset = this.offset;
+            byte[] thatBytes = that.getBytesInternal();
+            int thatOffset = that.offset;
+
+            int size = thisOffset + Math.min(this.byteLength, that.byteLength);
+
+            while (thisOffset < size)
+            {
+                int a = thisBytes[thisOffset++] & 0xff;
+                int b = thatBytes[thatOffset++] & 0xff;
+                int diff = a - b;
+                if (diff != 0)
+                {
+                    return diff;
+                }
+            }
+
+            return this.byteLength - that.byteLength;
+        }
+
+        int length = length();
+        int thatLength = that.length();
+        // Else compare using charAt
+        int size = Math.min(length, thatLength);
+        for (int i = 0; i < size; i++)
+        {
+            char a = charAt(i);
+            char b = that.charAt(i);
             int diff = a - b;
             if (diff != 0)
             {
                 return diff;
             }
         }
-
-        return this.length - that.length;
+        return length - thatLength;
     }
+
+    // CharSequence
+
+    @Override
+    public int length()
+    {
+        if (charLength >= 0)
+        {
+            return charLength;
+        }
+
+        if (latin1)
+        {
+            charLength = byteLength;
+            return charLength;
+        }
+
+        // Count UTF8 chars
+        int count = 0;
+        int i = offset;
+        int end = offset + byteLength;
+
+        while (i < end)
+        {
+            int b = bytes[i] & 0xFF;
+
+            if (b < 0x80)
+            {
+                i += 1;
+                count += 1;
+            }
+            else if ((b >> 5) == 0b110)
+            {
+                i += 2;
+                count += 1;
+            }
+            else if ((b >> 4) == 0b1110)
+            {
+                i += 3;
+                count += 1;
+            }
+            else if ((b >> 3) == 0b11110)
+            {
+                i += 4;
+                count += 2;
+            }
+            else
+            {
+                i += 1;
+                count += 1;
+            }
+        }
+
+        charLength = count;
+        return count;
+    }
+
+    @Override
+    public char charAt(int index)
+    {
+        if (index < 0)
+            throw new IndexOutOfBoundsException();
+
+        if (string != null)
+        {
+            return string.charAt(index);
+        }
+
+        if (latin1)
+        {
+            if (index >= byteLength)
+                throw new IndexOutOfBoundsException();
+            return (char) (bytes[offset + index] & 0xFF);
+        }
+
+        // Find UTF8 char
+        int i = offset;
+        int end = offset + byteLength;
+        int charPos = 0;
+
+        while (i < end)
+        {
+            int b = bytes[i] & 0xFF;
+            int codePoint;
+            int byteCount;
+
+            if (b < 0x80)
+            {
+                codePoint = b;
+                byteCount = 1;
+            }
+            else if ((b >> 5) == 0b110)
+            {
+                codePoint = ((b & 0x1F) << 6) | (bytes[i + 1] & 0x3F);
+                byteCount = 2;
+            }
+            else if ((b >> 4) == 0b1110)
+            {
+                codePoint = ((b & 0x0F) << 12) | ((bytes[i + 1] & 0x3F) << 6) | (bytes[i + 2] & 0x3F);
+                byteCount = 3;
+            }
+            else if ((b >> 3) == 0b11110)
+            {
+                codePoint = ((b & 0x07) << 18) | ((bytes[i + 1] & 0x3F) << 12) | ((bytes[i + 2] & 0x3F) << 6) | (bytes[i + 3] & 0x3F);
+                byteCount = 4;
+            }
+            else
+            {
+                codePoint = b;
+                byteCount = 1;
+            }
+
+            if (codePoint <= 0xFFFF)
+            {
+                if (charPos == index)
+                    return (char) codePoint;
+                charPos++;
+            }
+            else
+            {
+                int cpPrime = codePoint - 0x10000;
+                char high = (char) ((cpPrime >> 10) + 0xD800);
+                char low = (char) ((cpPrime & 0x3FF) + 0xDC00);
+
+                if (charPos == index)
+                    return high;
+                if (charPos + 1 == index)
+                    return low;
+                charPos += 2;
+            }
+
+            i += byteCount;
+        }
+
+        throw new IndexOutOfBoundsException();
+    }
+
+    @Override
+    public CharSequence subSequence(int start, int end)
+    {
+        return toString().subSequence(start, end);
+    }
+
+    // End Of CharSequence
 
     @Override
     public int hashCode()
@@ -147,7 +315,7 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
                 && !hashIsZero)
         {
             result = START;
-            int end = offset + length;
+            int end = offset + byteLength;
             for (int i = offset; i < end; i++)
             {
                 result = result * CONSTANT + bytes[i];
@@ -185,19 +353,40 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
                 return string.equals(that.string);
             }
 
-            byte[] bytes1 = getBytesInternal();
-            byte[] bytes2 = that.getBytesInternal();
-
-            if (length != that.length)
+            // Same encoding => compare bytes
+            if (latin1 == that.latin1)
             {
-                return false;
-            }
+                byte[] bytes1 = getBytesInternal();
+                byte[] bytes2 = that.getBytesInternal();
 
-            for (int i = 0; i < length; i++)
-            {
-                if (bytes1[offset + i] != bytes2[that.offset + i])
+                if (byteLength != that.byteLength)
                 {
                     return false;
+                }
+
+                for (int i = 0; i < byteLength; i++)
+                {
+                    if (bytes1[offset + i] != bytes2[that.offset + i])
+                    {
+                        return false;
+                    }
+                }
+            }
+            // Else compare using charAt
+            else
+            {
+                int length = this.length();
+                if (length != that.length())
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < length; i++)
+                {
+                    if (charAt(i) != that.charAt(i))
+                    {
+                        return false;
+                    }
                 }
             }
             return true;
@@ -211,11 +400,19 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
         return string != null;
     }
 
+    /**
+     * Returns true if this string is latin1 encoded. NOTE! Only applicable if {@link #hasString()} is false, then the string is encoded in whatever the java.lang.String is encoded with.
+     */
+    public boolean isLatin1()
+    {
+        return latin1;
+    }
+
     /** Return the byte length of this instance. */
     public int getByteLength()
     {
         getBytesInternal();
-        return length;
+        return byteLength;
     }
 
     private byte[] getBytesInternal()
@@ -227,7 +424,7 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
         else if (string != null)
         {
             bytes = string.getBytes(StandardCharsets.UTF_8);
-            length = bytes.length;
+            byteLength = bytes.length;
             offset = 0;
         }
         return bytes;
@@ -251,7 +448,14 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
             return string;
         }
 
-        string = new String(bytes, offset, length, StandardCharsets.UTF_8);
+        if (latin1)
+        {
+            string = new String(bytes, offset, byteLength, StandardCharsets.ISO_8859_1);
+        }
+        else
+        {
+            string = new String(bytes, offset, byteLength, StandardCharsets.UTF_8);
+        }
         return string;
     }
 
@@ -306,14 +510,14 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
         for (int i = 0; i < count; i++)
         {
             UTF8String str = strings.get(i);
-            System.arraycopy(str.getBytesInternal(), str.offset, bytes, offset, str.length);
-            offset += str.length;
+            System.arraycopy(str.getBytesInternal(), str.offset, bytes, offset, str.byteLength);
+            offset += str.byteLength;
             // Don't add a last delimiter
             if (i < count - 1
-                    && delimeter.length > 0)
+                    && delimeter.byteLength > 0)
             {
-                System.arraycopy(delimeter.getBytesInternal(), delimeter.offset, bytes, offset, delimeter.length);
-                offset += delimeter.length;
+                System.arraycopy(delimeter.getBytesInternal(), delimeter.offset, bytes, offset, delimeter.byteLength);
+                offset += delimeter.byteLength;
             }
         }
 
@@ -352,6 +556,7 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
      */
     public static UTF8String from(Object object)
     {
+        requireNonNull(object);
         if (object instanceof Boolean)
         {
             return ((Boolean) object).booleanValue() ? TRUE
@@ -363,8 +568,8 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
         }
         else if (object instanceof byte[] bytes)
         {
-            // Assume utf8 bytes
-            return new UTF8String(bytes, 0, bytes.length);
+            boolean latin1 = detectLatin1(bytes, 0, bytes.length);
+            return new UTF8String(bytes, 0, bytes.length, latin1);
         }
         return from(String.valueOf(object));
     }
@@ -385,9 +590,10 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
         return utf8(bytes, 0, bytes.length);
     }
 
+    /** Constructs a string from utf8 bytes. */
     public static UTF8String utf8(byte[] bytes, int offset, int length)
     {
-        return new UTF8String(bytes, offset, length);
+        return new UTF8String(bytes, offset, length, false);
     }
 
     public static UTF8String latin(byte[] bytes)
@@ -396,13 +602,53 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
     }
 
     /**
-     * Create a utf8 string from latin encoded bytes. NOTE! Recommended usage is utf8 since this method allocates some when converting bytes.
+     * Create a utf8 string from latin encoded bytes. NOTE! This does assume all bytes are latin1 encoded and does not check if that holds true.
      */
     public static UTF8String latin(byte[] bytes, int offset, int length)
     {
-        ByteBuffer buffer = ByteBuffer.wrap(bytes, offset, length);
-        CharBuffer charBuffer = StandardCharsets.ISO_8859_1.decode(buffer);
-        ByteBuffer encoded = StandardCharsets.UTF_8.encode(charBuffer);
-        return utf8(encoded.array(), 0, encoded.limit());
+        return new UTF8String(bytes, offset, length, true);
+    }
+
+    /** Detects if provided bytes are all latin1 encoded. */
+    public static boolean detectLatin1(byte[] bytes, int offset, int length)
+    {
+        int end = offset + length;
+        int i = offset;
+
+        while (i < end)
+        {
+            int b = bytes[i] & 0xFF;
+
+            if (b < 0x80)
+            {
+                i++;
+            }
+            else if ((b >> 5) == 0b110
+                    && i + 1 < end
+                    && (bytes[i + 1] & 0xC0) == 0x80)
+            {
+                return false;
+            }
+            else if ((b >> 4) == 0b1110
+                    && i + 2 < end
+                    && (bytes[i + 1] & 0xC0) == 0x80
+                    && (bytes[i + 2] & 0xC0) == 0x80)
+            {
+                return false;
+            }
+            else if ((b >> 3) == 0b11110
+                    && i + 3 < end
+                    && (bytes[i + 1] & 0xC0) == 0x80
+                    && (bytes[i + 2] & 0xC0) == 0x80
+                    && (bytes[i + 3] & 0xC0) == 0x80)
+            {
+                return false;
+            }
+            else
+            {
+                i++;
+            }
+        }
+        return true;
     }
 }

@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -13,11 +14,23 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 
 /** Test of {@link UTF8String} */
 class UTF8StringTest
 {
+
+    @Test
+    void test_valuevector()
+    {
+        UTF8String str = UTF8String.from("hello");
+        assertEquals(1, str.size());
+        assertFalse(str.isNull(0));
+        assertEquals(ResolvedType.STRING, str.type());
+        assertEquals(str.getString(0), str);
+    }
+
     @Test
     void test_get_bytes()
     {
@@ -129,6 +142,7 @@ class UTF8StringTest
     @Test
     void test_compareTo()
     {
+        // String
         UTF8String utf1 = UTF8String.from("hello");
         UTF8String utf2 = UTF8String.from("world");
         UTF8String utf3 = UTF8String.from("hello world");
@@ -139,6 +153,72 @@ class UTF8StringTest
         assertTrue(utf1.compareTo(utf2) < 0);
         assertTrue(utf2.compareTo(utf1) > 0);
         assertTrue(utf1.compareTo(utf3) < 0);
+        assertTrue(utf3.compareTo(utf1) > 0);
+
+        // Same encoding
+        utf1 = UTF8String.from("hello".getBytes(StandardCharsets.UTF_8));
+        utf2 = UTF8String.from("world".getBytes(StandardCharsets.UTF_8));
+        utf3 = UTF8String.from("hello world".getBytes(StandardCharsets.UTF_8));
+        assertEquals(0, utf1.compareTo(utf1));
+        assertFalse(utf1.equals(utf2));
+        assertFalse(utf1.equals(utf3));
+
+        assertTrue(utf1.compareTo(utf2) < 0);
+        assertTrue(utf2.compareTo(utf1) > 0);
+        assertTrue(utf1.compareTo(utf3) < 0);
+        assertTrue(utf3.compareTo(utf1) > 0);
+
+        // Mixed encoding
+        UTF8String s1 = UTF8String.utf8("hello".getBytes(StandardCharsets.UTF_8));
+        UTF8String s2 = UTF8String.latin("world".getBytes(StandardCharsets.ISO_8859_1));
+
+        assertEquals(0, s1.compareTo(s1));
+        assertTrue(s1.compareTo(s2) < 0);
+        assertTrue(s2.compareTo(s1) > 0);
+
+        // Same prefix
+        s1 = UTF8String.utf8("hello".getBytes(StandardCharsets.UTF_8));
+        s2 = UTF8String.latin("hello 12".getBytes(StandardCharsets.ISO_8859_1));
+
+        assertTrue(s1.compareTo(s2) < 0);
+        assertTrue(s2.compareTo(s1) > 0);
+    }
+
+    @Test
+    void test_equals()
+    {
+        // Same encoding
+        UTF8String s1 = UTF8String.utf8("hello".getBytes(StandardCharsets.UTF_8));
+        UTF8String s2 = UTF8String.utf8("hello".getBytes(StandardCharsets.UTF_8));
+
+        assertNotEquals(s1, null);
+        assertNotEquals(s1, 123);
+        assertEquals(s1, s1);
+        assertEquals(s1, s2);
+        assertEquals(s2, s1);
+
+        s2 = UTF8String.utf8("world".getBytes(StandardCharsets.UTF_8));
+        assertNotEquals(s1, s2);
+        assertNotEquals(s2, s1);
+
+        s2 = UTF8String.utf8("world 123".getBytes(StandardCharsets.UTF_8));
+        assertNotEquals(s1, s2);
+        assertNotEquals(s2, s1);
+
+        // Mized
+        s1 = UTF8String.utf8("hello".getBytes(StandardCharsets.UTF_8));
+        s2 = UTF8String.latin("hello".getBytes(StandardCharsets.ISO_8859_1));
+
+        assertEquals(s1, s2);
+        assertEquals(s2, s1);
+
+        s2 = UTF8String.latin("world".getBytes(StandardCharsets.ISO_8859_1));
+        assertNotEquals(s1, s2);
+        assertNotEquals(s2, s1);
+
+        s2 = UTF8String.latin("world 123".getBytes(StandardCharsets.ISO_8859_1));
+        assertNotEquals(s1, s2);
+        assertNotEquals(s2, s1);
     }
 
     @Test

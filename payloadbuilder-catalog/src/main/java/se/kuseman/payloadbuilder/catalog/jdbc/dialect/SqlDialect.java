@@ -185,7 +185,11 @@ public interface SqlDialect
             }
             else
             {
-                vector.setString(row, UTF8String.from(rs.getString(ordinal)));
+                String string = rs.getString(ordinal);
+                if (string != null)
+                {
+                    vector.setString(row, UTF8String.from(string));
+                }
             }
         }
         else if (type == Type.DateTime)

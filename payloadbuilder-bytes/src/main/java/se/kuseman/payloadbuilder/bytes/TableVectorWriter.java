@@ -18,12 +18,6 @@ class TableVectorWriter extends AReferenceVectorWriter
     }
 
     @Override
-    protected boolean isLiteral(ValueVector vector, int from, int to)
-    {
-        return false;
-    }
-
-    @Override
     protected void writeMeta(BytesWriter writer, ValueVector vector)
     {
         int size = vector.type()

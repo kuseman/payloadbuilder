@@ -32,7 +32,7 @@ class FloatVector extends AVector
         }
 
         int encoding = buffer.get(position++);
-        if (encoding == PayloadReader.LITERAL_ENCODING)
+        if (encoding == PayloadReader.REGULAR_LITERAL_ENCODING)
         {
             float value = buffer.getFloat(position);
             return ValueVector.literalFloat(value, size);
