@@ -389,8 +389,31 @@ class TestHarnessRunner
             {
                 ColumnValue expectedColumn = j < expectedRow.size() ? expectedRow.get(j)
                         : null;
-                ColumnValue actualColumn = j < actualRow.size() ? actualRow.get(j)
-                        : null;
+
+                ColumnValue actualColumn = null;
+                // Find the expected column among the actual
+                if (onlyAssertExpectedColumns)
+                {
+                    for (int k = j; k < actualRow.size(); k++)
+                    {
+                        if (expectedColumn.getKey()
+                                .equalsIgnoreCase(actualRow.get(k)
+                                        .getKey()))
+                        {
+                            actualColumn = actualRow.get(k);
+                        }
+                    }
+                    if (actualColumn == null)
+                    {
+                        throw new IllegalArgumentException("No column found among actual with name: " + expectedColumn.getKey());
+                    }
+                }
+                else
+                {
+                    actualColumn = j < actualRow.size() ? actualRow.get(j)
+                            : null;
+
+                }
 
                 if (!equals(expectedColumn, actualColumn))
                 {

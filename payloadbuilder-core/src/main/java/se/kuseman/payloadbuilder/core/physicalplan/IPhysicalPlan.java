@@ -33,6 +33,9 @@ public interface IPhysicalPlan extends DescribableNode
     /** Return this plans children */
     List<IPhysicalPlan> getChildren();
 
+    /** Accept visitor */
+    <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context);
+
     /** Returns true if this plan has any writable output else false */
     default boolean hasWritableOutput()
     {

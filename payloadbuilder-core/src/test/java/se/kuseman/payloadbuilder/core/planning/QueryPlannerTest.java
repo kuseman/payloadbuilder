@@ -70,11 +70,8 @@ import se.kuseman.payloadbuilder.core.expression.NullPredicateExpression;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
-import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeInterceptor;
 import se.kuseman.payloadbuilder.core.physicalplan.Assert;
-import se.kuseman.payloadbuilder.core.physicalplan.CachePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.ConstantScan;
-import se.kuseman.payloadbuilder.core.physicalplan.DescribePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionPredicate;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.physicalplan.Filter;
@@ -171,7 +168,7 @@ class QueryPlannerTest extends APhysicalPlanTest
                                         ocre("campaign", variant, CoreColumn.Type.NAMED_ASTERISK)),
                                     SystemCatalog.get().getOperatorFunction("object_array"),
                                     "sys",
-                                    Schema.of(ast("__expr1", ResolvedType.table(campsSchema), true))),
+                                    Schema.of(col("__expr1", ResolvedType.table(campsSchema), true))),
                                 Set.of(nast("campaign", ResolvedType.ANY, variant)),
                                 null,
                                 Schema.of(ast("v", ResolvedType.ANY, variant))),
@@ -180,7 +177,7 @@ class QueryPlannerTest extends APhysicalPlanTest
                             null),
                         SystemCatalog.get().getOperatorFunction("object"),
                         "sys",
-                        Schema.of(ast("__expr0", ResolvedType.object(priceSchema), true))),
+                        Schema.of(col("__expr0", ResolvedType.object(priceSchema), true))),
                     Set.of(nast("campaign", ResolvedType.ANY, variant)),
                     null,
                     Schema.of(ast("v", variant))),
@@ -240,9 +237,9 @@ class QueryPlannerTest extends APhysicalPlanTest
                 col("camps", ResolvedType.table(constantSchema))
                 );
         IPhysicalPlan expected = new Projection(
-                10,
+                8,
                 NestedLoop.leftJoin(
-                    9,
+                    7,
                     new TableScan(
                         0,
                         variantSchema,
@@ -250,33 +247,27 @@ class QueryPlannerTest extends APhysicalPlanTest
                         "test",
                         t.scanDataSources.get(0),
                         emptyList()),
-                    new CachePlan(
-                        8,
-                        new OperatorFunctionScan(
-                            7,
-                            new Projection(
-                                6,
-                                NestedLoop.leftJoin(
-                                    5,
-                                    new ConstantScan(1, TupleVector.CONSTANT),
-                                        new CachePlan(
-                                        4,
-                                            new OperatorFunctionScan(
-                                                3,
-                                                new ConstantScan(2, TupleVector.of(constantSchema)),
-                                                SystemCatalog.get().getOperatorFunction("object_array"),
-                                                "sys",
-                                                Schema.of(col("__expr1", ResolvedType.table(constantSchema), true)))
-                                        ),
-                                    null,
-                                    false),
-                                Schema.of(col("camps", ResolvedType.table(constantSchema))),
-                                List.of(new AliasExpression(ce("__expr1", 0, ResolvedType.table(constantSchema)), "camps")),
-                                null),
-                            SystemCatalog.get().getOperatorFunction("object"),
-                            "sys",
-                            Schema.of(col("__expr0", ResolvedType.object(priceSchema), true)))
-                    ),
+                    new OperatorFunctionScan(
+                        6,
+                        new Projection(
+                            5,
+                            NestedLoop.leftJoin(
+                                4,
+                                new ConstantScan(1, TupleVector.CONSTANT),
+                                new OperatorFunctionScan(
+                                    3,
+                                    new ConstantScan(2, TupleVector.of(constantSchema)),
+                                    SystemCatalog.get().getOperatorFunction("object_array"),
+                                    "sys",
+                                    Schema.of(col("__expr1", ResolvedType.table(constantSchema), true))),
+                                null,
+                                false),
+                            Schema.of(col("camps", ResolvedType.table(constantSchema))),
+                            List.of(new AliasExpression(ce("__expr1", 0, ResolvedType.table(constantSchema)), "camps")),
+                            null),
+                        SystemCatalog.get().getOperatorFunction("object"),
+                        "sys",
+                        Schema.of(col("__expr0", ResolvedType.object(priceSchema), true))),
                     null,
                     false),
                 Schema.of(col("price", ResolvedType.object(priceSchema))),
@@ -330,63 +321,6 @@ class QueryPlannerTest extends APhysicalPlanTest
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
                 new ExpressionPredicate(and(gt(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(10)), gt(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(20))))
                 );
-        //@formatter:on
-
-        // System.out.println(actual.print(0));
-        // System.out.println(expected.print(0));
-
-        Assertions.assertThat(actual)
-                .usingRecursiveComparison()
-                .isEqualTo(expected);
-
-        assertEquals(expected, actual);
-    }
-
-    @Test
-    void test_sub_query_filter_elimination_analyze()
-    {
-        // Verify that the nested filters are merged when the subquery are eliminated
-        //@formatter:off
-        String query = """
-               analyze
-               select *
-               from
-               (
-                 select *
-                 from tableA a
-                 where a.col1 > 10
-               ) x
-               where x.col > 20
-               """;
-        //@formatter:on
-
-        TestCatalog t = new TestCatalog(emptyMap());
-        catalogRegistry.registerCatalog("t", t);
-
-        QueryStatement queryStatement = parse(query);
-        queryStatement = StatementPlanner.plan(session, queryStatement);
-
-        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
-                .get(0)).getPlan();
-
-        TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
-
-        Schema expectedSchemaA = Schema.of(ast("a", tableA));
-
-        //@formatter:off
-        IPhysicalPlan expected = new DescribePlan(4,
-                    new AnalyzeInterceptor(
-                        3,
-                        new Filter(
-                            2,
-                            new AnalyzeInterceptor(
-                                1,
-                                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList())
-                            ),
-                            new ExpressionPredicate(and(gt(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(10)),
-                                    gt(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK), intLit(20))))
-                        )),
-                    true);
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -500,70 +434,6 @@ class QueryPlannerTest extends APhysicalPlanTest
                         add(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK))),
                 subQueryX
                 );
-        //@formatter:on
-
-        // System.out.println(actual.print(0));
-        // System.out.println(expected.print(0));
-
-        Assertions.assertThat(actual)
-                .usingRecursiveComparison()
-                .isEqualTo(expected);
-
-        assertEquals(expected, actual);
-    }
-
-    @Test
-    void test_sub_query_projection_elimination_analyze()
-    {
-        // Verify that the nested projections are merged when the subquery are eliminated
-        //@formatter:off
-        String query = """
-                analyze
-                select x.col1, x.col2, x.col3 + x.col2
-                from
-                (
-                  select col1, col2, col3
-                  from tableA
-                ) x
-                """;
-        //@formatter:on
-
-        TestCatalog t = new TestCatalog(emptyMap());
-        catalogRegistry.registerCatalog("t", t);
-
-        QueryStatement queryStatement = parse(query);
-        queryStatement = StatementPlanner.plan(session, queryStatement);
-
-        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
-                .get(0)).getPlan();
-
-        TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "");
-        TableSourceReference subQueryX = new TableSourceReference(0, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
-        Schema expectedSchemaA = Schema.of(ast("", tableA));
-
-        //@formatter:off
-        IPhysicalPlan expected =
-                new DescribePlan(
-                    6,
-                    new AnalyzeInterceptor(
-                        5,
-                        new Projection(
-                            4,
-                            new AnalyzeInterceptor(
-                                1,
-                                new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList())
-                            ),
-                            Schema.of(
-                              nast("col1", ResolvedType.ANY, tableA),
-                              nast("col2", ResolvedType.ANY, tableA),
-                              col("", Type.Any, "col3 + col2")
-                            ),
-                            List.of(cre("col1", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK),
-                                    add(cre("col3", tableA, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA, CoreColumn.Type.NAMED_ASTERISK))),
-                            subQueryX
-                        )
-                    ),
-                    true);
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -866,12 +736,9 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.innerJoin(
-                3,
+                2,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
-                new CachePlan(
-                    2,
-                    new TableScan(1, expectedSchemaA1, tableA1, "test", t.scanDataSources.get(1), emptyList())
-                ),
+                new TableScan(1, expectedSchemaA1, tableA1, "test", t.scanDataSources.get(1), emptyList()),
                 new ExpressionPredicate(gt(cre("value", tableA1, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK),
                         cre("value", tableA, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK))),
                 null,
@@ -917,12 +784,9 @@ class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaB = Schema.of(ast("b", tableB));
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.leftJoin(
-                3,
+                2,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
-                new CachePlan(
-                    2,
-                    new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList())
-                ),
+                new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                 null,
                 false);
         //@formatter:on
@@ -1079,15 +943,12 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.innerJoin(
-                4,
+                3,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
-                new CachePlan(
-                    3,
-                    new Filter(
-                        2,
-                        new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
-                        new ExpressionPredicate(eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE)))
-                ),
+                new Filter(
+                    2,
+                    new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
+                    new ExpressionPredicate(eq(cre("active", tableB, CoreColumn.Type.NAMED_ASTERISK), LiteralBooleanExpression.TRUE))),
                 null,
                 false);
         //@formatter:on
@@ -1128,7 +989,7 @@ class QueryPlannerTest extends APhysicalPlanTest
         };
         catalogRegistry.registerCatalog("t", t);
 
-        session.setSystemProperty(QuerySession.FORCE_NO_INNER_CACHE, ValueVector.literalBoolean(true, 1));
+        // session.setSystemProperty(QuerySession.FORCE_NO_INNER_CACHE, ValueVector.literalBoolean(true, 1));
 
         QueryStatement queryStatement = parse(query);
         queryStatement = StatementPlanner.plan(session, queryStatement);
@@ -1383,14 +1244,11 @@ class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected =
                 new Sort(
-                    4,
+                    3,
                     NestedLoop.innerJoin(
-                        3,
+                        2,
                         new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
-                        new CachePlan(
-                            2,
-                            new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList())
-                        ),
+                        new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                         null,
                         false),
                     asList(sortItem(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK), Order.DESC, NullOrder.UNDEFINED),
@@ -1451,14 +1309,11 @@ class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected =
                 new Sort(
-                    4,
+                    3,
                     NestedLoop.innerJoin(
-                        3,
+                        2,
                         new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
-                        new CachePlan(
-                            2,
-                            new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList())
-                        ),
+                        new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
                         null,
                         false),
                     asList(sortItem(cre("col2", tableB, CoreColumn.Type.NAMED_ASTERISK), Order.ASC, NullOrder.UNDEFINED)));
@@ -1592,24 +1447,21 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         //@formatter:off
         IPhysicalPlan expected = new Projection(
-                6,
+                5,
                 NestedLoop.leftJoin(
-                    5,
+                    4,
                     new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
-                    new CachePlan(
-                        4,
-                        Assert.maxRowCount(
-                            3,
-                            new Projection(
-                                2,
-                                new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
-                                Schema.of(
-                                    nast("__expr0", ResolvedType.ANY, "", tableB, true, "col1")
-                                ),
-                                asList(new AliasExpression(cre("col1", tableB, CoreColumn.Type.NAMED_ASTERISK), "__expr0", true)),
-                                null),
-                            1)
-                        ),
+                    Assert.maxRowCount(
+                        3,
+                        new Projection(
+                            2,
+                            new TableScan(1, expectedSchemaB, tableB, "test", t.scanDataSources.get(1), emptyList()),
+                            Schema.of(
+                                nast("__expr0", ResolvedType.ANY, "", tableB, true, "col1")
+                            ),
+                            asList(new AliasExpression(cre("col1", tableB, CoreColumn.Type.NAMED_ASTERISK), "__expr0", true)),
+                            null),
+                        1),
                     null,
                     false),
                 Schema.of(
@@ -1702,7 +1554,7 @@ class QueryPlannerTest extends APhysicalPlanTest
                             null),
                         SystemCatalog.get().getOperatorFunction("object_array"),
                         "sys",
-                        Schema.of(ast("__expr0", ResolvedType.table(objectArraySchema), true))),
+                        Schema.of(col("__expr0", ResolvedType.table(objectArraySchema), true))),
                     asSet(pop("b", ResolvedType.table(expectedSchemaB), tableB)),
                     null,
                     SchemaUtils.joinSchema(expectedSchemaA, expectedSchemaB, "b")),
@@ -3024,84 +2876,6 @@ class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    void test_predicate_pushdown_with_analyze()
-    {
-        //@formatter:off
-        String query = ""
-                + "analyze select * "
-                + "from \"table\" "
-                + "where col = 10 "         // Comparison  
-                + "and col2 in (10,20) "    // In
-                + "and col3 like 'string' " // Like
-                + "and col4 is null "       // Null
-                + "and someFunc() ";        // Function call
-                
-        //@formatter:on
-
-        // Capture col and "" (someFunc)
-        ScalarFunctionInfo someFunc = new ScalarFunctionInfo("someFunc", FunctionInfo.FunctionType.SCALAR)
-        {
-        };
-        TestCatalog catalog = new TestCatalog(ofEntries(entry(QualifiedName.of("table"), CollectionUtils.asSet("col", ""))))
-        {
-            {
-                registerFunction(someFunc);
-            }
-        };
-
-        catalogRegistry.registerCatalog("t", catalog);
-
-        QueryStatement queryStatement = parse(query);
-        queryStatement = StatementPlanner.plan(session, queryStatement);
-
-        IPhysicalPlan actual = ((PhysicalStatement) queryStatement.getStatements()
-                .get(0)).getPlan();
-
-        TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
-
-        //@formatter:off
-        Schema expectedSchema = Schema.of(ast("", table));
-        
-        IPhysicalPlan expected = new DescribePlan(
-                4,
-                new AnalyzeInterceptor(
-                    3,
-                    new Filter(
-                        2,
-                        new AnalyzeInterceptor(
-                            1,
-                            new TableScan(0, expectedSchema, table, "test", catalog.scanDataSources.get(0), emptyList())
-                        ),
-                        new ExpressionPredicate(
-                            and(
-                                and(
-                                    new InExpression(cre("col2", table, CoreColumn.Type.NAMED_ASTERISK), asList(intLit(10), intLit(20)), false),
-                                    new LikeExpression(cre("col3", table, CoreColumn.Type.NAMED_ASTERISK), new LiteralStringExpression("string"), false, null)
-                                ),
-                                new NullPredicateExpression(cre("col4", table, CoreColumn.Type.NAMED_ASTERISK), false)))
-                        )),
-                true);
-        //@formatter:on
-
-        //@formatter:off
-        assertEquals(1, catalog.consumedPredicate.size());
-        assertEquals(asList(
-                Triple.of(null, IPredicate.Type.FUNCTION_CALL, asList(new FunctionCallExpression("t", someFunc, null, asList()))),
-                Triple.of(QualifiedName.of("col"), IPredicate.Type.COMPARISION, asList(intLit(10)))
-                ), catalog.consumedPredicate.get(QualifiedName.of("table")));
-        //@formatter:on
-
-        // System.out.println(actual.print(0));
-        // System.out.println(expected.print(0));
-
-        Assertions.assertThat(actual)
-                .usingRecursiveComparison()
-                .isEqualTo(expected);
-
-        assertEquals(expected, actual);
-    }
-
-    @Test
     void test_predicate_pushdown_all_filters_consumed()
     {
         //@formatter:off
@@ -3151,7 +2925,7 @@ class QueryPlannerTest extends APhysicalPlanTest
         assertEquals(expected, actual);
     }
 
-    private QueryStatement parse(String query)
+    static QueryStatement parse(String query)
     {
         return PARSER.parseQuery(query, null);
     }

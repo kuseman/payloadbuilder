@@ -60,6 +60,12 @@ public class TableScan implements IPhysicalPlan
     }
 
     @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
+    @Override
     public Map<String, Object> getDescribeProperties(IExecutionContext context)
     {
         Map<String, Object> properties = new LinkedHashMap<>();
@@ -212,10 +218,25 @@ public class TableScan implements IPhysicalPlan
                 Column vectorColumn = actual.getColumns()
                         .get(i);
 
-                if (!schemaColumn.getType()
-                        .equals(vectorColumn.getType())
+                if ((schemaColumn.getType()
+                        .getType() != vectorColumn.getType()
+                                .getType())
                         || !schemaColumn.getName()
                                 .equals(vectorColumn.getName()))
+                {
+                    return false;
+                }
+
+                Schema schemaSchema = schemaColumn.getType()
+                        .getSchema();
+                if (schemaSchema == null)
+                {
+                    continue;
+                }
+
+                // Dig down into nested schemas
+                if (!schemaEqualsRegardingTypeAndName(schemaSchema, vectorColumn.getType()
+                        .getSchema()))
                 {
                     return false;
                 }

@@ -94,14 +94,22 @@ public final class SchemaUtils
         return new Schema(columns);
     }
 
-    /** Returns true if this schema contains asterisk columns */
-    public static boolean isAsterisk(Schema schema)
+    /**
+     * Returns true if provided schema has columns that originates from any asterisk input. Ie. any column on any level that is of type {@link CoreColumn.Type#ASTERISK} or
+     * {@link CoreColumn.Type#NAMED_ASTERISK}
+     */
+    public static boolean originatesFromAsteriskInput(Schema schema)
     {
-        return isAsterisk(schema, false);
+        return isAsterisk(schema, true, true);
     }
 
-    /** Returns true if this schema contains asterisk columns */
-    public static boolean isAsterisk(Schema schema, boolean includeNamedAsterisks)
+    /** Returns true if this schema contains asterisk columns. One or more columns of type {@link CoreColumn.Type#ASTERISK}. */
+    public static boolean isAsterisk(Schema schema)
+    {
+        return isAsterisk(schema, false, false);
+    }
+
+    private static boolean isAsterisk(Schema schema, boolean includeNamedAsterisks, boolean traverseIntoSubSchemas)
     {
         int size = schema.getSize();
         if (size == 0)
@@ -113,7 +121,7 @@ public final class SchemaUtils
         {
             Column column = schema.getColumns()
                     .get(i);
-            if (isAsterisk(column, includeNamedAsterisks))
+            if (isAsterisk(column, includeNamedAsterisks, traverseIntoSubSchemas))
             {
                 return true;
             }
@@ -126,13 +134,10 @@ public final class SchemaUtils
      */
     public static boolean isAsterisk(Column column)
     {
-        return isAsterisk(column, false);
+        return isAsterisk(column, false, false);
     }
 
-    /**
-     * Returns true if provided column is asterisk.
-     */
-    public static boolean isAsterisk(Column column, boolean includeNamedAsterisks)
+    private static boolean isAsterisk(Column column, boolean includeNamedAsterisks, boolean traverseIntoSubSchemas)
     {
         if (column instanceof CoreColumn cc)
         {
@@ -144,11 +149,15 @@ public final class SchemaUtils
             }
 
             // Dig down into complex type schema
-            if (cc.getType()
-                    .getSchema() != null)
+            // We also do this for populated columns as those count as asterisk
+            // if their column is asterisk
+            if ((traverseIntoSubSchemas
+                    || cc.getColumnType() == CoreColumn.Type.POPULATED)
+                    && cc.getType()
+                            .getSchema() != null)
             {
                 return isAsterisk(cc.getType()
-                        .getSchema(), includeNamedAsterisks);
+                        .getSchema(), includeNamedAsterisks, traverseIntoSubSchemas);
             }
         }
         return false;

@@ -39,6 +39,16 @@ public class Limit implements IPhysicalPlan
         return nodeId;
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
+    public IExpression getLimitExpression()
+    {
+        return limitExpression;
+    }
+
     @Override
     public Schema getSchema()
     {
@@ -49,6 +59,12 @@ public class Limit implements IPhysicalPlan
     public String getName()
     {
         return "Limit";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override

@@ -45,7 +45,7 @@ public class Projection implements IPhysicalPlan
         this.hasAsteriskProjection = expressions.stream()
                 .anyMatch(e -> e instanceof AsteriskExpression);
         this.hasAsteriskSchemaOrInput = hasAsteriskProjection
-                || SchemaUtils.isAsterisk(schema, true);
+                || SchemaUtils.originatesFromAsteriskInput(schema);
         this.parentTableSource = parentTableSource;
 
         if (expressions.size() != schema.getSize())
@@ -79,6 +79,12 @@ public class Projection implements IPhysicalPlan
     public String getName()
     {
         return "Project";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override

@@ -35,6 +35,12 @@ public class AnalyzeInterceptor implements IPhysicalPlan
     }
 
     @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
+    @Override
     public List<? extends DescribableNode> getChildNodes()
     {
         // We skip this node in tree because we want the query plan to look like if
@@ -93,18 +99,9 @@ public class AnalyzeInterceptor implements IPhysicalPlan
         final AnalyzeData data = context.getStatementContext()
                 .getOrCreateNodeData(nodeId, AnalyzeData::new);
         data.increaseExecutionCount();
-
-        if (data.iterator == null)
-        {
-            data.iterator = new AnalyzeIterator(data);
-        }
-
         data.resumeNodeTime();
-        final TupleIterator it = input.execute(context);
+        data.iterator.it = input.execute(context);
         data.suspenNodeTime();
-
-        data.iterator.it = it;
-
         return data.iterator;
     }
 
@@ -241,6 +238,6 @@ public class AnalyzeInterceptor implements IPhysicalPlan
     /** Analyze data */
     private static class AnalyzeData extends NodeData
     {
-        AnalyzeIterator iterator;
+        AnalyzeIterator iterator = new AnalyzeIterator(this);
     }
 }

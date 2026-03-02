@@ -38,10 +38,26 @@ public class Assert implements IPhysicalPlan
         return nodeId;
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
+    public Supplier<Consumer<TupleVector>> getPredicateSupplier()
+    {
+        return predicateSupplier;
+    }
+
     @Override
     public String getName()
     {
         return "Assert";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override
@@ -136,6 +152,12 @@ public class Assert implements IPhysicalPlan
     public String toString()
     {
         return "Assert (" + nodeId + "), type: " + predicateSupplier;
+    }
+
+    /** Copy assert with new input. */
+    public static Assert copy(Assert source, IPhysicalPlan input)
+    {
+        return new Assert(source.nodeId, input, source.predicateSupplier);
     }
 
     /** Create an assert node that assert max rows from input */

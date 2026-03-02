@@ -39,6 +39,23 @@ public class Concatenation implements IPhysicalPlan
         return nodeId;
     }
 
+    public List<IPhysicalPlan> getInputs()
+    {
+        return inputs;
+    }
+
+    @Override
+    public String getName()
+    {
+        return "Concatenation";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
     @Override
     public Schema getSchema()
     {

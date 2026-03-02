@@ -150,6 +150,12 @@ public abstract class APhysicalPlanTest extends AExpressionTest
             }
 
             @Override
+            public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+            {
+                throw new RuntimeException("Cannot be visited");
+            }
+
+            @Override
             public TupleIterator execute(IExecutionContext context)
             {
                 if (executeAction != null)

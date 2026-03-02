@@ -3,17 +3,20 @@ package se.kuseman.payloadbuilder.core.statement;
 import static java.util.Objects.requireNonNull;
 
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Logical select statement. Statement in the planning phase. Will be transformed in to a {@link PhysicalStatement} further down the line */
 public class LogicalSelectStatement extends Statement
 {
     private final ILogicalPlan select;
     private final boolean assignmentSelect;
+    private final Location location;
 
-    public LogicalSelectStatement(ILogicalPlan select, boolean assignmentSelect)
+    public LogicalSelectStatement(ILogicalPlan select, boolean assignmentSelect, Location location)
     {
         this.select = requireNonNull(select, "select");
         this.assignmentSelect = assignmentSelect;
+        this.location = location;
     }
 
     public ILogicalPlan getSelect()
@@ -24,6 +27,11 @@ public class LogicalSelectStatement extends Statement
     public boolean isAssignmentSelect()
     {
         return assignmentSelect;
+    }
+
+    public Location getLocation()
+    {
+        return location;
     }
 
     @Override

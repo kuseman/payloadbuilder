@@ -36,10 +36,21 @@ public class AssignmentPlan implements IPhysicalPlan
         return nodeId;
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
     @Override
     public String getName()
     {
         return input.getName();
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override

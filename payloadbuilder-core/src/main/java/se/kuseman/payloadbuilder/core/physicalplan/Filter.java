@@ -51,6 +51,12 @@ public class Filter implements IPhysicalPlan
         return "Filter";
     }
 
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
     public BiFunction<TupleVector, IExecutionContext, ValueVector> getPredicate()
     {
         return predicate;

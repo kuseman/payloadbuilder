@@ -49,10 +49,26 @@ public class Sort implements IPhysicalPlan
         return nodeId;
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
+    public List<SortItem> getSortItems()
+    {
+        return sortItems;
+    }
+
     @Override
     public String getName()
     {
         return "Sort";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override

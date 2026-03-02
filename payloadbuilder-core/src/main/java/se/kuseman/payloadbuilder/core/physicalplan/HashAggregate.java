@@ -87,11 +87,37 @@ public class HashAggregate implements IPhysicalPlan
         return nodeId;
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
+    public List<IExpression> getAggregateExpressions()
+    {
+        return aggregateExpressions;
+    }
+
+    public List<IAggregateExpression> getProjectionExpressions()
+    {
+        return projectionExpressions;
+    }
+
+    public TableSourceReference getParentTableSource()
+    {
+        return parentTableSource;
+    }
+
     @Override
     public String getName()
     {
         return aggregateExpressions.isEmpty() ? "Hash Distinct"
                 : "Hash Aggregate";
+    }
+
+    @Override
+    public <T, C> T accept(IPhysicalPlanVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override
