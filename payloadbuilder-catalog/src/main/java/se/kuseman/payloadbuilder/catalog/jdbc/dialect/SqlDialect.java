@@ -227,7 +227,7 @@ public interface SqlDialect
         if (vector.hasNulls()
                 && vector.isNull(row))
         {
-            stm.setObject(ordinal, null);
+            stm.setNull(ordinal, toJdbcType(type));
             return;
         }
 
@@ -268,6 +268,23 @@ public interface SqlDialect
             default:
                 throw new IllegalArgumentException("Type: " + type + " is not supported.");
         }
+    }
+
+    private static int toJdbcType(Column.Type type)
+    {
+        return switch (type)
+        {
+            case Boolean -> java.sql.Types.BOOLEAN;
+            case Int -> java.sql.Types.INTEGER;
+            case Long -> java.sql.Types.BIGINT;
+            case Float -> java.sql.Types.REAL;
+            case Double -> java.sql.Types.DOUBLE;
+            case Decimal -> java.sql.Types.DECIMAL;
+            case String, Any -> java.sql.Types.NVARCHAR;
+            case DateTime -> java.sql.Types.TIMESTAMP;
+            case DateTimeOffset -> java.sql.Types.TIMESTAMP_WITH_TIMEZONE;
+            default -> java.sql.Types.OTHER;
+        };
     }
 
     /** Return column definition for provided column. */

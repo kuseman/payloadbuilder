@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.IDatasink;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -87,7 +88,8 @@ class InsertSink implements IDatasink
             int colCount = -1;
             int totalRowCount = 0;
             int batchCount = 0;
-            String preparedStatement = null;
+            PreparedStatement stm = null;
+            Column.Type[] types = null;
             try
             {
                 while (input.hasNext())
@@ -106,35 +108,42 @@ class InsertSink implements IDatasink
                         throw new RuntimeException("JDBC insert expects that all batches have the same schema. Schema used: " + schema + " batch schema: " + next.getSchema());
                     }
 
-                    if (preparedStatement == null)
-                    {
-                        preparedStatement = createTableAndPreparedStatement(dialect, connection, schema);
-                    }
-
                     ValueVector[] columns = new ValueVector[colCount];
-                    int rowCount = next.getRowCount();
                     for (int j = 0; j < colCount; j++)
                     {
                         columns[j] = next.getColumn(j);
                     }
-                    try (PreparedStatement stm = connection.prepareStatement(preparedStatement))
+
+                    if (stm == null)
                     {
+                        String preparedStatement = createTableAndPreparedStatement(dialect, connection, schema);
+                        stm = connection.prepareStatement(preparedStatement);
                         currentStatemnet.set(stm);
-                        for (int i = 0; i < rowCount; i++)
+                        types = new Column.Type[colCount];
+                        for (int j = 0; j < colCount; j++)
                         {
-                            for (int j = 0; j < colCount; j++)
-                            {
-                                dialect.setStatementValue(columns[j].type()
-                                        .getType(), stm, j + 1, i, columns[j]);
-                            }
-                            stm.addBatch();
+                            types[j] = columns[j].type()
+                                    .getType();
                         }
-                        stm.executeBatch();
-                        connection.commit();
                     }
+
+                    int rowCount = next.getRowCount();
+                    for (int i = 0; i < rowCount; i++)
+                    {
+                        for (int j = 0; j < colCount; j++)
+                        {
+                            dialect.setStatementValue(types[j], stm, j + 1, i, columns[j]);
+                        }
+                        stm.addBatch();
+                    }
+                    stm.executeBatch();
                     totalRowCount += next.getRowCount();
                     batchCount++;
                     LOGGER.debug("Inserted batch: {}, total rows: {}, in: {}ms", batchCount, totalRowCount, TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS));
+                }
+                if (stm != null)
+                {
+                    connection.commit();
                 }
             }
             catch (SQLException e)
@@ -144,6 +153,7 @@ class InsertSink implements IDatasink
             }
             finally
             {
+                JdbcUtils.closeQuiet(stm);
                 connection.setAutoCommit(true);
             }
         }
