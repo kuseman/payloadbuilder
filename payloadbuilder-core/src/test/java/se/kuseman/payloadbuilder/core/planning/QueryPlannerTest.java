@@ -2607,34 +2607,43 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         //CSOFF
         IPhysicalPlan expected = new HashMatch(
-                5,
+                6,
                 new TableScan(0, expectedSchemaA, tableA, "test", t.scanDataSources.get(0), emptyList()),
-                new HashAggregate(
-                    4,
-                    new HashMatch(
-                       3,
-                       new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicateB, t.seekDataSources.get(0), emptyList()),
-                       new IndexSeek(2, expectedSchemaC, tableC, "test", expectedSeekPredicateC, t.seekDataSources.get(1), emptyList()),
-                       List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
-                       List.of(cre("col", tableC, CoreColumn.Type.NAMED_ASTERISK)),
-                       new ExpressionPredicate(
-                               eq(cre("col", tableC, CoreColumn.Type.NAMED_ASTERISK), cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK))
-                       ),
-                       null,
-                       false,
-                       true),
-                       asList(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
-                       asList(
-                            new AggregateWrapperExpression(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), true, false),
-                            new AggregateWrapperExpression(new AliasExpression(
-                                    new ComparisonExpression(
-                                        IComparisonExpression.Type.GREATER_THAN,
+                new Projection(
+                    5,
+                    new HashAggregate(
+                        4,
+                        new HashMatch(
+                           3,
+                           new IndexSeek(1, expectedSchemaB, tableB, "test", expectedSeekPredicateB, t.seekDataSources.get(0), emptyList()),
+                           new IndexSeek(2, expectedSchemaC, tableC, "test", expectedSeekPredicateC, t.seekDataSources.get(1), emptyList()),
+                           List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
+                           List.of(cre("col", tableC, CoreColumn.Type.NAMED_ASTERISK)),
+                           new ExpressionPredicate(
+                                   eq(cre("col", tableC, CoreColumn.Type.NAMED_ASTERISK), cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK))
+                           ),
+                           null,
+                           false,
+                           true),
+                           asList(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
+                           asList(
+                                new AggregateWrapperExpression(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK), true, false),
+                                new AggregateWrapperExpression(new AliasExpression(
                                         new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))),
-                                        intLit(0)),
-                                    "active"), true, false)
+                                        "__expr0"), true, true)
+                            ),
+                           subQueryB
                         ),
-                       subQueryB
-                    ),
+                    Schema.of(nast("col", ResolvedType.of(Type.Any), tableB), col("active", ResolvedType.of(Type.Boolean), subQueryB)),
+                    asList(
+                        cre("col", tableB, 0, CoreColumn.Type.NAMED_ASTERISK),
+                        new AliasExpression(
+                            new ComparisonExpression(
+                                IComparisonExpression.Type.GREATER_THAN,
+                                cre("__expr0", subQueryB, 1, ResolvedType.of(Type.Int), CoreColumn.Type.REGULAR),
+                                intLit(0)),
+                            "active")),
+                    subQueryB),
                 List.of(cre("col", tableA, CoreColumn.Type.NAMED_ASTERISK)),
                 List.of(cre("col", tableB, CoreColumn.Type.NAMED_ASTERISK)),
                 new ExpressionPredicate(

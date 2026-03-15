@@ -360,6 +360,13 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
             IExpression filterPredicate = planData.filterPredicate;
             planData.filterPredicate = null;
 
+            // filterPredicate may have been consumed by visit(Aggregate) when mixed expressions
+            // required placing the Filter between the Aggregate and the outer Projection
+            if (filterPredicate == null)
+            {
+                return input;
+            }
+
             return new Filter(input, plan.getTableSource(), filterPredicate);
         }
 
@@ -420,6 +427,95 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
         List<Pair<String, IExpression>> pushDownExpressions = new ArrayList<>();
         AggregateColumnsCollector.Context ctx = new AggregateColumnsCollector.Context(context, planProjections, pushDownExpressions);
 
+        /* @formatter:off
+         *
+         * ANSI SQL compliance: aggregate functions should only appear inside the Aggregate operator.
+         * Any expression that combines aggregate function results with non-aggregate operations
+         * (e.g. t.col + max(col1), count(*) * 2) must be split:
+         *   - The aggregate function(s) are extracted and kept in the Aggregate with generated aliases
+         *   - The outer computation is placed in a Projection operator above the Aggregate
+         *
+         * Example:  SELECT count(1), t.col + max(col1) FROM t GROUP BY t.col
+         *   Before:  Aggregate(projections: [count(1), AggWrapper(t.col + max(col1))])
+         *   After:   Projection([__expr0, t.col + __expr1],
+         *              Aggregate(projections: [AggWrapper(count(1) as __expr0), AggWrapper(max(col1) as __expr1 internal), AggWrapper(t.col internal)]))
+         *
+         * @formatter:on
+         */
+        List<IExpression> outerProjectionExpressions = null;
+        for (int i = 0; i < projectionSize; i++)
+        {
+            IAggregateExpression pe = planProjections.get(i);
+            if (!isMixedProjection(pe))
+            {
+                // Non-mixed: if we already have outer projections, add a pass-through reference for this projection
+                if (outerProjectionExpressions != null)
+                {
+                    outerProjectionExpressions.add(getAggregateProjectionRef(pe, i, planProjections, ctx));
+                }
+                continue;
+            }
+
+            // Mixed projection found: initialize outer projections if not done yet
+            if (outerProjectionExpressions == null)
+            {
+                outerProjectionExpressions = new ArrayList<>();
+                // Add pass-through references for all previously processed non-mixed projections
+                for (int j = 0; j < i; j++)
+                {
+                    outerProjectionExpressions.add(getAggregateProjectionRef(planProjections.get(j), j, planProjections, ctx));
+                }
+            }
+
+            // Unwrap the mixed expression (strip AggregateWrapper and optional AliasExpression)
+            IExpression inner = ((AggregateWrapperExpression) pe).getExpression();
+            String alias = null;
+            if (inner instanceof AliasExpression ae)
+            {
+                alias = ae.getAliasString();
+                inner = ae.getExpression();
+            }
+
+            // Extract aggregate functions from the mixed expression via AggregateColumnsCollector.
+            // This adds internal projections for each aggregate function found and returns
+            // a rewritten expression that uses column references instead of aggregate function calls.
+            ctx.nonAggegatedColumnExpressions.clear();
+            IExpression transformed = inner.accept(AggregateColumnsCollector.INSTANCE, ctx);
+            validateExpressions(plan, ctx, projectionColumns, unWrappedPlanProjections, planProjections, false, "SELECT");
+
+            // Build the outer projection expression, preserving the alias if there was one.
+            // If no alias and the mixed expression was a bare non-aggregate function call
+            // (wrapped by SchemaResolver so it could reach this path), use the original
+            // expression's toString() as the column name for a user-readable output column.
+            // For other no-alias mixed expressions (e.g. arithmetic), keep the old behavior.
+            IExpression outerExpr;
+            if (alias != null)
+            {
+                outerExpr = new AliasExpression(transformed, alias);
+            }
+            else if (inner instanceof IFunctionCallExpression)
+            {
+                outerExpr = new AliasExpression(transformed, pe.toString());
+            }
+            else
+            {
+                outerExpr = transformed;
+            }
+            outerProjectionExpressions.add(outerExpr);
+        }
+
+        // Remove mixed projection expressions from planProjections (in reverse order to preserve indices)
+        if (outerProjectionExpressions != null)
+        {
+            for (int i = projectionSize - 1; i >= 0; i--)
+            {
+                if (isMixedProjection(planProjections.get(i)))
+                {
+                    planProjections.remove(i);
+                }
+            }
+        }
+
         int sortItemSize = planData.sortItems.size();
         // Analyze sort expressions
         for (int i = 0; i < sortItemSize; i++)
@@ -454,7 +550,114 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
             planInput = new Projection(planInput, projections, null);
         }
 
-        return new Aggregate(planInput, plan.getAggregateExpressions(), planProjections, plan.getParentTableSource());
+        ILogicalPlan result = new Aggregate(planInput, plan.getAggregateExpressions(), planProjections, plan.getParentTableSource());
+
+        // Wrap with a Projection above the Aggregate if mixed expressions were found
+        if (outerProjectionExpressions != null)
+        {
+            // If there is a HAVING predicate, place the Filter between the Aggregate and the outer
+            // Projection so it can reference internal aggregate aliases (e.g. __exprN)
+            if (planData.filterPredicate != null)
+            {
+                result = new Filter(result, null, planData.filterPredicate);
+                planData.filterPredicate = null;
+            }
+            result = new Projection(result, outerProjectionExpressions, null);
+        }
+
+        return result;
+    }
+
+    /**
+     * Returns true if the given aggregate projection expression is "mixed": it contains at least one aggregate function call but is not itself purely an aggregate function. Such expressions must be
+     * split so that aggregate functions reside in the Aggregate operator and the remaining computation is placed in a Projection above it.
+     */
+    private static boolean isMixedProjection(IAggregateExpression pe)
+    {
+        if (!(pe instanceof AggregateWrapperExpression awe))
+        {
+            return false;
+        }
+        IExpression inner = awe.getExpression();
+        if (inner instanceof AliasExpression ae)
+        {
+            inner = ae.getExpression();
+        }
+        // Assignment expressions (@var = expr) are a non-standard extension; never split them
+        // CSOFF
+        if (inner instanceof se.kuseman.payloadbuilder.core.expression.AssignmentExpression)
+        // CSON
+        {
+            return false;
+        }
+        // A pure aggregate function is never mixed
+        if (inner instanceof IFunctionCallExpression fce
+                && fce.getFunctionInfo()
+                        .getFunctionType()
+                        .isAggregate())
+        {
+            return false;
+        }
+        return containsAggregateFunctionCall(inner);
+    }
+
+    /** Returns true if the expression or any of its descendants is an aggregate function call. */
+    private static boolean containsAggregateFunctionCall(IExpression expression)
+    {
+        if (expression instanceof IFunctionCallExpression fce
+                && fce.getFunctionInfo()
+                        .getFunctionType()
+                        .isAggregate())
+        {
+            return true;
+        }
+        for (IExpression child : expression.getChildren())
+        {
+            if (containsAggregateFunctionCall(child))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns an expression suitable for referencing the given aggregate projection from an outer Projection operator. For aggregate function calls without an alias this will assign a generated alias
+     * in {@code planProjections} at {@code index} so that the returned column reference resolves correctly.
+     */
+    private static IExpression getAggregateProjectionRef(IAggregateExpression pe, int index, List<IAggregateExpression> planProjections, AggregateColumnsCollector.Context ctx)
+    {
+        // Pure aggregate function calls (FunctionCallExpression implements IAggregateExpression):
+        // let AggregateColumnsCollector handle alias assignment via findAggregateProjection
+        if (pe instanceof IFunctionCallExpression)
+        {
+            return pe.accept(AggregateColumnsCollector.INSTANCE, ctx);
+        }
+        if (pe instanceof AggregateWrapperExpression awe)
+        {
+            IExpression inner = awe.getExpression();
+            // Already aliased (e.g. AliasExpression wrapping the expression)
+            if (inner instanceof AliasExpression ae)
+            {
+                return new UnresolvedColumnExpression(QualifiedName.of(ae.getAliasString()), -1, null);
+            }
+            // Column reference or other HasAlias (e.g. group-by column reference)
+            if (inner instanceof HasAlias ha)
+            {
+                String alias = ha.getAlias()
+                        .getAlias();
+                if (!StringUtils.isBlank(alias))
+                {
+                    return new UnresolvedColumnExpression(QualifiedName.of(alias), -1, null);
+                }
+            }
+            // No usable alias: generate one and update the projection in planProjections
+            String genAlias = "__expr" + ctx.context.expressionCounter++;
+            String outputAlias = pe.toString();
+            planProjections.set(index, new AggregateWrapperExpression(new AliasExpression(inner, genAlias, outputAlias, awe.isInternal()), awe.isSingleValue(), awe.isInternal()));
+            return new UnresolvedColumnExpression(QualifiedName.of(genAlias), -1, null);
+        }
+        throw new IllegalStateException("Cannot create reference for projection: " + pe);
     }
 
     private boolean shouldReplaceSortItem(IExpression sortItemExpression, IExpression projectionExpression)

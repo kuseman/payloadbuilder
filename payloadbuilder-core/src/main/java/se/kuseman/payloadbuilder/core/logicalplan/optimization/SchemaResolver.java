@@ -20,6 +20,7 @@ import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
@@ -99,7 +100,23 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
         // Loop projection expressions
         List<IAggregateExpression> projectionExpressions = plan.getProjectionExpressions()
                 .stream()
-                .map(e -> (IAggregateExpression) e.accept(ExpressionResolver.INSTANCE, context))
+                .map(e ->
+                {
+                    IAggregateExpression resolved = (IAggregateExpression) e.accept(ExpressionResolver.INSTANCE, context);
+                    // The parser returns bare (unwrapped) FunctionCallExpressions for function-call projections
+                    // because FunctionCallExpression/UnresolvedFunctionCallExpression implements IAggregateExpression.
+                    // Non-aggregate function calls that wrap an aggregate (e.g. upper(max(col))) need to be
+                    // wrapped in AggregateWrapperExpression here so that ComputedExpressionPushDown can detect
+                    // them as "mixed" and split them into a Projection above the Aggregate.
+                    if (resolved instanceof FunctionCallExpression fce
+                            && !fce.getFunctionInfo()
+                                    .getFunctionType()
+                                    .isAggregate())
+                    {
+                        return (IAggregateExpression) new AggregateWrapperExpression(fce, false, false);
+                    }
+                    return resolved;
+                })
                 .collect(toList());
 
         context.resolvingAggregateProjectionExpression = false;
@@ -268,18 +285,31 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
             {
                 throw new ParseException("Cannot aggregate expressions containing aggregate functions", location);
             }
-            // Top level function call must be a scalar function that is also an aggregate
+            // Top level function call must be a scalar function that is also an aggregate,
+            // UNLESS it wraps an aggregate function (e.g. concat('prefix', max(col))) — those
+            // are valid mixed expressions that ComputedExpressionPushDown will split apart.
+            // Lambda functions (map, filter, etc.) operate on grouped data inherently and are
+            // always allowed in aggregate projections without wrapping an explicit aggregate call.
             else if (context.resolvingAggregateProjectionExpression
                     && !context.insideAggregateFunction
                     && !functionInfo.getFunctionType()
-                            .isAggregate())
+                            .isAggregate()
+                    && !(functionInfo instanceof LambdaFunction)
+                    && !containsAggregateFunctionCall(expression.getArguments(), context))
             {
                 throw new ParseException(functionInfo.getName() + " is not an aggregate function", location);
             }
 
             boolean isAggregate = functionInfo.getFunctionType()
                     .isAggregate();
-            if (isAggregate)
+            boolean isLambda = functionInfo instanceof LambdaFunction;
+            // Save and restore insideAggregateFunction so that nested lambda/aggregate calls
+            // (e.g. filter inside map) don't clobber the outer call's state. Without this,
+            // chained lambdas like col.filter(...).map(x -> concat(...)) would reset the flag
+            // to false after 'filter' finishes, causing 'concat' to be rejected.
+            boolean savedInsideAggregateFunction = context.insideAggregateFunction;
+            if (isAggregate
+                    || isLambda)
             {
                 context.insideAggregateFunction = true;
             }
@@ -303,12 +333,50 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                 result = new FunctionCallExpression(catalogAlias, functionInfo, expression.getAggregateMode(), arguments);
             }
 
-            if (isAggregate)
+            if (isAggregate
+                    || isLambda)
             {
-                context.insideAggregateFunction = false;
+                context.insideAggregateFunction = savedInsideAggregateFunction;
             }
 
             return result;
+        }
+
+        /** Returns true if any expression in the list (recursively) is an aggregate function call. */
+        private static boolean containsAggregateFunctionCall(List<IExpression> expressions, Ctx context)
+        {
+            for (IExpression e : expressions)
+            {
+                if (containsAggregateFunctionCallExpr(e, context))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static boolean containsAggregateFunctionCallExpr(IExpression expression, Ctx context)
+        {
+            if (expression instanceof UnresolvedFunctionCallExpression ufe)
+            {
+                Pair<String, ScalarFunctionInfo> p = context.getSession()
+                        .resolveScalarFunctionInfo(ufe.getCatalogAlias(), ufe.getName());
+                if (p != null
+                        && p.getValue()
+                                .getFunctionType()
+                                .isAggregate())
+                {
+                    return true;
+                }
+            }
+            for (IExpression child : expression.getChildren())
+            {
+                if (containsAggregateFunctionCallExpr(child, context))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 

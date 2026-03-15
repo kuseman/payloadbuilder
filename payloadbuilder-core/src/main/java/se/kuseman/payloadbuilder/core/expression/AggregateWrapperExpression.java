@@ -14,6 +14,7 @@ import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
+import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
 
 /** An aggregate expression that wrapps a ordinary expression and turns it into an aggregate result */
 public class AggregateWrapperExpression implements IAggregateExpression, HasAlias
@@ -22,12 +23,12 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
 
     /**
      * Should we return a single value for each group? Ie. is this column one of the aggregate expressions.
-     * 
+     *
      * <pre>
      *  select col1, count(*)   <---- col1 is singleValue since we have that one in the group clause
      *  from table
      *  group by col1
-     *  
+     *
      *  Ie. If all referenced expressions down the tree references only the group by expressions we return a single value
      * </pre>
      */
@@ -123,8 +124,13 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
             return ase.createAggregator();
         }
 
-        // A wrapped aggregate alias expression
-        if (e instanceof IAggregateExpression)
+        // A wrapped aggregate function expression (e.g. max(col), sum(col)).
+        // Only delegate to createAggregator() for actual aggregate functions — not for plain scalar
+        // FunctionCallExpressions which also implement IAggregateExpression but don't support createAggregator.
+        if (e instanceof IFunctionCallExpression fce
+                && fce.getFunctionInfo()
+                        .getFunctionType()
+                        .isAggregate())
         {
             return ((IAggregateExpression) e).createAggregator();
         }

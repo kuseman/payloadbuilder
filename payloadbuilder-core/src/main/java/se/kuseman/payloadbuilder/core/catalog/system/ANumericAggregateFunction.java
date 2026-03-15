@@ -218,25 +218,45 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
                 @Override
                 public int getInt(int row)
                 {
-                    return intResult.getInt(row);
+                    if (intResult != null)
+                    {
+                        return intResult.getInt(row);
+                    }
+                    // Implicit cast from object result (happens when resultType=Any)
+                    return ((Number) objectResult.get(row)).intValue();
                 }
 
                 @Override
                 public long getLong(int row)
                 {
-                    return longResult.getLong(row);
+                    if (longResult != null)
+                    {
+                        return longResult.getLong(row);
+                    }
+                    // Implicit cast from object result (happens when resultType=Any)
+                    return ((Number) objectResult.get(row)).longValue();
                 }
 
                 @Override
                 public float getFloat(int row)
                 {
-                    return floatResult.getFloat(row);
+                    if (floatResult != null)
+                    {
+                        return floatResult.getFloat(row);
+                    }
+                    // Implicit cast from object result (happens when resultType=Any)
+                    return ((Number) objectResult.get(row)).floatValue();
                 }
 
                 @Override
                 public double getDouble(int row)
                 {
-                    return doubleResult.getDouble(row);
+                    if (doubleResult != null)
+                    {
+                        return doubleResult.getDouble(row);
+                    }
+                    // Implicit cast from object result (happens when resultType=Any)
+                    return ((Number) objectResult.get(row)).doubleValue();
                 }
 
                 @Override
