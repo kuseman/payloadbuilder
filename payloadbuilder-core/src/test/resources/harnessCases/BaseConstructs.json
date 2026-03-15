@@ -644,6 +644,127 @@
       ]
     },
     {
+      "name": "Agg. functions with non-aggregate expression on aggregate result",
+      "description": "Tests ANSI SQL compliance: mixed expressions (aggregate + scalar) are split into a Projection above the Aggregate",
+      "query": [
+        "select id, sum(value) + 1 sum_plus_one ",
+        "from agg_data ",
+        "group by id ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 }, { "key": "sum_plus_one", "value": 31 }],
+          [{ "key": "id", "value": 2 }, { "key": "sum_plus_one", "value": 31 }],
+          [{ "key": "id", "value": 3 }, { "key": "sum_plus_one", "value": 111 }]
+        ]
+      ]
+    },
+    {
+      "name": "Agg. functions with two aggregates combined",
+      "description": "Tests ANSI SQL compliance: expression combining two aggregate functions is split into a Projection above the Aggregate",
+      "query": [
+        "select id, sum(value) + max(value) sum_plus_max ",
+        "from agg_data ",
+        "group by id ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 }, { "key": "sum_plus_max", "value": 50 }],
+          [{ "key": "id", "value": 2 }, { "key": "sum_plus_max", "value": 60 }],
+          [{ "key": "id", "value": 3 }, { "key": "sum_plus_max", "value": 170 }]
+        ]
+      ]
+    },
+    {
+      "name": "Agg. functions with mixed expression and having",
+      "description": "Tests ANSI SQL compliance: mixed expression in SELECT with HAVING clause",
+      "query": [
+        "select id, sum(value) + 1 sum_plus_one ",
+        "from agg_data ",
+        "group by id ",
+        "having sum(value) > 30 ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 3 }, { "key": "sum_plus_one", "value": 111 }]
+        ]
+      ]
+    },
+    {
+      "name": "Agg. functions wrapped in non-aggregate function",
+      "description": "Tests ANSI SQL compliance: non-aggregate function wrapping an aggregate (e.g. concat('prefix', max(col)))",
+      "query": [
+        "select id, concat('max:', max(string1)) max_string ",
+        "from strings ",
+        "group by id ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 }, { "key": "max_string", "value": "max:some string 1" }],
+          [{ "key": "id", "value": 2 }, { "key": "max_string", "value": "max:hello world" }],
+          [{ "key": "id", "value": 3 }, { "key": "max_string", "value": "max:string 3" }],
+          [{ "key": "id", "value": 4 }, { "key": "max_string", "value": "max:same little text" }]
+        ]
+      ]
+    },
+    {
+      "name": "Scalar function wrapping aggregate (createAggregator fix)",
+      "description": "Scalar FunctionCallExpression wrapping an aggregate must not throw 'Aggregate not implemented' from AggregateWrapperExpression.createAggregator(). The expression is split by isMixedProjection into Projection(scalar)+Aggregate(agg).",
+      "query": [
+        "select id, upper(max(string1)) max_upper_string ",
+        "from strings ",
+        "group by id ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 }, { "key": "max_upper_string", "value": "SOME STRING 1" }],
+          [{ "key": "id", "value": 2 }, { "key": "max_upper_string", "value": "HELLO WORLD" }],
+          [{ "key": "id", "value": 3 }, { "key": "max_upper_string", "value": "STRING 3" }],
+          [{ "key": "id", "value": 4 }, { "key": "max_upper_string", "value": "SAME LITTLE TEXT" }]
+        ]
+      ]
+    },
+    {
+      "name": "Scalar function wrapping aggregate without alias (no-alias fix)",
+      "description": "upper(max(string1)) without an alias must not throw 'Aggregate not implemented'. SchemaResolver must wrap bare non-aggregate FunctionCallExpressions in AggregateWrapperExpression so ComputedExpressionPushDown can detect them as mixed.",
+      "query": [
+        "select id, upper(max(string1)) ",
+        "from strings ",
+        "group by id ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 }, { "key": "upper(max(string1))", "value": "SOME STRING 1" }],
+          [{ "key": "id", "value": 2 }, { "key": "upper(max(string1))", "value": "HELLO WORLD" }],
+          [{ "key": "id", "value": 3 }, { "key": "upper(max(string1))", "value": "STRING 3" }],
+          [{ "key": "id", "value": 4 }, { "key": "upper(max(string1))", "value": "SAME LITTLE TEXT" }]
+        ]
+      ]
+    },
+    {
+      "name": "Lambda function in aggregate projection (no-alias)",
+      "description": "col2.map(x -> concat(x, 'ggg')) in a GROUP BY query must not throw 'map is not an aggregate function'. SchemaResolver now exempts LambdaFunction from the aggregate-only check and wraps the call in AggregateWrapperExpression so ExpressionAggregator evaluates it per group.",
+      "query": [
+        "select id, data.map(x -> concat(x, 'ggg')) mapped_data ",
+        "from data ",
+        "group by id ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 }, { "key": "mapped_data", "value": ["1_1ggg", "1_2ggg"] }],
+          [{ "key": "id", "value": 2 }, { "key": "mapped_data", "value": ["2_1ggg"] }],
+          [{ "key": "id", "value": 3 }, { "key": "mapped_data", "value": ["3_1ggg", "3_2ggg", "3_3ggg"] }]
+        ]
+      ]
+    },
+    {
       "name": "Group by. Single value etc.",
       "query": [
         "select id * id               single    -- Only single values included in expression ",
