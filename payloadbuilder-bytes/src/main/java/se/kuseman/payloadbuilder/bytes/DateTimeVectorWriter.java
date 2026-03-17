@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.bytes;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.bytes.PayloadWriter.WriterSettings;
 
 /** Writer of {@link Column.Type#DateTime} */
 class DateTimeVectorWriter extends AReferenceVectorWriter
@@ -15,19 +16,29 @@ class DateTimeVectorWriter extends AReferenceVectorWriter
     }
 
     @Override
-    protected boolean isLiteral(ValueVector vector, int from, int to)
+    protected Encoding getEncoding(ValueVector vector, int from, int to, WriterSettings settings)
     {
-        long value = vector.getDateTime(from)
-                .getEpoch();
-        for (int i = from + 1; i < to; i++)
+        boolean firstSet = false;
+        long value = -1;
+        for (int i = from + 0; i < to; i++)
         {
-            if (value != vector.getDateTime(i)
+            if (vector.isNull(i))
+            {
+                return Encoding.REGULAR;
+            }
+            else if (!firstSet)
+            {
+                value = vector.getDateTime(i)
+                        .getEpoch();
+                firstSet = true;
+            }
+            else if (value != vector.getDateTime(i)
                     .getEpoch())
             {
-                return false;
+                return Encoding.REGULAR;
             }
         }
-        return true;
+        return Encoding.REGULAR_LITERAL;
     }
 
     @Override

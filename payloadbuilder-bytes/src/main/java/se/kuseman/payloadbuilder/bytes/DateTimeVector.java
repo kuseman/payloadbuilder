@@ -34,7 +34,7 @@ class DateTimeVector extends AVector
         }
 
         int encoding = buffer.get(position++);
-        if (encoding == PayloadReader.LITERAL_ENCODING)
+        if (encoding == PayloadReader.REGULAR_LITERAL_ENCODING)
         {
             int valueOffset = buffer.getInt(position);
             return ValueVector.literalDateTime(EpochDateTime.from(buffer.getLong(valueOffset)), size);

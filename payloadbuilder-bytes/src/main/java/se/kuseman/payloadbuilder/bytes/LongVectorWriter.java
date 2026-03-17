@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.bytes;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.bytes.PayloadWriter.WriterSettings;
 
 /** Writer of {@link Column.Type#Long} */
 class LongVectorWriter extends AReferenceVectorWriter
@@ -15,17 +16,27 @@ class LongVectorWriter extends AReferenceVectorWriter
     }
 
     @Override
-    protected boolean isLiteral(ValueVector vector, int from, int to)
+    protected Encoding getEncoding(ValueVector vector, int from, int to, WriterSettings settings)
     {
-        long value = vector.getLong(from);
-        for (int i = from + 1; i < to; i++)
+        boolean firstValue = false;
+        long value = -1;
+        for (int i = from + 0; i < to; i++)
         {
-            if (value != vector.getLong(i))
+            if (vector.isNull(i))
             {
-                return false;
+                return Encoding.REGULAR;
+            }
+            else if (!firstValue)
+            {
+                value = vector.getLong(i);
+                firstValue = true;
+            }
+            else if (value != vector.getLong(i))
+            {
+                return Encoding.REGULAR;
             }
         }
-        return true;
+        return Encoding.REGULAR_LITERAL;
     }
 
     @Override

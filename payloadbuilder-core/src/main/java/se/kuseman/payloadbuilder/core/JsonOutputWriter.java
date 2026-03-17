@@ -34,7 +34,8 @@ public class JsonOutputWriter implements OutputWriter
     private final JsonSettings settings;
     private String currentField;
     private boolean firstResultSet = true;
-    private byte[] stringBuffer;
+    private byte[] byteBuffer;
+    private char[] charBuffer;
 
     private String rowSeparator;
     private String resultSetSeparator;
@@ -201,29 +202,42 @@ public class JsonOutputWriter implements OutputWriter
     @Override
     public void writeString(UTF8String string)
     {
-        if (!outputStream
-                || string.hasString())
-        {
-            writeValue(string.toString());
-            return;
-        }
-
-        // In outputstream mode we can write the raw uf8 bytes
-        // this is more performant since we don't have to create a String first
-        int length = string.getByteLength();
-
-        // Extend buffer if needed
-        if (stringBuffer == null
-                || stringBuffer.length < length)
-        {
-            stringBuffer = new byte[length];
-        }
-
-        string.getBytes(stringBuffer);
         try
         {
+            if (!outputStream
+                    || string.hasString()
+                    || string.isLatin1())
+            {
+                int length = string.length();
+                // Extend buffer if needed
+                if (charBuffer == null
+                        || charBuffer.length < length)
+                {
+                    charBuffer = new char[length];
+                }
+                for (int i = 0; i < length; i++)
+                {
+                    charBuffer[i] = string.charAt(i);
+                }
+
+                writeFieldNameInternal();
+                generator.writeString(charBuffer, 0, length);
+                return;
+            }
+
+            // When having an output stream we can write raw utf8 bytes
+            // which is more performant than traversing through CharSequence#charAt
+            int length = string.getByteLength();
+            // Extend buffer if needed
+            if (byteBuffer == null
+                    || byteBuffer.length < length)
+            {
+                byteBuffer = new byte[length];
+            }
+            string.getBytes(byteBuffer);
+
             writeFieldNameInternal();
-            generator.writeUTF8String(stringBuffer, 0, length);
+            generator.writeUTF8String(byteBuffer, 0, length);
         }
         catch (IOException e)
         {
