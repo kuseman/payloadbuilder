@@ -37,7 +37,7 @@ class IntVectorWriter implements VectorWriter
 
             if (literal)
             {
-                writer.putByte(PayloadReader.LITERAL_ENCODING);
+                writer.putByte(PayloadReader.REGULAR_LITERAL_ENCODING);
                 // Literal int then we have the literal value in the data position
                 writer.putInt(value);
                 return;

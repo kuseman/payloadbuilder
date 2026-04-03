@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.bytes;
 
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.bytes.PayloadWriter.WriterSettings;
 
 /** A writer that writes vectors who's items are references to other places in the buffer */
 abstract class AReferenceVectorWriter implements VectorWriter
@@ -8,28 +9,26 @@ abstract class AReferenceVectorWriter implements VectorWriter
     @Override
     public void write(BytesWriter writer, WriteCache cache, ValueVector vector, int from, int to, int nullCount)
     {
+        Encoding encoding = getEncoding(vector, from, to, cache.getSettings());
+
         // Find out if we have a literal vector
-        if (nullCount == 0)
+        if (nullCount == 0
+                && encoding.isLiteral)
         {
-            boolean literal = isLiteral(vector, from, to);
+            writer.putByte(encoding.encoding);
 
-            if (literal)
-            {
-                writer.putByte(PayloadReader.LITERAL_ENCODING);
+            int valueOffset = writer.position();
 
-                int valueOffset = writer.position();
+            // Set writer to position after literl data
+            writer.position(valueOffset + AVector.REFERENCE_HEADER_SIZE);
 
-                // Set writer to position after literl data
-                writer.position(valueOffset + AVector.REFERENCE_HEADER_SIZE);
-
-                // Get cached position
-                int position = getAndCachePosition(writer, cache, vector, from);
-                writer.putInt(valueOffset, position);
-                return;
-            }
+            // Get cached position
+            int position = getAndCachePosition(writer, cache, vector, from);
+            writer.putInt(valueOffset, position);
+            return;
         }
 
-        writer.putByte(PayloadReader.REGULAR_ENCODING);
+        writer.putByte(encoding.encoding);
 
         writeMeta(writer, vector);
 
@@ -63,9 +62,35 @@ abstract class AReferenceVectorWriter implements VectorWriter
     {
     }
 
-    /** Returns true if vector is literal */
-    protected abstract boolean isLiteral(ValueVector vector, int from, int to);
+    /**
+     * Return encoding byte for this vector. Reserved encodings: 0 - REGULAR_LITERAL_ENCODING 1 - REGULAR_ENCODING
+     */
+    protected Encoding getEncoding(ValueVector vector, int from, int to, WriterSettings settings)
+    {
+        return Encoding.REGULAR;
+    }
 
     /** Get and cache position of provided row */
     protected abstract int getAndCachePosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row);
+
+    record Encoding(byte encoding, boolean isLiteral)
+    {
+
+        static final Encoding REGULAR = new Encoding(PayloadReader.REGULAR_ENCODING, false);
+        static final Encoding REGULAR_LITERAL = new Encoding(PayloadReader.REGULAR_LITERAL_ENCODING, true);
+
+        Encoding
+        {
+            if (isLiteral
+                    && encoding == PayloadReader.REGULAR_ENCODING)
+            {
+                throw new IllegalArgumentException("Illegal encoding byte. " + PayloadReader.REGULAR_ENCODING + " is reserved for regular encoding");
+            }
+            else if (!isLiteral
+                    && encoding == PayloadReader.REGULAR_LITERAL_ENCODING)
+            {
+                throw new IllegalArgumentException("Illegal literal flag. Encoding byte: " + PayloadReader.REGULAR_LITERAL_ENCODING + " is reserved for regular literal encoding");
+            }
+        }
+    }
 }

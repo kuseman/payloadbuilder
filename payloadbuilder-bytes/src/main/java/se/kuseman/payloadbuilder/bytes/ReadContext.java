@@ -1,8 +1,8 @@
 package se.kuseman.payloadbuilder.bytes;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -12,7 +12,7 @@ class ReadContext
 {
     private final Schema schema;
     private final boolean expandSchema;
-    private Map<Integer, BigDecimal> bigDecimalCache = new HashMap<>();
+    private Map<Integer, BigDecimal> bigDecimalCache = new ConcurrentHashMap<>();
 
     ReadContext()
     {

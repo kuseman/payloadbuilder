@@ -69,6 +69,7 @@ public interface ValueVector
         {
             return UTF8String.from(getInt(row));
         }
+
         return UTF8String.from(getAny(row));
     }
 
@@ -459,7 +460,7 @@ public interface ValueVector
         }
     }
 
-    /** Return value as Java string for provided row */
+    /** Return value as Java string for provided row. Null is returned when value is null. */
     default String valueAsString(int row)
     {
         Object value = valueAsObject(row);
