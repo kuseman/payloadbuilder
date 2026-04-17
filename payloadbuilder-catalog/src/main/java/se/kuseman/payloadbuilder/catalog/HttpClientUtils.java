@@ -1,4 +1,4 @@
-package se.kuseman.payloadbuilder.catalog.es;
+package se.kuseman.payloadbuilder.catalog;
 
 import static java.util.Arrays.asList;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -36,16 +36,17 @@ import org.apache.hc.core5.ssl.SSLContextBuilder;
 import org.apache.hc.core5.util.TimeValue;
 import org.apache.hc.core5.util.Timeout;
 
-import se.kuseman.payloadbuilder.api.execution.IQuerySession;
-import se.kuseman.payloadbuilder.catalog.CredentialsException;
-
-/** Client utils */
+/** Shared HTTP client utilities for catalog implementations */
 public final class HttpClientUtils
 {
-    static final int DEFAULT_RECIEVE_TIMEOUT = 15000;
-    static final int DEFAULT_CONNECT_TIMEOUT = 500;
+    public static final int DEFAULT_RECIEVE_TIMEOUT = 15000;
+    public static final int DEFAULT_CONNECT_TIMEOUT = 500;
     private static final List<Header> HEADERS = asList(new BasicHeader(HttpHeaders.ACCEPT_ENCODING, "gzip"), new BasicHeader(HttpHeaders.ACCEPT, "application/json"),
             new BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"));
+
+    private HttpClientUtils()
+    {
+    }
 
     /**
      * Execute request. Handling 401 authorization etc. NOTE! Caller should take care of resource handling of the response
@@ -72,26 +73,18 @@ public final class HttpClientUtils
         });
     }
 
-    /**
-     * Execute request with provided session.
-     *
-     * @throws IOException Throws IOException
-     */
-    static <T> T execute(IQuerySession session, String catalogAlias, ClassicHttpRequest request, HttpClientResponseHandler<T> handler) throws IOException
+    /** Get password from object (String or char[]) */
+    public static String getPassword(Object password)
     {
-        Boolean trustCertificate = (Boolean) session.getCatalogProperty(catalogAlias, ESCatalog.TRUSTCERTIFICATE_KEY)
-                .valueAsObject(0);
-        AuthType authType = AuthType.from(session.getCatalogProperty(catalogAlias, ESCatalog.AUTH_TYPE_KEY)
-                .valueAsString(0));
-        String authUsername = session.getCatalogProperty(catalogAlias, ESCatalog.AUTH_USERNAME_KEY)
-                .valueAsString(0);
-        String authPassword = getPassword(session.getCatalogProperty(catalogAlias, ESCatalog.AUTH_PASSWORD_KEY)
-                .valueAsObject(0));
-        Integer connectTimeout = (Integer) session.getCatalogProperty(catalogAlias, ESCatalog.CONNECT_TIMEOUT_KEY)
-                .valueAsObject(0);
-        Integer receiveTimeout = (Integer) session.getCatalogProperty(catalogAlias, ESCatalog.RECEIVE_TIMEOUT_KEY)
-                .valueAsObject(0);
-        return execute(catalogAlias, request, trustCertificate, connectTimeout, receiveTimeout, authType, authUsername, authPassword, handler);
+        if (password instanceof String)
+        {
+            return (String) password;
+        }
+        else if (password instanceof char[])
+        {
+            return new String((char[]) password);
+        }
+        return null;
     }
 
     /**
@@ -172,18 +165,5 @@ public final class HttpClientUtils
         }
 
         return builder.build();
-    }
-
-    private static String getPassword(Object password)
-    {
-        if (password instanceof String)
-        {
-            return (String) password;
-        }
-        else if (password instanceof char[])
-        {
-            return new String((char[]) password);
-        }
-        return null;
     }
 }
