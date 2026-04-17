@@ -96,7 +96,7 @@ class CatFunction extends TableFunctionInfo
 
         try
         {
-            result = HttpClientUtils.execute(context.getSession(), catalogAlias, get, response ->
+            result = ESHttpClientUtils.execute(context.getSession(), catalogAlias, get, response ->
             {
                 HttpEntity entity = response.getEntity();
                 if (response.getCode() != HttpStatus.SC_OK)

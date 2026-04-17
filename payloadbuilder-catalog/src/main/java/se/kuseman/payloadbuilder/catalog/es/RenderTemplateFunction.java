@@ -97,7 +97,7 @@ class RenderTemplateFunction extends ScalarFunctionInfo
 
         try
         {
-            return HttpClientUtils.execute(context.getSession(), catalogAlias, post, response ->
+            return ESHttpClientUtils.execute(context.getSession(), catalogAlias, post, response ->
             {
                 HttpEntity entity = response.getEntity();
                 return ValueVector.literalString(IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8), 1);

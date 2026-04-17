@@ -438,7 +438,7 @@ class ESDatasource implements IDatasource
                     ClassicHttpRequest delete = strategy.getDeleteScrollRequest(endpoint, scrollId.get());
                     try
                     {
-                        HttpClientUtils.execute(context.getSession(), catalogAlias, delete, response ->
+                        ESHttpClientUtils.execute(context.getSession(), catalogAlias, delete, response ->
                         {
                             HttpEntity entity = response.getEntity();
                             int status = response.getCode();
@@ -486,7 +486,7 @@ class ESDatasource implements IDatasource
 
                     try
                     {
-                        esReponse = HttpClientUtils.execute(context.getSession(), catalogAlias, currentRequest, response ->
+                        esReponse = ESHttpClientUtils.execute(context.getSession(), catalogAlias, currentRequest, response ->
                         {
                             HttpEntity entity = response.getEntity();
                             if (response.getCode() != HttpStatus.SC_OK)

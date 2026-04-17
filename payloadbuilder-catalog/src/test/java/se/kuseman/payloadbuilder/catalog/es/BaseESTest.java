@@ -61,6 +61,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.INamedExpression;
+import se.kuseman.payloadbuilder.catalog.HttpClientUtils;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMeta.Version;
 import se.kuseman.payloadbuilder.test.ExpressionTestUtils;
 import se.kuseman.payloadbuilder.test.IPredicateMock;
