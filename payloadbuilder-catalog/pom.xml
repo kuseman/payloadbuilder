@@ -15,6 +15,8 @@
         <main.basedir>${project.parent.basedir}</main.basedir>
 
         <testcontainers-version>2.0.2</testcontainers-version>
+        <kafka-clients.version>3.7.0</kafka-clients.version>
+        <avro.version>1.11.3</avro.version>
     </properties>
 
     <dependencies>
@@ -67,6 +69,19 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <!-- Kafka -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>${kafka-clients.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+            <version>${avro.version}</version>
+            <optional>true</optional>
         </dependency>
 
         <!-- Test -->
