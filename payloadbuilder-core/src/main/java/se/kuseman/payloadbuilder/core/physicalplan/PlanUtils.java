@@ -101,6 +101,12 @@ public class PlanUtils
             {
                 break;
             }
+
+            // Don't call hasNext() again if iterator would block waiting for new data
+            if (iterator.isBlocking())
+            {
+                break;
+            }
         }
 
         if (b != null)
