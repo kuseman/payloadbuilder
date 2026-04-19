@@ -94,6 +94,67 @@ class PlanUtilsTest extends APhysicalPlanTest
                 .getIntAllocationCount());
     }
 
+    @Test
+    void test_blocking_iterator_returns_after_first_batch()
+    {
+        // Simulates a streaming datasource that returns a partial batch
+        // then signals isBlocking() = true. concat() should return
+        // the partial batch without calling hasNext() again.
+        TupleVector batch = TupleVector.of(Schema.of(Column.of("col", Type.Int)), asList(ValueVector.literalInt(42, 3)));
+
+        TupleIterator blockingIterator = new TupleIterator()
+        {
+            private boolean returned = false;
+
+            @Override
+            public TupleVector next()
+            {
+                returned = true;
+                return batch;
+            }
+
+            @Override
+            public boolean hasNext()
+            {
+                if (returned)
+                {
+                    // A real streaming iterator would block here waiting for data.
+                    // If concat() calls hasNext() after isBlocking() returned true,
+                    // that would cause a hang. We fail the test to catch that.
+                    throw new AssertionError("hasNext() called after isBlocking() returned true - this would hang a streaming datasource");
+                }
+                return true;
+            }
+
+            @Override
+            public boolean isBlocking()
+            {
+                return returned;
+            }
+        };
+
+        TupleVector actual = PlanUtils.concat(context, blockingIterator, 500);
+
+        assertEquals(3, actual.getRowCount());
+        assertEquals(42, actual.getColumn(0)
+                .getInt(0));
+    }
+
+    @Test
+    void test_non_blocking_iterator_still_concatenates()
+    {
+        // Non-blocking iterators (isBlocking() = false) should still
+        // concatenate multiple small batches up to maxRows
+        TupleVector vector = TupleVector.of(Schema.of(Column.of("col", Type.Int)), asList(range(10)));
+        TupleIterator it = split(vector, -1);
+
+        TupleVector actual = PlanUtils.concat(context, it, 5);
+
+        // Should have concatenated 5 one-row batches
+        assertEquals(5, actual.getRowCount());
+        assertTrue(it.hasNext(), "Iterator should still have remaining rows");
+    }
+
     private TupleIterator split(TupleVector vector, int estimatedBatchCount)
     {
         return new TupleIterator()

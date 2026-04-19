@@ -21,6 +21,19 @@ public interface TupleIterator extends Iterator<TupleVector>
         }
     };
 
+    /**
+     * <pre>
+     * Returns true if this iterator may block on the next hasNext() call
+     * waiting for data that hasn't arrived yet. Default is false (non-blocking).
+     * Streaming datasources should override this to return true when
+     * all currently available data has been returned.
+     * </pre>
+     */
+    default boolean isBlocking()
+    {
+        return false;
+    }
+
     /** Close the iterator */
     default void close()
     {
