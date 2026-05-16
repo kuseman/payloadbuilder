@@ -6,6 +6,7 @@ import java.math.BigInteger;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.bytes.PayloadWriter.WriterSettings;
 
 /** Writer of {@link Column.Type#Decimal} */
 class DecimalVectorWriter extends AReferenceVectorWriter
@@ -19,17 +20,26 @@ class DecimalVectorWriter extends AReferenceVectorWriter
     }
 
     @Override
-    protected boolean isLiteral(ValueVector vector, int from, int to)
+    protected Encoding getEncoding(ValueVector vector, int from, int to, WriterSettings settings)
     {
-        Decimal value = vector.getDecimal(from);
-        for (int i = from + 1; i < to; i++)
+        Decimal value = null;
+        for (int i = from + 0; i < to; i++)
         {
-            if (!value.equals(vector.getDecimal(i)))
+            if (vector.isNull(i))
             {
-                return false;
+                return Encoding.REGULAR;
+            }
+            else if (value == null)
+            {
+                value = vector.getDecimal(i);
+                continue;
+            }
+            else if (!value.equals(vector.getDecimal(i)))
+            {
+                return Encoding.REGULAR;
             }
         }
-        return true;
+        return Encoding.REGULAR_LITERAL;
     }
 
     @Override

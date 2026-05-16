@@ -15,12 +15,6 @@ class ArrayVectorWriter extends AReferenceVectorWriter
     }
 
     @Override
-    protected boolean isLiteral(ValueVector vector, int from, int to)
-    {
-        return false;
-    }
-
-    @Override
     protected int getAndCachePosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
     {
         int position = writer.position();

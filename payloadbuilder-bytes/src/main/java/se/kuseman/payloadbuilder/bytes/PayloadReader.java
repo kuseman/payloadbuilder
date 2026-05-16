@@ -23,7 +23,7 @@ public class PayloadReader
     static final byte P = 'P';
     static final byte L = 'L';
     static final byte B = 'B';
-    static final byte LITERAL_ENCODING = 0;
+    static final byte REGULAR_LITERAL_ENCODING = 0;
     static final byte REGULAR_ENCODING = 1;
 
     /** Checks if provided payload is valid payload */

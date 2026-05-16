@@ -5,14 +5,27 @@ import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.bytes.PayloadWriter.WriterSettings;
 
 /** Cache used during writing to reuse bytes from equals string/bigdecimals/longs etc. */
 class WriteCache
 {
+    private final WriterSettings settings;
+
     private Map<Long, Integer> longCache = new HashMap<>();
     private Map<Double, Integer> doubleCache = new HashMap<>();
     private Map<UTF8String, Integer> stringCache = new HashMap<>();
     private Map<Decimal, Integer> decimalCache = new HashMap<>();
+
+    WriteCache(WriterSettings settings)
+    {
+        this.settings = settings;
+    }
+
+    WriterSettings getSettings()
+    {
+        return settings;
+    }
 
     /** Get position to provided long value */
     Integer getLongPosition(long value)
