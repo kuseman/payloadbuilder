@@ -1,4 +1,4 @@
-package se.kuseman.payloadbuilder.catalog.es;
+package se.kuseman.payloadbuilder.catalog;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -8,7 +8,8 @@ public enum AuthType
     NONE,
     BASIC;
 
-    static AuthType from(Object value)
+    /** Create AuthType from provided value */
+    public static AuthType from(Object value)
     {
         if (value == null)
         {

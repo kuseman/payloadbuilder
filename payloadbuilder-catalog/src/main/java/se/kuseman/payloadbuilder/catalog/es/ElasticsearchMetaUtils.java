@@ -302,7 +302,7 @@ class ElasticsearchMetaUtils
         HttpGet get = new HttpGet(String.format("%s/%s", endpoint, path));
         try
         {
-            return HttpClientUtils.execute(session, catalogAlias, get, response ->
+            return ESHttpClientUtils.execute(session, catalogAlias, get, response ->
             {
                 HttpEntity entity = response.getEntity();
                 if (response.getCode() != HttpStatus.SC_OK)
