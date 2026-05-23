@@ -94,12 +94,12 @@ Simple query using multiple catalogs:
         }
 ```
 
-### Queryeer IDE
+### Queryeer Desktop IDE
 
-Standalone Query IDE written in Swing
+Payloadbuilder is bundled inside Queryeer Desktop IDE
 
-[Queryeer](https://github.com/kuseman/Queryeer)
-![Queryeer](/documentation/queryeer.png?raw=true "Queryeer")
+[Queryeer Desktop](https://github.com/kuseman/queryeer-desktop)
+![Queryeer Desktop](/documentation/queryeer.png?raw=true "Queryeer Desktop")
 
 ## Roadmap
 
