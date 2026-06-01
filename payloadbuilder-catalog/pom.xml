@@ -15,7 +15,7 @@
         <main.basedir>${project.parent.basedir}</main.basedir>
 
         <testcontainers-version>2.0.2</testcontainers-version>
-        <kafka-clients.version>3.7.0</kafka-clients.version>
+        <kafka-clients.version>3.9.2</kafka-clients.version>
         <avro.version>1.11.4</avro.version>
     </properties>
 
