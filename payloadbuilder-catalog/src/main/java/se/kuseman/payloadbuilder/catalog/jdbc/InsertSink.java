@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import org.slf4j.Logger;
@@ -55,8 +56,9 @@ class InsertSink implements IDatasink
     }
 
     @Override
-    public void execute(IExecutionContext context, TupleIterator input)
+    public void execute(IExecutionContext context, Supplier<TupleIterator> inputSupplier)
     {
+        TupleIterator input = inputSupplier.get();
         String database = catalog.getDatabase(context.getSession(), catalogAlias);
         SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
         AtomicReference<Statement> currentStatemnet = new AtomicReference<>();

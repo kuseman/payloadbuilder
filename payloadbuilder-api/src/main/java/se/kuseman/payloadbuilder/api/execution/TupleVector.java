@@ -166,15 +166,30 @@ public interface TupleVector
 
         for (int i = 0; i < columnSize; i++)
         {
-            ResolvedType schemaType = schema.getColumns()
-                    .get(i)
-                    .getType();
+            Column col = schema.getColumns()
+                    .get(i);
+            ResolvedType schemaType = col.getType();
             ResolvedType vectorType = columns.get(i)
                     .type();
 
-            validate(schema.getColumns()
-                    .get(i)
-                    .getName(), schemaType, vectorType);
+            // Fast-path: Any skips validation; simple types with no sub-schema are done after a type
+            // equality check — avoid allocating a path list for these common cases.
+            if (schemaType.getType() == Type.Any)
+            {
+                continue;
+            }
+            if (schemaType.getType() != vectorType.getType())
+            {
+                throw new IllegalArgumentException("Schema type: " + schemaType.getType() + " for column: " + col.getName() + " doesn't match value vectors type " + vectorType);
+            }
+            if (schemaType.getSchema() == null)
+            {
+                continue;
+            }
+
+            List<String> path = new ArrayList<>();
+            path.add(col.getName());
+            validate(path, schemaType, vectorType);
         }
 
         return new TupleVector()
@@ -337,25 +352,8 @@ public interface TupleVector
         return sb.toString();
     }
 
-    private static void validate(String columnPath, ResolvedType schemaType, ResolvedType vectorType)
+    private static void validate(List<String> columnPath, ResolvedType schemaType, ResolvedType vectorType)
     {
-        // Don't validate any types, they can differ, reflection will be used runtime
-        if (schemaType.getType() == Type.Any)
-        {
-            return;
-        }
-
-        if (schemaType.getType() != vectorType.getType())
-        {
-            throw new IllegalArgumentException("Schema type: " + schemaType.getType() + " for column: " + columnPath + " doesn't match value vectors type " + vectorType);
-        }
-
-        // If this is not a complex type we're done
-        if (schemaType.getSchema() == null)
-        {
-            return;
-        }
-
         Schema vectorSchema = vectorType.getSchema();
 
         // Skip validation of empty vector schemas
@@ -369,7 +367,7 @@ public interface TupleVector
 
         if (size != vectorSchema.getSize())
         {
-            throw new IllegalArgumentException("Schema size: " + size + " for column: " + columnPath + " doesn't match value vectors size: " + vectorSchema.getSize());
+            throw new IllegalArgumentException("Schema size: " + size + " for column: " + String.join("/", columnPath) + " doesn't match value vectors size: " + vectorSchema.getSize());
         }
 
         for (int i = 0; i < size; i++)
@@ -378,7 +376,26 @@ public interface TupleVector
                     .get(i);
             Column vectorColumn = vectorSchema.getColumns()
                     .get(i);
-            validate(columnPath + "/" + schemaColumn, schemaColumn.getType(), vectorColumn.getType());
+            ResolvedType childSchemaType = schemaColumn.getType();
+            ResolvedType childVectorType = vectorColumn.getType();
+
+            if (childSchemaType.getType() == Type.Any)
+            {
+                continue;
+            }
+            if (childSchemaType.getType() != childVectorType.getType())
+            {
+                throw new IllegalArgumentException("Schema type: " + childSchemaType
+                        .getType() + " for column: " + String.join("/", columnPath) + "/" + schemaColumn.getName() + " doesn't match value vectors type " + childVectorType);
+            }
+            if (childSchemaType.getSchema() == null)
+            {
+                continue;
+            }
+
+            columnPath.add(schemaColumn.getName());
+            validate(columnPath, childSchemaType, childVectorType);
+            columnPath.remove(columnPath.size() - 1);
         }
     }
 }

@@ -49,6 +49,22 @@ class NestedLoopTest extends AJoinTest
      */
     private Set<Column> outerReferences = asSet(col("col", ResolvedType.of(Type.Any), new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t")));
 
+    @Test
+    void test_getSchema_returns_cached_instance()
+    {
+        // Regression: getSchema() previously called joinSchema() on every invocation,
+        // allocating a new Schema on every outer-row iteration. Verify same instance returned.
+        IPhysicalPlan plan = NestedLoop.innerJoin(0, scanVectors(schemaLessDS(() ->
+        {
+        }, false), outerSchema), scanVectors(schemaLessDS(() ->
+        {
+        }, false), innerSchema), null, false);
+
+        Schema first = plan.getSchema();
+        Schema second = plan.getSchema();
+        org.junit.jupiter.api.Assertions.assertSame(first, second, "getSchema() must return the same Schema instance on repeated calls");
+    }
+
     @Disabled
     @Test
     void measure()

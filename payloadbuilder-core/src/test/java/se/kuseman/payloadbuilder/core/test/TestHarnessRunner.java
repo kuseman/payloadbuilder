@@ -630,9 +630,9 @@ class TestHarnessRunner
             return new IDatasink()
             {
                 @Override
-                public void execute(IExecutionContext context, TupleIterator input)
+                public void execute(IExecutionContext context, Supplier<TupleIterator> input)
                 {
-                    TupleVector vector = PlanUtils.concat(context, input);
+                    TupleVector vector = PlanUtils.concat(context, input.get());
                     int rowCount = vector.getRowCount();
                     int colCount = vector.getSchema()
                             .getSize();
@@ -682,9 +682,9 @@ class TestHarnessRunner
             return new IDatasink()
             {
                 @Override
-                public void execute(IExecutionContext context, TupleIterator input)
+                public void execute(IExecutionContext context, Supplier<TupleIterator> input)
                 {
-                    TupleVector vector = PlanUtils.concat(context, input);
+                    TupleVector vector = PlanUtils.concat(context, input.get());
                     Schema schema = vector.getSchema();
 
                     // Set the runtime data of the test table

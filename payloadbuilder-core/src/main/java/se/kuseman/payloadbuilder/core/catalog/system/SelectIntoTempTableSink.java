@@ -20,11 +20,11 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.ITupleVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
-import se.kuseman.payloadbuilder.core.physicalplan.PlanUtils;
 
 /** Sink for inserting into temporary tables. */
 class SelectIntoTempTableSink implements IDatasink
@@ -58,7 +58,7 @@ class SelectIntoTempTableSink implements IDatasink
     }
 
     @Override
-    public void execute(IExecutionContext context, TupleIterator input)
+    public void execute(IExecutionContext context, Supplier<TupleIterator> input)
     {
         // Strip the # prefix, we don't want that when looking up tables
         QualifiedName table = this.table.extract(1)
@@ -98,7 +98,30 @@ class SelectIntoTempTableSink implements IDatasink
             }
         }
 
-        Supplier<TemporaryTable> tempTableSupplier = () -> new TemporaryTable(PlanUtils.concat(context, input), indices);
+        Supplier<TemporaryTable> tempTableSupplier = () ->
+        {
+            // Always materialise through TupleVectorBuilder rather than using PlanUtils.concat directly.
+            // PlanUtils.concat has a single-batch fast-path that returns the raw TupleVector as-is.
+            // For a TableScan that raw vector is an anonymous inner class (TableScan$1$1) holding
+            // a strong reference to its outer iterator (TableScan$1) and through that to the
+            // ExecutionContext → QuerySession → temporaryTables chain. Storing that in
+            // TemporaryTable.vector retains the entire chain for the cached entry's lifetime.
+            TupleIterator it = input.get();
+            try
+            {
+                ITupleVectorBuilder builder = context.getVectorFactory()
+                        .getTupleVectorBuilder(0);
+                while (it.hasNext())
+                {
+                    builder.append(it.next());
+                }
+                return new TemporaryTable(builder.build(), indices);
+            }
+            finally
+            {
+                it.close();
+            }
+        };
         TemporaryTable temporaryTable;
         if (cacheTtl != null)
         {

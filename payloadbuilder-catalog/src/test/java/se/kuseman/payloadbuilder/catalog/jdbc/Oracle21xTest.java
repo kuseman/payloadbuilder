@@ -71,7 +71,7 @@ class Oracle21xTest extends BaseJDBCTest
                         new Option(QualifiedName.of(JdbcCatalog.COLUMN, "mynclob", JdbcCatalog.DECLARATION), new LiteralStringExpression("NCLOB"))));
 
         //@formatter:off
-        sink.execute(mockExecutionContext(), TupleIterator.singleton(TupleVector.of(Schema.of(
+        sink.execute(mockExecutionContext(), () -> TupleIterator.singleton(TupleVector.of(Schema.of(
                 Column.of("myclob", Type.String, new Column.MetaData(Map.of(MetaData.NULLABLE, false))),
                 Column.of("mynclob", Type.String)),
                 List.of(

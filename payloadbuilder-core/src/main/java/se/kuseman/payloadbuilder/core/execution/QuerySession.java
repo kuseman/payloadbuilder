@@ -318,7 +318,7 @@ public class QuerySession implements IQuerySession
     }
 
     /** Return variables map */
-    Map<String, ValueVector> getVariables()
+    public Map<String, ValueVector> getVariables()
     {
         return variables;
     }

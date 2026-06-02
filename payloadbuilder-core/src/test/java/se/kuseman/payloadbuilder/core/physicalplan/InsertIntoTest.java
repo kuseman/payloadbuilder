@@ -1,8 +1,6 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -11,15 +9,12 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.IDatasink;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
@@ -44,52 +39,68 @@ class InsertIntoTest extends APhysicalPlanTest
                 .withMetaData(new Column.MetaData(Map.of("key", "value")))
                 .build());
 
-        // Setut a runtime schema that should be used to verify schema rewriting
+        // Set a runtime schema that should be used to verify schema rewriting
         context.getStatementContext()
                 .setRuntimeSchema(1, expectedSchema);
 
         IPhysicalPlan plan = Mockito.mock(IPhysicalPlan.class);
         TupleIterator iterator = Mockito.mock(TupleIterator.class);
-        when(iterator.hasNext()).thenReturn(true);
+        when(iterator.hasNext()).thenReturn(true, false);
         when(iterator.next()).thenReturn(vector);
+        when(iterator.estimatedBatchCount()).thenReturn(3);
+        when(iterator.estimatedRowCount()).thenReturn(100);
         // Asterisk schema of input
         when(plan.getSchema()).thenReturn(Schema.of(ast("*", table)));
         when(plan.execute(context)).thenReturn(iterator);
 
-        IDatasink sink = Mockito.mock(IDatasink.class);
-        doAnswer(new Answer<Void>()
+        // The sink receives a Supplier — call input.get() to execute the upstream plan,
+        // then consume the resulting iterator. InsertInto must close the iterator.
+        TupleVector[] captured = new TupleVector[1];
+        IDatasink sink = (ctx, input) ->
         {
-            @Override
-            public Void answer(InvocationOnMock invocation) throws Throwable
-            {
-                // Call iterator methods to verify that the lazy iterator catches them
-                ((TupleIterator) invocation.getArgument(1)).hasNext();
-                TupleVector vector = ((TupleIterator) invocation.getArgument(1)).next();
-                ((TupleIterator) invocation.getArgument(1)).estimatedBatchCount();
-                ((TupleIterator) invocation.getArgument(1)).estimatedRowCount();
-
-                assertEquals(expectedSchema, vector.getSchema());
-                assertEquals(3, vector.getRowCount());
-                VectorTestUtils.assertVectorsEquals(ValueVector.literalInt(10, 3), vector.getColumn(0));
-
-                // We skip close to make sure that InsertInto does that for us if implementation forget
-                return null;
-            }
-        }).when(sink)
-                .execute(any(IExecutionContext.class), any(TupleIterator.class));
+            TupleIterator it = input.get();
+            // Verify wrapper forwards estimation methods to the underlying iterator
+            assertEquals(3, it.estimatedBatchCount());
+            assertEquals(100, it.estimatedRowCount());
+            it.hasNext();
+            captured[0] = it.next();
+            // Intentionally skip close() to verify InsertInto closes it
+        };
 
         InsertInto into = new InsertInto(0, plan, null, sink);
-
         into.execute(context);
 
-        verify(sink).execute(any(IExecutionContext.class), any(TupleIterator.class));
+        // Verify the proxy vector applied the asterisk schema rewrite
+        assertEquals(expectedSchema, captured[0].getSchema());
+        assertEquals(3, captured[0].getRowCount());
+        VectorTestUtils.assertVectorsEquals(ValueVector.literalInt(10, 3), captured[0].getColumn(0));
+
         verify(plan).getSchema();
         verify(plan).execute(context);
-        verify(iterator).hasNext();
-        verify(iterator).next();
         verify(iterator).estimatedBatchCount();
         verify(iterator).estimatedRowCount();
+        verify(iterator).hasNext();
+        verify(iterator).next();
         verify(iterator).close();
-        verifyNoMoreInteractions(plan, sink, iterator);
+        verifyNoMoreInteractions(plan, iterator);
+    }
+
+    @Test
+    void test_sink_can_skip_execution_on_cache_hit()
+    {
+        IPhysicalPlan plan = Mockito.mock(IPhysicalPlan.class);
+        when(plan.getSchema()).thenReturn(Schema.EMPTY);
+
+        // Sink that does NOT call input.get() — simulates a cache hit
+        IDatasink sink = (ctx, input) ->
+        {
+        };
+
+        InsertInto into = new InsertInto(0, plan, null, sink);
+        into.execute(context);
+
+        // Plan was never executed since sink did not call input.get()
+        verify(plan).getSchema();
+        verifyNoMoreInteractions(plan);
     }
 }

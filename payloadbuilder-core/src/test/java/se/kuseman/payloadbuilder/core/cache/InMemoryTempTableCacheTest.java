@@ -65,17 +65,17 @@ class InMemoryTempTableCacheTest
 
         Thread.sleep(150);
 
-        // Key expired and reload is performed and we get the stale "old" data back
+        // Key expired — background reload triggered, stale value returned immediately
         table = cacheImpl.computeIfAbsent(QualifiedName.of("table"), Duration.ofMillis(100), supplier);
         assertSame(first, table.getTupleVector());
         assertEquals(1, cacheImpl.getCacheHits());
         assertEquals(1, cacheImpl.getCacheMisses());
         assertEquals(1, cacheImpl.getCacheStaleHits());
 
-        // Let executor get value
+        // Let background reload complete
         Thread.sleep(10);
 
-        // A second call will yield the new result
+        // Fresh value now available
         table = cacheImpl.computeIfAbsent(QualifiedName.of("table"), Duration.ofMillis(100), supplier);
         assertSame(second, table.getTupleVector());
         assertEquals(2, cacheImpl.getCacheHits());
@@ -84,17 +84,16 @@ class InMemoryTempTableCacheTest
 
         Thread.sleep(150);
 
-        // Key expired and reload will fail and we should get second result back
+        // Key expired — reload will fail, stale value kept
         table = cacheImpl.computeIfAbsent(QualifiedName.of("table"), Duration.ofMillis(100), supplier);
         assertSame(second, table.getTupleVector());
         assertEquals(2, cacheImpl.getCacheHits());
         assertEquals(1, cacheImpl.getCacheMisses());
         assertEquals(2, cacheImpl.getCacheStaleHits());
 
-        // Let executor get value
+        // Let background reload attempt complete (it fails, second is kept)
         Thread.sleep(10);
 
-        // A second call will still yield second result
         table = cacheImpl.computeIfAbsent(QualifiedName.of("table"), Duration.ofMillis(100), supplier);
         assertSame(second, table.getTupleVector());
         assertEquals(2, cacheImpl.getCacheHits());
@@ -103,17 +102,16 @@ class InMemoryTempTableCacheTest
 
         Thread.sleep(150);
 
-        // Key expired and reload will kick in and we should get second result back
+        // Key expired again — background reload with third
         table = cacheImpl.computeIfAbsent(QualifiedName.of("table"), Duration.ofMillis(100), supplier);
         assertSame(second, table.getTupleVector());
         assertEquals(2, cacheImpl.getCacheHits());
         assertEquals(1, cacheImpl.getCacheMisses());
         assertEquals(4, cacheImpl.getCacheStaleHits());
 
-        // Let executor get value
+        // Let background reload complete
         Thread.sleep(10);
 
-        // A second call will yield the new result
         table = cacheImpl.computeIfAbsent(QualifiedName.of("table"), Duration.ofMillis(100), supplier);
         assertSame(third, table.getTupleVector());
         assertEquals(3, cacheImpl.getCacheHits());
