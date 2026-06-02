@@ -52,7 +52,7 @@ public class ExecutionContext implements IExecutionContext
         this.variables = source.variables;
         this.statementContext = new StatementContext(source.statementContext);
         this.vectorFactory = source.vectorFactory;
-        this.expressionFactory = new ExpressionFactory();
+        this.expressionFactory = source.expressionFactory;
     }
 
     /** Return session */

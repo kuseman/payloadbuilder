@@ -228,7 +228,7 @@ class FilesystemCatalogTest
                 List.of(VectorTestUtils.vv(Type.Int, 100, 200, 300), VectorTestUtils.vv(Type.String, "hundret", "two hundret", "three hundred")));
         // @format:on
 
-        sink.execute(context, new TupleIterator()
+        sink.execute(context, () -> new TupleIterator()
         {
             int index = 0;
 
@@ -283,7 +283,7 @@ class FilesystemCatalogTest
                 List.of(VectorTestUtils.vv(Type.Int, 100, 200, 300), VectorTestUtils.vv(Type.String, "hundret", "two hundret", "three hundred")));
         // @format:on
 
-        sink.execute(context, new TupleIterator()
+        sink.execute(context, () -> new TupleIterator()
         {
             int index = 0;
 
@@ -339,7 +339,7 @@ class FilesystemCatalogTest
                 List.of(VectorTestUtils.vv(Type.Int, 100, 200, 300), VectorTestUtils.vv(Type.String, "hundret", "two hundret", "three hundred")));
         // @format:on
 
-        sink.execute(context, new TupleIterator()
+        sink.execute(context, () -> new TupleIterator()
         {
             int index = 0;
 
@@ -396,7 +396,7 @@ class FilesystemCatalogTest
                 List.of(VectorTestUtils.vv(Type.Int, 100, 200, 300), VectorTestUtils.vv(Type.String, "hundret", "two hundret", "three hundred")));
         // @format:on
 
-        sink.execute(context, new TupleIterator()
+        sink.execute(context, () -> new TupleIterator()
         {
             int index = 0;
 
@@ -452,7 +452,7 @@ class FilesystemCatalogTest
                 List.of(VectorTestUtils.vv(Type.Int, 100, 200, 300), VectorTestUtils.vv(Type.String, "hundret", "two hundret", "three hundred")));
         // @format:on
 
-        sink.execute(context, new TupleIterator()
+        sink.execute(context, () -> new TupleIterator()
         {
             int index = 0;
 
@@ -501,7 +501,7 @@ class FilesystemCatalogTest
                 List.of(VectorTestUtils.vv(Type.Int, 10, 20, 30), VectorTestUtils.vv(Type.String, "ten", "twenty", "thirty åäö")));
         // @format:on
 
-        sink.execute(context, TupleIterator.singleton(vector1));
+        sink.execute(context, () -> TupleIterator.singleton(vector1));
 
         // Insert into again but with json
         //@formatter:off
@@ -513,7 +513,7 @@ class FilesystemCatalogTest
                 List.of("newIntCol2", "newStringCol2")));
         //@formatter:on
 
-        sink.execute(context, TupleIterator.singleton(vector1));
+        sink.execute(context, () -> TupleIterator.singleton(vector1));
         // CSOFF
         assertEquals("""
                 newIntCol newStringCol

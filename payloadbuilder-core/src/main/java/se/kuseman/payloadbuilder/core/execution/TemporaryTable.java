@@ -232,11 +232,14 @@ public class TemporaryTable
     {
         final TupleVector vector;
         final ValueVector selection;
+        private final ValueVector[] columns;
 
         IndexTupleVector(TupleVector vector, IntList rows)
         {
             this.vector = vector;
             this.selection = VectorUtils.convertToSelectionVector(rows);
+            this.columns = new ValueVector[vector.getSchema()
+                    .getSize()];
         }
 
         @Override
@@ -254,7 +257,13 @@ public class TemporaryTable
         @Override
         public ValueVector getColumn(int column)
         {
-            return SelectedValueVector.select(vector.getColumn(column), selection);
+            ValueVector col = columns[column];
+            if (col == null)
+            {
+                col = SelectedValueVector.select(vector.getColumn(column), selection);
+                columns[column] = col;
+            }
+            return col;
         }
     }
 

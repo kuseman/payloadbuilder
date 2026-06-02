@@ -64,7 +64,7 @@ abstract class ASqlServerTest extends BaseJDBCTest
         Column myStringColumn = getStringColumn("mystring", 100);
         IDatasink sink = catalog.getInsertIntoSink(context.getSession(), CATALOG_ALIAS, tableName, new InsertIntoData(0, Schema.EMPTY, emptyList(), emptyList()));
         //@formatter:off
-        sink.execute(context, TupleIterator.singleton(TupleVector.of(Schema.of(
+        sink.execute(context, () -> TupleIterator.singleton(TupleVector.of(Schema.of(
                 intColumn,
                 myStringColumn),
                 VectorTestUtils.vv(Type.Int, 10, 20),

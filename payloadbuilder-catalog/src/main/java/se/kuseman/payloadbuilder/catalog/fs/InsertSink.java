@@ -8,6 +8,7 @@ import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -44,18 +45,19 @@ class InsertSink implements IDatasink
     }
 
     @Override
-    public void execute(IExecutionContext context, TupleIterator input)
+    public void execute(IExecutionContext context, Supplier<TupleIterator> input)
     {
         WriteResolveResult resolveResult = catalog.resolveForWrite(context, catalogAlias, table, options);
+        TupleIterator it = input.get();
 
         //@formatter:off
         try (OutputStream os = Files.newOutputStream(Path.of(resolveResult.filename()), OPENOPTIONS);
                 VectorWriter vectorWriter = context.getVectorWriter(resolveResult.format(), os, options))
         //@formatter:on
         {
-            while (input.hasNext())
+            while (it.hasNext())
             {
-                TupleVector next = getVector(input.next());
+                TupleVector next = getVector(it.next());
                 vectorWriter.write(next);
             }
         }
@@ -65,7 +67,7 @@ class InsertSink implements IDatasink
         }
         finally
         {
-            input.close();
+            it.close();
         }
     }
 

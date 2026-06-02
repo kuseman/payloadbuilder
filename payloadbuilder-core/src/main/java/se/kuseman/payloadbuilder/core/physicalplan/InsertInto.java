@@ -60,17 +60,78 @@ public class InsertInto implements IPhysicalPlan
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
-        LazyTupleIterator iterator = new LazyTupleIterator(context);
+        int[] rowCount = new int[1];
+        boolean[] closed = new boolean[1];
+        TupleIterator[] underlying = new TupleIterator[1];
+
         try
         {
-            datasink.execute(context, iterator);
+            datasink.execute(context, () ->
+            {
+                TupleIterator it = input.execute(context);
+                underlying[0] = it;
+                return new TupleIterator()
+                {
+                    @Override
+                    public int estimatedBatchCount()
+                    {
+                        return it.estimatedBatchCount();
+                    }
+
+                    @Override
+                    public int estimatedRowCount()
+                    {
+                        return it.estimatedRowCount();
+                    }
+
+                    @Override
+                    public boolean hasNext()
+                    {
+                        return it.hasNext();
+                    }
+
+                    @Override
+                    public TupleVector next()
+                    {
+                        TupleVector next = it.next();
+                        if (insertColumns != null
+                                && next.getSchema()
+                                        .getSize() != insertColumns.size())
+                        {
+                            throw new QueryException("Insert column count doesn't match input column count. Insert columns: " + insertColumns
+                                                     + ", input columns: "
+                                                     + next.getSchema()
+                                                             .getColumns());
+                        }
+                        rowCount[0] += next.getRowCount();
+                        return hasAsteriskSchemaOrInput ? createProxyVector(context, next)
+                                : next;
+                    }
+
+                    @Override
+                    public void close()
+                    {
+                        if (!closed[0])
+                        {
+                            closed[0] = true;
+                            it.close();
+                        }
+                    }
+                };
+            });
         }
         finally
         {
-            // Make sure we always close the iterator to guard against bad implementations
-            iterator.close();
+            // Guard against datasink implementations that forget to close the iterator
+            if (underlying[0] != null
+                    && !closed[0])
+            {
+                closed[0] = true;
+                underlying[0].close();
+            }
         }
-        ((StatementContext) context.getStatementContext()).setRowCount(iterator.rowCount);
+
+        ((StatementContext) context.getStatementContext()).setRowCount(rowCount[0]);
         return TupleIterator.EMPTY;
     }
 
@@ -113,107 +174,27 @@ public class InsertInto implements IPhysicalPlan
         return false;
     }
 
-    /**
-     * Lazy iterator that executes the input on first access. This to allow for {@link IDatasink}'s to handle caches etc. without the need for executing anything if not needed.
-     */
-    private class LazyTupleIterator implements TupleIterator
+    private TupleVector createProxyVector(IExecutionContext context, TupleVector tv)
     {
-        private final IExecutionContext context;
-        private TupleIterator iterator;
-        private int rowCount;
-        private boolean closed;
-
-        LazyTupleIterator(IExecutionContext context)
+        return new TupleVector()
         {
-            this.context = context;
-        }
-
-        @Override
-        public int estimatedBatchCount()
-        {
-            return getIterator().estimatedBatchCount();
-        }
-
-        @Override
-        public int estimatedRowCount()
-        {
-            return getIterator().estimatedRowCount();
-        }
-
-        @Override
-        public void close()
-        {
-            if (!closed
-                    && iterator != null)
+            @Override
+            public Schema getSchema()
             {
-                iterator.close();
-                closed = true;
-            }
-        }
-
-        @Override
-        public boolean hasNext()
-        {
-            return getIterator().hasNext();
-        }
-
-        @Override
-        public TupleVector next()
-        {
-            TupleVector next = getIterator().next();
-
-            if (insertColumns != null
-                    && next.getSchema()
-                            .getSize() != insertColumns.size())
-            {
-                throw new QueryException("Insert column count doesn't match input column count. Insert columns: " + insertColumns
-                                         + ", input columns: "
-                                         + next.getSchema()
-                                                 .getColumns());
-            }
-            rowCount += next.getRowCount();
-
-            // Create a proxy vector if the input is asterisk to have a proper schema with meta etc.
-            // that is only known runtime
-            if (hasAsteriskSchemaOrInput)
-            {
-                next = createProxyVector(next);
+                return SchemaUtils.rewriteSchema(tv.getSchema(), (StatementContext) context.getStatementContext());
             }
 
-            return next;
-        }
-
-        private TupleIterator getIterator()
-        {
-            if (iterator == null)
+            @Override
+            public int getRowCount()
             {
-                iterator = input.execute(context);
+                return tv.getRowCount();
             }
-            return iterator;
-        }
 
-        private TupleVector createProxyVector(TupleVector tv)
-        {
-            return new TupleVector()
+            @Override
+            public ValueVector getColumn(int column)
             {
-                @Override
-                public Schema getSchema()
-                {
-                    return SchemaUtils.rewriteSchema(tv.getSchema(), (StatementContext) context.getStatementContext());
-                }
-
-                @Override
-                public int getRowCount()
-                {
-                    return tv.getRowCount();
-                }
-
-                @Override
-                public ValueVector getColumn(int column)
-                {
-                    return tv.getColumn(column);
-                }
-            };
-        }
+                return tv.getColumn(column);
+            }
+        };
     }
 }

@@ -60,6 +60,24 @@ class HashMatchTest extends AJoinTest
     }
 
     @Test
+    void test_getSchema_returns_cached_instance()
+    {
+        // Regression: getSchema() previously called joinSchema() on every invocation,
+        // allocating a new Schema on every probe operation. Verify same instance returned.
+        Schema outerSchema = Schema.of(Column.of("col1", Type.Int));
+        Schema innerSchema = Schema.of(Column.of("col3", Type.String));
+        IPhysicalPlan plan = createInnerJoin(scanVectors(schemaLessDS(() ->
+        {
+        }, false), outerSchema), scanVectors(schemaLessDS(() ->
+        {
+        }, false), innerSchema), (tv, ctx) -> ValueVector.literalBoolean(true, tv.getRowCount()), null);
+
+        Schema first = plan.getSchema();
+        Schema second = plan.getSchema();
+        org.junit.jupiter.api.Assertions.assertSame(first, second, "getSchema() must return the same Schema instance on repeated calls");
+    }
+
+    @Test
     void test_join_integer_against_string_hash_outer()
     {
         Schema outerSchema = Schema.of(Column.of("col1", Type.Int));

@@ -21,12 +21,12 @@ public class KafkaCatalog extends Catalog
     static final String NAME = "Kafka";
 
     // Catalog property keys
-    static final String BOOTSTRAP_SERVERS = "bootstrap_servers";
-    static final String SCHEMA_REGISTRY_URL = "schema_registry_url";
-    static final String SECURITY_PROTOCOL = "security_protocol";
-    static final String SASL_MECHANISM = "sasl_mechanism";
-    static final String SASL_JAAS_CONFIG = "sasl_jaas_config";
-    static final String TOPIC = "topic";
+    public static final String BOOTSTRAP_SERVERS = "bootstrap_servers";
+    public static final String SCHEMA_REGISTRY_URL = "schema_registry_url";
+    public static final String SECURITY_PROTOCOL = "security_protocol";
+    public static final String SASL_MECHANISM = "sasl_mechanism";
+    public static final String SASL_JAAS_CONFIG = "sasl_jaas_config";
+    public static final String TOPIC = "topic";
     private static final QualifiedName OFFSET = QualifiedName.of("offset");
     private static final QualifiedName TIMESTAMP = QualifiedName.of("timestamp");
 

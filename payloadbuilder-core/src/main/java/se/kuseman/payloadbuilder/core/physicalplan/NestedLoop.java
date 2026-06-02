@@ -259,7 +259,8 @@ public class NestedLoop implements IPhysicalPlan
     @Override
     public Schema getSchema()
     {
-        return getSchema(false);
+        return schema != null ? schema
+                : getSchema(false);
     }
 
     private Schema getSchema(boolean cartesian)

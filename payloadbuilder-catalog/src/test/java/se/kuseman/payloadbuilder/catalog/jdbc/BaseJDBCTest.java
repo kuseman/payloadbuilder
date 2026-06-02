@@ -265,7 +265,7 @@ abstract class BaseJDBCTest
         //@formatter:on
         // CSON
 
-        selectIntoSink.execute(executionContext, TupleIterator.singleton(testData));
+        selectIntoSink.execute(executionContext, () -> TupleIterator.singleton(testData));
     }
 
     @Test
@@ -519,7 +519,7 @@ abstract class BaseJDBCTest
         //@formatter:on
         // CSON
         context = mockExecutionContext();
-        insertIntoSink.execute(context, TupleIterator.singleton(testData));
+        insertIntoSink.execute(context, () -> TupleIterator.singleton(testData));
 
         it = ds.execute(context);
 
