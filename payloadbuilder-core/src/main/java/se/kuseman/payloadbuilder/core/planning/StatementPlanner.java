@@ -17,6 +17,7 @@ import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
+import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.statement.QueryStatement;
 
 /** Statement planner that transforms a {@link QueryStatement} to an executable form */
@@ -40,6 +41,18 @@ public class StatementPlanner
 
         /** Flag indicating that next plan to be generated is an analzye */
         boolean analyze;
+
+        /** Maps each AnalyzeInterceptor nodeId to the source Location of the wrapped operator. Populated when coverage mode is active. */
+        Map<Integer, Location> nodeLocations = new HashMap<>();
+
+        /** True when this plan is being compiled in query coverage mode (generates InstrumentedCaseExpression wrappers). */
+        boolean coverageMode;
+
+        /** Optional name assigned at compile time via {@link Payloadbuilder#compile(QuerySession, String, String)}. Used as the stable key in coverage reports. */
+        String queryName;
+
+        /** Counts SELECT/SELECT-INTO statements instrumented for coverage in this compile. Used to generate unique keys for multi-statement files. */
+        int statementCoverageIndex;
 
         /** Field with the last created logical plan. Used when holding schema information for temp tables etc. */
         ILogicalPlan currentLogicalPlan;
@@ -72,13 +85,23 @@ public class StatementPlanner
 
         /** Push down predicates that can be consumed by catalog */
         List<AnalyzePair> predicatePairs = emptyList();
+
+        /** TOP/LIMIT count pushed down from an enclosing Limit operator. -1 = no limit */
+        int topCount = -1;
     }
 
     /** Plans provided query. Produces a runnable query that can be cached */
     public static QueryStatement plan(QuerySession session, QueryStatement query)
     {
+        return plan(session, query, null);
+    }
+
+    /** Plans provided query with an optional name used in coverage reports. */
+    public static QueryStatement plan(QuerySession session, QueryStatement query, String queryName)
+    {
         ExecutionContext context = new ExecutionContext(session);
         Context ctx = new Context(context);
+        ctx.queryName = queryName;
 
         // Add existing session tables into context
         // This is used when working in a statefull session system like Queryeer

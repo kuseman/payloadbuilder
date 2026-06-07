@@ -79,7 +79,7 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
         context.schema = prevSchema;
         context.outerSchema = prevOuterSchema;
 
-        return new Projection(input, expressions, plan.getParentTableSource());
+        return new Projection(input, expressions, plan.getParentTableSource()).withLocation(plan.getLocation());
     }
 
     @Override
@@ -91,7 +91,7 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
         context.schema = input.getSchema();
 
         IExpression e = ColumnOrdinalRewriter.INSTANCE.visit(plan.getPredicate(), context);
-        return new Filter(input, plan.getTableSource(), e);
+        return new Filter(input, plan.getTableSource(), e).withLocation(plan.getLocation());
     }
 
     @Override
@@ -111,7 +111,7 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
                 })
                 .collect(toList());
 
-        return new Sort(input, sortItems);
+        return new Sort(input, sortItems).withLocation(plan.getLocation());
     }
 
     @Override
@@ -143,7 +143,7 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
 
         context.outerSchema = prevOuterSchema;
 
-        return new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), condition, plan.getOuterReferences(), plan.isSwitchedInputs(), plan.getOuterSchema());
+        return new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), condition, plan.getOuterReferences(), plan.isSwitchedInputs(), plan.getOuterSchema()).withLocation(plan.getLocation());
     }
 
     @Override

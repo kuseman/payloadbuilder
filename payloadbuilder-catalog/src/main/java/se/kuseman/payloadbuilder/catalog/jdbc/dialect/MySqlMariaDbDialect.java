@@ -14,6 +14,13 @@ class MySqlMariaDbDialect implements SqlDialect
     private static final ZoneId UTC = ZoneId.of("UTC");
 
     @Override
+    public void appendTopN(StringBuilder sb, int n)
+    {
+        sb.append(" LIMIT ")
+                .append(n);
+    }
+
+    @Override
     public ColumnMeta getColumnMeta(ResultSetMetaData rsmd, int jdbcType, int ordinal) throws SQLException
     {
         ColumnMeta meta = SqlDialect.super.getColumnMeta(rsmd, jdbcType, ordinal);

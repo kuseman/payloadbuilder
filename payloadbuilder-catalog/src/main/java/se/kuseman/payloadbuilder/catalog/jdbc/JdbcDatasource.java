@@ -48,6 +48,7 @@ import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 class JdbcDatasource implements IDatasource
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(JdbcDatasource.class);
+    static final String QUERY = "Query";
     private final JdbcCatalog catalog;
     private final String catalogAlias;
     private final QualifiedName table;
@@ -58,9 +59,10 @@ class JdbcDatasource implements IDatasource
     private final IExpression tableHintsOption;
     private final List<Option> options;
     private final Map<String, ColumnOption> columnOptions;
+    private final int topCount;
 
     JdbcDatasource(JdbcCatalog catalog, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, Projection projection, List<IPredicate> predicates, List<ISortItem> sortItems,
-            IExpression tableHintsOption, List<Option> options)
+            IExpression tableHintsOption, List<Option> options, int topCount)
     {
         this.catalog = catalog;
         this.catalogAlias = catalogAlias;
@@ -72,6 +74,7 @@ class JdbcDatasource implements IDatasource
         this.tableHintsOption = tableHintsOption;
         this.options = options;
         this.columnOptions = ColumnOption.extract(options);
+        this.topCount = topCount;
     }
 
     @Override
@@ -94,7 +97,7 @@ class JdbcDatasource implements IDatasource
                     .collect(joining(",")));
         }
 
-        result.put("Query", buildSql(dialect, context, true));
+        result.put(QUERY, buildSql(dialect, context, true));
 
         return result;
     }
@@ -129,6 +132,15 @@ class JdbcDatasource implements IDatasource
                     .collect(joining(","));
         };
         StringBuilder sb = new StringBuilder("SELECT ");
+        // Dialect-specific TOP at the beginning of SELECT (e.g. SQL Server TOP(n))
+        if (topCount >= 0)
+        {
+            String selectTop = dialect.selectTopN(topCount);
+            if (!selectTop.isEmpty())
+            {
+                sb.append(selectTop);
+            }
+        }
         sb.append(projectionString);
         sb.append(" FROM ");
         sb.append(table.toString())
@@ -264,6 +276,14 @@ class JdbcDatasource implements IDatasource
                 sb.append(item.getOrder() == Order.ASC ? " ASC"
                         : " DESC");
             }
+        }
+
+        // Dialect-specific trailing TOP/LIMIT (e.g. LIMIT n for MySQL/PostgreSQL, FETCH FIRST n ROWS ONLY for ANSI)
+        if (topCount >= 0
+                && dialect.selectTopN(topCount)
+                        .isEmpty())
+        {
+            dialect.appendTopN(sb, topCount);
         }
 
         return sb.toString();
@@ -456,6 +476,9 @@ class JdbcDatasource implements IDatasource
                         .getPrintWriter());
                 JdbcUtils.printWarnings(connection, context.getSession()
                         .getPrintWriter());
+                // Cancel any in-progress query so the server stops executing and data transfer halts
+                // (important when a TOP/LIMIT operator closes the iterator before all rows are consumed)
+                JdbcUtils.cancelQuiet(statement);
                 JdbcUtils.closeQuiet(connection, statement, rs);
                 schemaResult = null;
                 vectors = null;
@@ -501,6 +524,10 @@ class JdbcDatasource implements IDatasource
                     {
                         statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
                     }
+
+                    // Enable streaming so drivers that support it (SQL Server adaptive, MySQL useCursorFetch, etc.) fetch
+                    // rows on demand. Combined with close() → cancel() this stops data transfer as soon as caller is done.
+                    statement.setFetchSize(batchSize);
 
                     JdbcUtils.printWarnings(statement, context.getSession()
                             .getPrintWriter());

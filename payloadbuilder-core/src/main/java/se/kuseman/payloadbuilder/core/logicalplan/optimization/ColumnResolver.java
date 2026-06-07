@@ -206,7 +206,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // the sub query table source since that is what resolving has resolved against but at runtime
         // the subquey operator is removed and hence we need to retain it's table source when expanding asteriskts etc.
         TableSourceReference parentTableSourceReference = context.subQueryTableSource.peek();
-        ILogicalPlan result = new Projection(input, expressions, parentTableSourceReference);
+        ILogicalPlan result = new Projection(input, expressions, parentTableSourceReference).withLocation(plan.getLocation());
         context.planSchema.push(new ResolveSchema(result.getSchema()));
         return result;
     }
@@ -223,7 +223,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         context.schema = schema;
         IExpression predicate = ColumnResolverVisitor.rewrite(context, plan.getPredicate());
 
-        ILogicalPlan result = new Filter(input, plan.getTableSource(), predicate);
+        ILogicalPlan result = new Filter(input, plan.getTableSource(), predicate).withLocation(plan.getLocation());
 
         context.planSchema.push(schema);
         return result;
@@ -250,7 +250,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 .map(si -> new SortItem(ColumnResolverVisitor.rewrite(context, si.getExpression()), si.getOrder(), si.getNullOrder(), si.getLocation()))
                 .collect(toList());
 
-        ILogicalPlan result = new Sort(input, sortItems);
+        ILogicalPlan result = new Sort(input, sortItems).withLocation(plan.getLocation());
         context.planSchema.push(schema);
         return result;
     }
@@ -391,7 +391,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         }
 
         // CSOFF
-        Join result = new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), condition, context.outerReferences, plan.isSwitchedInputs(), outerSchema);
+        Join result = new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), condition, context.outerReferences, plan.isSwitchedInputs(), outerSchema).withLocation(plan.getLocation());
         // CSON
 
         // Restore context values
