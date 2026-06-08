@@ -8,17 +8,30 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.core.common.SortItem;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Logical sort. Sorts input by sort items */
 public class Sort implements ILogicalPlan
 {
     private final ILogicalPlan input;
     private final List<SortItem> sortItems;
+    private Location location = Location.EMPTY;
 
     public Sort(ILogicalPlan input, List<SortItem> sortItems)
     {
         this.input = requireNonNull(input, "input");
         this.sortItems = requireNonNull(sortItems, "sortItems");
+    }
+
+    public Location getLocation()
+    {
+        return location;
+    }
+
+    public Sort withLocation(Location location)
+    {
+        this.location = requireNonNull(location, "location");
+        return this;
     }
 
     public ILogicalPlan getInput()

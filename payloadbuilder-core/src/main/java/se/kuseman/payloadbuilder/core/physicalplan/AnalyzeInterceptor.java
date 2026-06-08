@@ -115,6 +115,12 @@ public class AnalyzeInterceptor implements IPhysicalPlan
     }
 
     @Override
+    public boolean hasWritableOutput()
+    {
+        return input.hasWritableOutput();
+    }
+
+    @Override
     public boolean equals(Object obj)
     {
         if (obj == null)

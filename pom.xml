@@ -65,6 +65,7 @@
         <module>payloadbuilder-core</module>
         <module>payloadbuilder-catalog</module>
         <module>payloadbuilder-bytes</module>
+        <module>payloadbuilder-test</module>
     </modules>
 
     <dependencyManagement>

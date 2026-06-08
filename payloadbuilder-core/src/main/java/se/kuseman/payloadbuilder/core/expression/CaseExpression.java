@@ -16,6 +16,7 @@ import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.ICaseExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -25,11 +26,24 @@ public class CaseExpression implements ICaseExpression
 {
     private final List<WhenClause> whenClauses;
     private final IExpression elseExpression;
+    private final Location location;
 
     public CaseExpression(List<WhenClause> whenClauses, IExpression elseExpression)
     {
+        this(whenClauses, elseExpression, Location.EMPTY);
+    }
+
+    public CaseExpression(List<WhenClause> whenClauses, IExpression elseExpression, Location location)
+    {
         this.whenClauses = requireNonNull(whenClauses, "whenClauses");
         this.elseExpression = elseExpression;
+        this.location = location != null ? location
+                : Location.EMPTY;
+    }
+
+    public Location getLocation()
+    {
+        return location;
     }
 
     @Override

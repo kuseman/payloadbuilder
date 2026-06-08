@@ -183,7 +183,8 @@ public abstract class ARewriteExpressionVisitor<C> extends AExpressionVisitor<IE
     @Override
     public IExpression visit(ILogicalBinaryExpression expression, C context)
     {
-        return new LogicalBinaryExpression(expression.getLogicalType(), visit(expression.getLeft(), context), visit(expression.getRight(), context));
+        return new LogicalBinaryExpression(expression.getLogicalType(), visit(expression.getLeft(), context), visit(expression.getRight(), context))
+                .withLocation(((LogicalBinaryExpression) expression).getLocation());
     }
 
     @Override

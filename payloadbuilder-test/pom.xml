@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>se.kuseman</groupId>
+        <artifactId>payloadbuilder</artifactId>
+        <version>1.13.0-SNAPSHOT</version>
+    </parent>
+    <groupId>se.kuseman.payloadbuilder</groupId>
+    <artifactId>payloadbuilder-test</artifactId>
+    <name>Payloadbuilder :: Test</name>
+    <url>https://github.com/kuseman/payloadbuilder</url>
+
+    <properties>
+        <main.basedir>${project.parent.basedir}</main.basedir>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>se.kuseman.payloadbuilder</groupId>
+            <artifactId>payloadbuilder-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- JUnit API as compile dependency since this module IS a test utility library -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <!-- TEST -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
