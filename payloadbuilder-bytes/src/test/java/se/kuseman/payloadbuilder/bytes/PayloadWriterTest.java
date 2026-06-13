@@ -2,12 +2,15 @@ package se.kuseman.payloadbuilder.bytes;
 
 import static java.util.Arrays.asList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -19,11 +22,19 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.ObjectVector;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.bytes.PayloadWriter.WriterSettings;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link PayloadWriter} */
 class PayloadWriterTest
 {
+    @Test
+    void test_Encoding()
+    {
+        assertThrows(IllegalArgumentException.class, () -> new AReferenceVectorWriter.Encoding(PayloadReader.REGULAR_ENCODING, true));
+        assertThrows(IllegalArgumentException.class, () -> new AReferenceVectorWriter.Encoding(PayloadReader.REGULAR_LITERAL_ENCODING, false));
+    }
+
     @Test
     void test_fail_any()
     {
@@ -53,6 +64,33 @@ class PayloadWriterTest
     void test_invalid_payload_3()
     {
         assertThrows(IllegalArgumentException.class, () -> PayloadReader.read(new byte[] { PayloadReader.P, PayloadReader.L, 1, 2, PayloadReader.B }));
+    }
+
+    /** Tests special overrides for string vectors. valueAsString */
+    @Test
+    void test_StringVector_specialization()
+    {
+        // CSOFF
+        byte[] bytes = PayloadWriter.write(vv(Type.String, "one", "two", "three", "\u2705\u5F3A", null));
+        ValueVector vector = PayloadReader.read(bytes);
+        assertEquals("one", vector.valueAsString(0));
+        assertEquals("two", vector.valueAsString(1));
+        assertEquals("three", vector.valueAsString(2));
+        assertEquals("\u2705\u5F3A", vector.valueAsString(3));
+        assertNull(vector.valueAsString(4));
+        // CSON
+
+        WriterSettings settings = new WriterSettings();
+        settings.setUseLatin1EncodedStrings(true);
+        // CSOFF
+        bytes = PayloadWriter.write(vv(Type.String, "one", "two", "three", "four", null), settings);
+        vector = PayloadReader.read(bytes);
+        assertEquals("one", vector.valueAsString(0));
+        assertEquals("two", vector.valueAsString(1));
+        assertEquals("three", vector.valueAsString(2));
+        assertEquals("four", vector.valueAsString(3));
+        assertNull(vector.valueAsString(4));
+        // CSON
     }
 
     @Test
@@ -646,6 +684,8 @@ class PayloadWriterTest
         ValueVector actual;
         byte[] bytes;
 
+        assertThrows(IllegalArgumentException.class, () -> ArrayVector.getVector(ByteBuffer.allocate(10), 0, new ReadContext(), NullBuffer.ALL_NULL, ResolvedType.array(Type.String), (byte) 2, 1));
+
         // Empty
         v = VectorTestUtils.vv(ResolvedType.array(Type.Int));
 
@@ -704,11 +744,43 @@ class PayloadWriterTest
     }
 
     @Test
+    void test_decimal_literal()
+    {
+        ValueVector v;
+        ValueVector actual;
+        byte[] bytes;
+
+        v = VectorTestUtils.vv(Type.Decimal, 0, 0, 0, 0);
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertFalse(actual instanceof DecimalVector); // Literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.Decimal, 0, 0, 0, 0), actual);
+
+        // Test that literal encoding with nulls fails
+        v = VectorTestUtils.vv(Type.Decimal, 0, 0, null, 0);
+
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof DecimalVector); // Not literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.Decimal, 0, 0, null, 0), actual);
+
+        // Test null as first item
+        v = VectorTestUtils.vv(Type.Decimal, null, 0, 0, 0);
+
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof DecimalVector); // Not literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.Decimal, null, 0, 0, 0), actual);
+    }
+
+    @Test
     void test_decimal()
     {
         ValueVector v;
         ValueVector actual;
         byte[] bytes;
+
+        assertThrows(IllegalArgumentException.class, () -> DecimalVector.getVector(ByteBuffer.allocate(10), 0, new ReadContext(), NullBuffer.ALL_NULL, (byte) 2, 1));
 
         // Empty
         v = VectorTestUtils.vv(Type.Decimal);
@@ -761,11 +833,43 @@ class PayloadWriterTest
     }
 
     @Test
+    void test_datetime_literal()
+    {
+        ValueVector v;
+        ValueVector actual;
+        byte[] bytes;
+
+        v = VectorTestUtils.vv(Type.DateTime, 0L, 0L, 0L, 0L);
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertFalse(actual instanceof DateTimeVector); // Literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.DateTime, 0L, 0L, 0L, 0L), actual);
+
+        // Test that literal encoding with nulls fails
+        v = VectorTestUtils.vv(Type.DateTime, 0L, 0L, null, 0L);
+
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof DateTimeVector); // Not literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.DateTime, 0L, 0L, null, 0L), actual);
+
+        // Test null first items
+        v = VectorTestUtils.vv(Type.DateTime, null, 0L, 0L, 0L);
+
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof DateTimeVector); // Not literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.DateTime, null, 0L, 0L, 0L), actual);
+    }
+
+    @Test
     void test_datetime()
     {
         ValueVector v;
         ValueVector actual;
         byte[] bytes;
+
+        assertThrows(IllegalArgumentException.class, () -> DateTimeVector.getVector(ByteBuffer.allocate(10), 0, NullBuffer.ALL_NULL, (byte) 2, 1));
 
         // Empty
         v = VectorTestUtils.vv(Type.DateTime);
@@ -824,6 +928,8 @@ class PayloadWriterTest
         ValueVector actual;
         byte[] bytes;
 
+        assertThrows(IllegalArgumentException.class, () -> IntVector.getVector(ByteBuffer.allocate(10), 0, NullBuffer.ALL_NULL, (byte) 2, 1));
+
         // Empty
         v = VectorTestUtils.vv(Type.Int);
 
@@ -862,6 +968,36 @@ class PayloadWriterTest
         actual = PayloadReader.read(bytes);
 
         VectorTestUtils.assertVectorsEquals(v, actual);
+    }
+
+    @Test
+    void test_long_literal()
+    {
+        ValueVector v;
+        ValueVector actual;
+        byte[] bytes;
+
+        v = VectorTestUtils.vv(Type.Long, 0, 0, 0, 0);
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertFalse(actual instanceof LongVector); // A literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.Long, 0, 0, 0, 0), actual);
+
+        // Test that literal encoding with nulls fails
+        v = VectorTestUtils.vv(Type.Long, 0, 0, null, 0);
+
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof LongVector); // Not a literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.Long, 0, 0, null, 0), actual);
+
+        // Test null first
+        v = VectorTestUtils.vv(Type.Long, null, 0, 0, 0);
+
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof LongVector); // Not a literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.Long, null, 0, 0, 0), actual);
     }
 
     @Test
@@ -1023,6 +1159,8 @@ class PayloadWriterTest
         ValueVector actual;
         byte[] bytes;
 
+        assertThrows(IllegalArgumentException.class, () -> LongVector.getVector(ByteBuffer.allocate(10), 0, NullBuffer.ALL_NULL, (byte) 2, 1));
+
         // Empty
         v = VectorTestUtils.vv(Type.Long);
 
@@ -1073,11 +1211,100 @@ class PayloadWriterTest
     }
 
     @Test
+    void test_string_literal_without_latin1()
+    {
+        ValueVector v;
+        ValueVector actual;
+        byte[] bytes;
+
+        v = VectorTestUtils.vv(Type.String, "se", "se", "se");
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertFalse(actual instanceof StringVector); // A literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.String, "se", "se", "se"), actual);
+
+        for (int i = 0; i < actual.size(); i++)
+        {
+            assertFalse(actual.getString(i)
+                    .isLatin1());
+        }
+
+        // Test that literal encoding with nulls fails
+        v = VectorTestUtils.vv(Type.String, "se", "se", null, "se");
+
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof StringVector); // Not a literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.String, "se", "se", null, "se"), actual);
+
+        for (int i = 0; i < actual.size(); i++)
+        {
+            assertFalse(actual.getString(i)
+                    .isLatin1());
+        }
+    }
+
+    @Test
+    void test_string_literal_with_latin1()
+    {
+        ValueVector v;
+        ValueVector actual;
+        byte[] bytes;
+
+        WriterSettings settings = new WriterSettings();
+        settings.setUseLatin1EncodedStrings(true);
+
+        v = VectorTestUtils.vv(Type.String, "se", "se", "se");
+        bytes = PayloadWriter.write(v, settings);
+        actual = PayloadReader.read(bytes);
+        assertFalse(actual instanceof StringVector); // A literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.String, "se", "se", "se"), actual);
+
+        // Verify that all string are latin1
+        for (int i = 0; i < actual.size(); i++)
+        {
+            assertTrue(actual.getString(i)
+                    .isLatin1());
+        }
+
+        // Test that literal encoding with nulls fails
+        v = VectorTestUtils.vv(Type.String, "se", "se", null, "se");
+
+        bytes = PayloadWriter.write(v, settings);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof StringVector); // Not a literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.String, "se", "se", null, "se"), actual);
+
+        for (int i = 0; i < actual.size(); i++)
+        {
+            assertEquals(i == 2, actual.isNull(i));
+            assertTrue(actual.getString(i)
+                    .isLatin1());
+        }
+
+        // Test that utf 8 strings don't get encoded to latin1
+        v = VectorTestUtils.vv(Type.String, "se", "Между", null, "se");
+        bytes = PayloadWriter.write(v, settings);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof StringVector); // Not a literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.String, "se", "Между", null, "se"), actual);
+
+        for (int i = 0; i < actual.size(); i++)
+        {
+            assertEquals(i == 2, actual.isNull(i));
+            assertFalse(actual.getString(i)
+                    .isLatin1());
+        }
+    }
+
+    @Test
     void test_string()
     {
         ValueVector v;
         ValueVector actual;
         byte[] bytes;
+
+        assertThrows(IllegalArgumentException.class, () -> StringVector.getVector(ByteBuffer.allocate(10), 0, NullBuffer.ALL_NULL, (byte) 2, 1));
 
         // Empty
         v = VectorTestUtils.vv(Type.Long);
@@ -1095,6 +1322,9 @@ class PayloadWriterTest
 
         assertEquals(70, bytes.length);
         actual = PayloadReader.read(bytes);
+        assertFalse(actual.getString(0)
+                .isLatin1());
+        assertEquals("hello", actual.valueAsString(1));
 
         VectorTestUtils.assertVectorsEquals(v, actual);
 
@@ -1114,6 +1344,9 @@ class PayloadWriterTest
 
         assertEquals(17, bytes.length);
         actual = PayloadReader.read(bytes);
+        assertFalse(actual.getString(0)
+                .isLatin1());
+        assertEquals("sv", actual.valueAsString(2));
 
         VectorTestUtils.assertVectorsEquals(v, actual);
 
@@ -1126,6 +1359,62 @@ class PayloadWriterTest
         actual = PayloadReader.read(bytes);
 
         VectorTestUtils.assertVectorsEquals(v, actual);
+
+        // UTF8
+        v = VectorTestUtils.vv(Type.String, "sv", "sv", "Зареги", "sv");
+
+        bytes = PayloadWriter.write(v);
+
+        assertEquals(42, bytes.length);
+        actual = PayloadReader.read(bytes);
+        assertFalse(actual.getString(0)
+                .isLatin1());
+        VectorTestUtils.assertVectorsEquals(v, actual);
+
+        assertEquals("Зареги", actual.valueAsString(2));
+
+        // Null first
+        v = VectorTestUtils.vv(Type.String, null, 1, "hello", 4, "hello", 6, 7, 8, "world");
+
+        bytes = PayloadWriter.write(v);
+
+        assertEquals(70, bytes.length);
+        actual = PayloadReader.read(bytes);
+        assertFalse(actual.getString(0)
+                .isLatin1());
+        assertEquals("hello", actual.valueAsString(2));
+
+        VectorTestUtils.assertVectorsEquals(v, actual);
+    }
+
+    @Test
+    void test_double_literal()
+    {
+        ValueVector v;
+        ValueVector actual;
+        byte[] bytes;
+
+        v = VectorTestUtils.vv(Type.Double, 0, 0, 0, 0);
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertFalse(actual instanceof DoubleVector); // Literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.Double, 0, 0, 0, 0), actual);
+
+        // Test that literal encoding with nulls fails
+        v = VectorTestUtils.vv(Type.Double, 0, 0, null, 0);
+
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof DoubleVector); // Not literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.Double, 0, 0, null, 0), actual);
+
+        // Null first item
+        v = VectorTestUtils.vv(Type.Double, null, 0, 0, 0);
+
+        bytes = PayloadWriter.write(v);
+        actual = PayloadReader.read(bytes);
+        assertTrue(actual instanceof DoubleVector); // Not literal
+        VectorTestUtils.assertVectorsEquals(vv(Type.Double, null, 0, 0, 0), actual);
     }
 
     @Test
@@ -1134,6 +1423,8 @@ class PayloadWriterTest
         ValueVector v;
         ValueVector actual;
         byte[] bytes;
+
+        assertThrows(IllegalArgumentException.class, () -> DoubleVector.getVector(ByteBuffer.allocate(10), 0, NullBuffer.ALL_NULL, (byte) 2, 1));
 
         // Empty
         v = VectorTestUtils.vv(Type.Double);
@@ -1190,6 +1481,8 @@ class PayloadWriterTest
         ValueVector v;
         ValueVector actual;
         byte[] bytes;
+
+        assertThrows(IllegalArgumentException.class, () -> BooleanVector.getVector(ByteBuffer.allocate(10), 0, NullBuffer.ALL_NULL, (byte) 2, 1));
 
         // Empty
         v = VectorTestUtils.vv(Type.Boolean);
@@ -1256,6 +1549,8 @@ class PayloadWriterTest
         ValueVector v;
         ValueVector actual;
         byte[] bytes;
+
+        assertThrows(IllegalArgumentException.class, () -> FloatVector.getVector(ByteBuffer.allocate(10), 0, NullBuffer.ALL_NULL, (byte) 2, 1));
 
         // Empty
         v = VectorTestUtils.vv(Type.Float);
@@ -1932,6 +2227,8 @@ class PayloadWriterTest
         Schema expectedSchema;
         TupleVector expected;
 
+        assertThrows(IllegalArgumentException.class, () -> TableVector.getVector(ByteBuffer.allocate(10), 0, new ReadContext(), NullBuffer.ALL_NULL, ResolvedType.ANY, ResolvedType.ANY, (byte) 2, 1));
+
         // @formatter:off
         Schema schema = Schema.of(
                 Column.of("integer", Column.Type.Int),
@@ -1994,6 +2291,9 @@ class PayloadWriterTest
         byte[] bytes;
         Schema expectedSchema;
         TupleVector expected;
+
+        assertThrows(IllegalArgumentException.class,
+                () -> se.kuseman.payloadbuilder.bytes.ObjectVector.getVector(ByteBuffer.allocate(10), 0, new ReadContext(), NullBuffer.ALL_NULL, ResolvedType.ANY, ResolvedType.ANY, (byte) 2, 1));
 
         // @formatter:off
         Schema schema = Schema.of(

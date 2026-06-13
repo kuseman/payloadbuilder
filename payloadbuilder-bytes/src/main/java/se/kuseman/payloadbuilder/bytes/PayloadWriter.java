@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.bytes;
 import static java.util.Objects.requireNonNull;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /**
@@ -14,8 +15,14 @@ public class PayloadWriter
     {
     }
 
-    /** Writes vector to bytes */
+    /** Writes vector to bytes with default settings. */
     public static byte[] write(ValueVector vector)
+    {
+        return write(vector, new WriterSettings());
+    }
+
+    /** Writes vector to bytes with specified settings. */
+    public static byte[] write(ValueVector vector, WriterSettings settings)
     {
         requireNonNull(vector, "vector");
 
@@ -26,7 +33,7 @@ public class PayloadWriter
         writer.putByte(PayloadReader.B);
         writer.putVarInt(PayloadReader.VERSION);
 
-        WriteCache cache = new WriteCache();
+        WriteCache cache = new WriteCache(settings);
         writeVector(writer, cache, vector, 0, vector.size(), true);
 
         // Put a last byte used as checksum
@@ -86,5 +93,24 @@ public class PayloadWriter
         writer.putByte(vectorWriter.getVersion());
 
         vectorWriter.write(writer, cache, vector, from, to, nullCount);
+    }
+
+    /** Setting used when wrting bytes. */
+    public static class WriterSettings
+    {
+        private boolean useLatin1EncodedStrings = false;
+
+        public boolean isUseLatin1EncodedStrings()
+        {
+            return useLatin1EncodedStrings;
+        }
+
+        /**
+         * Should {@link UTF8String}'s be encoded with latin1. This is really useful in performance aspects since latin1 encoded strings used via {@link CharSequence} is much faster than UTF8.
+         */
+        public void setUseLatin1EncodedStrings(boolean useLatin1EncodedStrings)
+        {
+            this.useLatin1EncodedStrings = useLatin1EncodedStrings;
+        }
     }
 }

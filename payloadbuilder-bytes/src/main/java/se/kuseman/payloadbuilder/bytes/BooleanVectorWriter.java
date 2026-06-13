@@ -37,7 +37,7 @@ class BooleanVectorWriter implements VectorWriter
 
             if (literal)
             {
-                writer.putByte(PayloadReader.LITERAL_ENCODING);
+                writer.putByte(PayloadReader.REGULAR_LITERAL_ENCODING);
                 // Literal boolean then we have the literal value in the data position
                 writer.putByte((byte) (value ? 1
                         : 0));

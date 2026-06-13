@@ -32,7 +32,7 @@ class IntVector extends AVector
         }
 
         int encoding = buffer.get(position++);
-        if (encoding == PayloadReader.LITERAL_ENCODING)
+        if (encoding == PayloadReader.REGULAR_LITERAL_ENCODING)
         {
             int value = buffer.getInt(position);
             return ValueVector.literalInt(value, size);
