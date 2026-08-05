@@ -48,9 +48,10 @@ public class MongoCatalog extends Catalog
     {
         super(NAME);
         registerFunction(new AggregateFunction(this));
+        registerFunction(new RunCommandFunction(this));
     }
 
-    /** Return the (cached) {@link MongoClient} for provided session/catalog alias. Used by catalog functions like {@link AggregateFunction}. */
+    /** Return the (cached) {@link MongoClient} for provided session/catalog alias. Used by catalog functions like {@link AggregateFunction}/{@link RunCommandFunction}. */
     MongoClient getClient(IQuerySession session, String catalogAlias)
     {
         return clientHolder.getClient(session, catalogAlias);

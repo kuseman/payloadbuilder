@@ -295,6 +295,28 @@ abstract class BaseMongoTest
     }
 
     @Test
+    void test_runCommand_function()
+    {
+        insertTestData();
+        IExecutionContext context = mockContext();
+
+        RunCommandFunction function = (RunCommandFunction) catalog.getTableFunction("runCommand");
+        List<IExpression> arguments = List.of(ExpressionTestUtils.createStringExpression(DATABASE), ExpressionTestUtils.createStringExpression("{\"dbStats\": 1}"));
+
+        TupleIterator it = function.execute(context, CATALOG_ALIAS, arguments, new FunctionData(-1, emptyList()));
+        List<TupleVector> batches = drain(it);
+
+        assertEquals(1, batches.stream()
+                .mapToInt(TupleVector::getRowCount)
+                .sum());
+        TupleVector v = batches.get(0);
+        assertEquals(DATABASE, v.getColumn(indexOf(v, "db"))
+                .getAny(0));
+        assertEquals(1.0, v.getColumn(indexOf(v, "ok"))
+                .getAny(0));
+    }
+
+    @Test
     void test_system_tables()
     {
         insertTestData();
