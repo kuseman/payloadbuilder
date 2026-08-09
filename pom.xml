@@ -19,7 +19,7 @@
         <junit5.version>6.0.1</junit5.version>
         <mockito-core.version>4.3.1</mockito-core.version>
         <spotless.version>2.43.0</spotless.version>
-        <jackson.version>2.22.0</jackson.version>
+        <jackson.version>2.22.1</jackson.version>
         <commons-io.version>2.21.0</commons-io.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <commons-collections4.version>4.5.0</commons-collections4.version>

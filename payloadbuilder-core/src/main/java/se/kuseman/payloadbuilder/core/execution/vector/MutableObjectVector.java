@@ -1,6 +1,6 @@
 package se.kuseman.payloadbuilder.core.execution.vector;
 
-import com.fasterxml.jackson.core.internal.shaded.fdp.v2_22_0.JavaFloatParser;
+import com.fasterxml.jackson.core.internal.shaded.fdp.v2_22_1.JavaFloatParser;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
