@@ -363,7 +363,7 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
                 ILogicalPlan left = ctx.current;
                 ILogicalPlan right = plan;
 
-                ctx.current = new Join(left, right, Join.Type.LEFT, null, (IExpression) null, emptySet(), false, Schema.EMPTY);
+                ctx.current = new Join(left, right, Join.Type.LEFT, null, (IExpression) null, emptySet(), false, Schema.EMPTY).withLocation(expression.getLocation());
             }
             // Return an unresolved column that will be resolved as an ordinary column at next stage (ColumnResolver)
             return new UnresolvedColumnExpression(QualifiedName.of(alias), -1, expression.getLocation());

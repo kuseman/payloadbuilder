@@ -757,6 +757,36 @@ abstract class BaseJDBCTest
         assertEquals(1, rowCount);
     }
 
+    @Test
+    void test_datasource_table_scan_with_top_count()
+    {
+        IExecutionContext context = mockExecutionContext();
+        // Table has 5 rows — request only 3 via topCount push-down
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, TEST_TABLE, new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, emptyList()).withTopCount(3));
+
+        // Verify the generated SQL contains the dialect-specific row-limiting clause
+        Map<String, Object> describe = ds.getDescribeProperties(context);
+        String query = String.valueOf(describe.get(JdbcDatasource.QUERY));
+        assertTrue(query.toLowerCase()
+                .contains("top")
+                || query.toLowerCase()
+                        .contains("limit")
+                || query.toLowerCase()
+                        .contains("fetch first"),
+                "Expected TOP/LIMIT/FETCH FIRST in query: " + query);
+
+        TupleIterator it = ds.execute(context);
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            rowCount += it.next()
+                    .getRowCount();
+        }
+        it.close();
+
+        assertEquals(3, rowCount);
+    }
+
     protected IExecutionContext mockExecutionContext()
     {
         return mockExecutionContext(null);

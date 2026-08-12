@@ -8,6 +8,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import static se.kuseman.payloadbuilder.core.logicalplan.optimization.LogicalPlanOptimizer.resolveExpression;
 
 import java.util.List;
+import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
@@ -26,6 +27,9 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.common.SortItem;
+import se.kuseman.payloadbuilder.core.execution.PlanOperatorInfo;
+import se.kuseman.payloadbuilder.core.execution.PlanRuleRegistry;
+import se.kuseman.payloadbuilder.core.execution.QueryCoverageRegistry;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
@@ -36,8 +40,11 @@ import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 import se.kuseman.payloadbuilder.core.logicalplan.optimization.LogicalPlanOptimizer;
+import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
+import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeInterceptor;
 import se.kuseman.payloadbuilder.core.physicalplan.AssignmentPlan;
+import se.kuseman.payloadbuilder.core.physicalplan.CoveragePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.DescribePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.IPhysicalPlan;
 import se.kuseman.payloadbuilder.core.physicalplan.InsertInto;
@@ -205,6 +212,30 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
     @Override
     public Statement visit(LogicalSelectStatement statement, Context context)
     {
+        final boolean coverageEnabled = QueryCoverageRegistry.isEnabled();
+        final boolean rulesActive = PlanRuleRegistry.isActive();
+        if ((coverageEnabled
+                || rulesActive)
+                && !context.analyze)
+        {
+            context.analyze = true;
+            context.coverageMode = coverageEnabled;
+            final PhysicalStatement physicalStatement = createPhysicalPlan(statement, context);
+            context.analyze = false;
+            context.coverageMode = false;
+            if (rulesActive)
+            {
+                checkPlanRules(physicalStatement.getPlan(), context.nodeLocations, coverageQueryKey(context));
+            }
+            if (coverageEnabled)
+            {
+                String key = coverageQueryKey(context);
+                context.statementCoverageIndex++;
+                return new PhysicalStatement(new CoveragePlan(context.getNextNodeId(), physicalStatement.getPlan(), Map.copyOf(context.nodeLocations), key));
+            }
+            context.statementCoverageIndex++;
+            return physicalStatement;
+        }
         return createPhysicalPlan(statement, context);
     }
 
@@ -229,6 +260,17 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
 
     private Statement createInsertStatement(LogicalSelectIntoStatement statement, Context context, List<String> insertColumns)
     {
+        final boolean coverageActive = QueryCoverageRegistry.isEnabled()
+                && !context.analyze;
+        final boolean rulesActiveForInsert = PlanRuleRegistry.isActive()
+                && !context.analyze;
+        if (coverageActive
+                || rulesActiveForInsert)
+        {
+            context.analyze = true;
+            context.coverageMode = coverageActive;
+        }
+
         PhysicalStatement input = createPhysicalPlan(statement.getInput(), context);
 
         List<Option> options = statement.getOptions()
@@ -264,7 +306,72 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
                 : catalog.getInsertIntoSink(context.getSession(), catalogAlias, statement.getTable(), new InsertIntoData(nodeId, schema, options, insertColumns));
         //@formatter:on
 
-        return new PhysicalStatement(QueryPlanner.wrapWithAnalyze(context, new InsertInto(nodeId, input.getPlan(), insertColumns, sink)));
+        IPhysicalPlan insertPlan = QueryPlanner.wrapWithAnalyze(context, new InsertInto(nodeId, input.getPlan(), insertColumns, sink), statement.getLocation());
+
+        if (coverageActive
+                || rulesActiveForInsert)
+        {
+            context.analyze = false;
+            context.coverageMode = false;
+            if (rulesActiveForInsert)
+            {
+                checkPlanRules(insertPlan, context.nodeLocations, coverageQueryKey(context));
+            }
+            if (coverageActive)
+            {
+                String key = coverageQueryKey(context);
+                context.statementCoverageIndex++;
+                return new PhysicalStatement(new CoveragePlan(context.getNextNodeId(), insertPlan, Map.copyOf(context.nodeLocations), key));
+            }
+            context.statementCoverageIndex++;
+        }
+
+        return new PhysicalStatement(insertPlan);
+    }
+
+    /**
+     * Walks the physical plan tree and invokes all registered {@link se.kuseman.payloadbuilder.core.execution.PlanRuleRegistry} rules. Uses the same traversal as
+     * {@link se.kuseman.payloadbuilder.core.physicalplan.CoveragePlan}: {@link se.kuseman.payloadbuilder.core.physicalplan.AnalyzeInterceptor} nodes expose the operator name and location;
+     * non-interceptor nodes are transparent pass-throughs. The parent chain on each {@link se.kuseman.payloadbuilder.core.execution.PlanOperatorInfo} is built incrementally so rules can inspect
+     * ancestor operators via {@link se.kuseman.payloadbuilder.core.execution.PlanOperatorInfo#hasAncestor} and {@link se.kuseman.payloadbuilder.core.execution.PlanOperatorInfo#firstAncestor}.
+     */
+    private static void checkPlanRules(IPhysicalPlan plan, Map<Integer, Location> nodeLocations, String queryName)
+    {
+        checkPlanRules(plan, nodeLocations, queryName, null);
+    }
+
+    private static void checkPlanRules(IPhysicalPlan plan, Map<Integer, Location> nodeLocations, String queryName, PlanOperatorInfo parent)
+    {
+        if (plan instanceof AnalyzeInterceptor ai)
+        {
+            int aiNodeId = ai.getActualNodeId();
+            Location loc = nodeLocations.getOrDefault(aiNodeId, Location.EMPTY);
+            int line = loc.line() > 0 ? loc.line()
+                    : 0;
+            PlanOperatorInfo info = new PlanOperatorInfo(ai.getInput(), line, queryName, parent);
+            PlanRuleRegistry.check(info);
+            // info becomes the parent for this operator's children
+            checkPlanRules(ai.getInput(), nodeLocations, queryName, info);
+        }
+        else
+        {
+            // Non-interceptor nodes are transparent — pass the same parent through
+            for (IPhysicalPlan child : plan.getChildren())
+            {
+                checkPlanRules(child, nodeLocations, queryName, parent);
+            }
+        }
+    }
+
+    /** Returns the coverage query key for the current statement, appending {@code #N} for the second and subsequent statements in the same compile. */
+    private static String coverageQueryKey(Context context)
+    {
+        if (context.queryName == null)
+        {
+            return null;
+        }
+        return context.statementCoverageIndex == 0 ? context.queryName
+                : context.queryName + "#" + context.statementCoverageIndex;
     }
 
     private PhysicalStatement createPhysicalPlan(LogicalSelectStatement statement, Context context)

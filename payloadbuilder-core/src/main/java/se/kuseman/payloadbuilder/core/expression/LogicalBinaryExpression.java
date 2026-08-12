@@ -13,16 +13,29 @@ import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** AND/OR expression */
 public class LogicalBinaryExpression extends ABinaryExpression implements ILogicalBinaryExpression
 {
     private final Type type;
+    private Location location = Location.EMPTY;
 
     public LogicalBinaryExpression(Type type, IExpression left, IExpression right)
     {
         super(left, right);
         this.type = requireNonNull(type, "type");
+    }
+
+    public Location getLocation()
+    {
+        return location;
+    }
+
+    public LogicalBinaryExpression withLocation(Location location)
+    {
+        this.location = requireNonNull(location, "location");
+        return this;
     }
 
     @Override

@@ -234,7 +234,7 @@ public class JdbcCatalog extends Catalog
                 .findAny()
                 .orElse(null);
 
-        return new JdbcDatasource(this, catalogAlias, table, seekPredicate, projection, predicates, sortItems, tableHintsOption, data.getOptions());
+        return new JdbcDatasource(this, catalogAlias, table, seekPredicate, projection, predicates, sortItems, tableHintsOption, data.getOptions(), data.getTopCount());
     }
 
     private Projection getOptionProjection(List<Option> options)

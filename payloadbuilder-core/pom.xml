@@ -127,7 +127,7 @@
                     <plugin>
                         <groupId>se.bjurr.gitchangelog</groupId>
                         <artifactId>git-changelog-maven-plugin</artifactId>
-                        <version>1.92</version>
+                        <version>2.2.11</version>
                         <executions>
                             <execution>
                                 <id>GenerateChangelog</id>
@@ -145,25 +145,54 @@
 {{#ifReleaseTag .}}
 ## [{{name}}](https://github.com/kuseman/payloadbuilder/releases/tag/{{name}}) ({{tagDate .}})
 
-  {{#ifContainsType commits type='feat'}}
+{{#ifContainsBreaking commits}}
+### Breaking Changes
+    {{#commits}}
+      {{#ifCommitBreaking .}}
+ - {{#eachCommitScope .}} **{{.}}** {{/eachCommitScope}} {{{commitDescription .}}} ([{{hash}}](https://github.com/kuseman/payloadbuilder/commit/{{hashFull}}))
+      {{/ifCommitBreaking}}
+    {{/commits}}
+{{/ifContainsBreaking}}
+{{#ifContainsType commits type='feat'}}
 ### Features
-
     {{#commits}}
       {{#ifCommitType . type='feat'}}
  - {{#eachCommitScope .}} **{{.}}** {{/eachCommitScope}} {{{commitDescription .}}} ([{{hash}}](https://github.com/kuseman/payloadbuilder/commit/{{hashFull}}))
       {{/ifCommitType}}
     {{/commits}}
-  {{/ifContainsType}}
-
-  {{#ifContainsType commits type='fix'}}
+{{/ifContainsType}}
+{{#ifContainsType commits type='fix'}}
 ### Bug Fixes
-
     {{#commits}}
       {{#ifCommitType . type='fix'}}
  - {{#eachCommitScope .}} **{{.}}** {{/eachCommitScope}} {{{commitDescription .}}} ([{{hash}}](https://github.com/kuseman/payloadbuilder/commit/{{hashFull}}))
       {{/ifCommitType}}
     {{/commits}}
-  {{/ifContainsType}}
+{{/ifContainsType}}
+{{#ifContainsType commits type='perf'}}
+### Performance Improvements
+    {{#commits}}
+      {{#ifCommitType . type='perf'}}
+ - {{#eachCommitScope .}} **{{.}}** {{/eachCommitScope}} {{{commitDescription .}}} ([{{hash}}](https://github.com/kuseman/payloadbuilder/commit/{{hashFull}}))
+      {{/ifCommitType}}
+    {{/commits}}
+{{/ifContainsType}}
+{{#ifContainsType commits type='refactor'}}
+### Refactoring
+    {{#commits}}
+      {{#ifCommitType . type='refactor'}}
+ - {{#eachCommitScope .}} **{{.}}** {{/eachCommitScope}} {{{commitDescription .}}} ([{{hash}}](https://github.com/kuseman/payloadbuilder/commit/{{hashFull}}))
+      {{/ifCommitType}}
+    {{/commits}}
+{{/ifContainsType}}
+{{#ifContainsType commits type='docs'}}
+### Documentation
+    {{#commits}}
+      {{#ifCommitType . type='docs'}}
+ - {{#eachCommitScope .}} **{{.}}** {{/eachCommitScope}} {{{commitDescription .}}} ([{{hash}}](https://github.com/kuseman/payloadbuilder/commit/{{hashFull}}))
+      {{/ifCommitType}}
+    {{/commits}}
+{{/ifContainsType}}
 
 {{/ifReleaseTag}}
 {{/tags}}

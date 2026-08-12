@@ -194,6 +194,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -283,6 +284,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -331,6 +333,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -388,6 +391,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -447,6 +451,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -501,6 +506,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -565,6 +571,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -617,6 +624,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -677,6 +685,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -744,6 +753,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -819,6 +829,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -874,6 +885,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -920,6 +932,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -971,6 +984,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -1022,6 +1036,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -1082,6 +1097,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -1144,6 +1160,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -1182,6 +1199,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -1278,7 +1296,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
-                .ignoringFieldsOfTypes(Random.class)
+                .ignoringFieldsOfTypes(Random.class, Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -1771,6 +1789,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -1841,6 +1860,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -1894,6 +1914,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -1947,6 +1968,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2004,6 +2026,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2061,6 +2084,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2118,6 +2142,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2181,6 +2206,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2243,6 +2269,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2315,6 +2342,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2391,6 +2419,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2469,6 +2498,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2538,6 +2568,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2669,7 +2700,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
-                .ignoringFieldsOfTypes(Random.class)
+                .ignoringFieldsOfTypes(Random.class, Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2745,6 +2776,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2854,6 +2886,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2895,6 +2928,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -2936,6 +2970,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -3003,6 +3038,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -3081,6 +3117,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);

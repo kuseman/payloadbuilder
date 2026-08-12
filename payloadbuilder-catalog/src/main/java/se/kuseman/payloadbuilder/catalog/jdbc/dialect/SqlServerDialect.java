@@ -70,6 +70,12 @@ class SqlServerDialect implements SqlDialect
     }
 
     @Override
+    public String selectTopN(int n)
+    {
+        return "TOP(" + n + ") ";
+    }
+
+    @Override
     public String getDropTableStatement(QualifiedName qname, boolean lenient)
     {
         if (!lenient)

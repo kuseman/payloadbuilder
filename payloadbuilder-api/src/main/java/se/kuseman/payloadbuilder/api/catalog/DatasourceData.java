@@ -21,6 +21,8 @@ public class DatasourceData
     private final List<? extends ISortItem> sortItems;
     private final Projection projection;
     private final List<Option> options;
+    /** Top count hint from a TOP/LIMIT operator. -1 means no limit. Catalogs may use this to append TOP/LIMIT to their generated SQL. */
+    private int topCount = -1;
 
     public DatasourceData(int nodeId, List<IPredicate> predicates, List<? extends ISortItem> sortItems, Projection projection, List<Option> options)
     {
@@ -82,6 +84,22 @@ public class DatasourceData
     public List<Option> getOptions()
     {
         return options;
+    }
+
+    /**
+     * Return the top count hint pushed down from a TOP/LIMIT operator. Returns -1 if no limit is set. Catalogs that support row limiting (e.g. JDBC) may append TOP/LIMIT to their generated SQL for
+     * efficiency. The physical Limit operator remains in the plan and provides correctness; this is purely a performance hint.
+     */
+    public int getTopCount()
+    {
+        return topCount;
+    }
+
+    /** Set the top count hint. Called by the planner when a TOP/LIMIT operator is pushed down. */
+    public DatasourceData withTopCount(int n)
+    {
+        this.topCount = n;
+        return this;
     }
 
     /**
