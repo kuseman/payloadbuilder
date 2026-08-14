@@ -29,28 +29,35 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.catalog.CredentialsException;
 
 /**
- * Caches one {@link MongoClient} per connection string + authentication identity.
+ * Caches one {@link MongoClient} per connection string + authentication identity + timeout configuration.
  *
  * <pre>
  * A {@link MongoClient} pools its own connections and is thread safe, but connection strings are often ephemeral
  * (ie. pointing at short lived docker containers) so idle clients are closed and evicted by a housekeeping task,
  * mirroring the JdbcCatalog's pooled datasource housekeeping.
  *
- * NOTE! The cache key includes the username and a hash of the password (not the connection string alone). This matters because
- * a MongoClient/MongoCredential is immutable once built - unlike JdbcCatalog's HikariDataSource, there is no way to swap
- * credentials on an already constructed client. Keying only by connection string would let two different users of the same
- * URI (or a rotated password) silently keep reusing whichever client happened to be built first. Since the key changes when
- * credentials change, a credential change simply results in a new cache entry - the old one is left untouched and ages out
- * via the housekeeping task above.
+ * NOTE! The cache key includes the username, a hash of the password and the effective timeouts (not the connection string alone). This matters
+ * because a MongoClient/MongoCredential is immutable once built - unlike JdbcCatalog's HikariDataSource, there is no way to swap credentials or
+ * timeouts on an already constructed client. Keying only by connection string would let two different users of the same URI (or a rotated password,
+ * or a different timeout override) silently keep reusing whichever client happened to be built first. Since the key changes when any of those
+ * change, a change simply results in a new cache entry - the old one is left untouched and ages out via the housekeeping task above.
+ *
+ * NOTE! The driver defaults socketTimeout (read timeout on an established connection) to 0, ie. NO timeout - a firewall that silently drops
+ * packets (rather than actively refusing the connection) to an unreachable replica set member can then hang a query forever with no exception
+ * ever thrown. Bounded (but overridable) defaults are used here instead so such failures show up as a clear, bounded exception.
  * </pre>
  */
 class MongoClientHolder
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(MongoClientHolder.class);
     private static final long IDLE_MINUTES = 10;
+    private static final int DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
+    private static final int DEFAULT_SOCKET_TIMEOUT_MS = 30_000;
+    private static final int DEFAULT_SERVER_SELECTION_TIMEOUT_MS = 30_000;
 
     private final Map<String, ClientHolder> clientByKey = new ConcurrentHashMap<>();
     private final ScheduledFuture<?> houseKeepingFuture;
@@ -86,7 +93,11 @@ class MongoClientHolder
                     : authDatabase;
         }
 
-        String key = cacheKey(connectionString, username, authDatabase, password);
+        int connectTimeoutMs = getIntProperty(session, catalogAlias, MongoCatalog.CONNECT_TIMEOUT_KEY, DEFAULT_CONNECT_TIMEOUT_MS);
+        int socketTimeoutMs = getIntProperty(session, catalogAlias, MongoCatalog.SOCKET_TIMEOUT_KEY, DEFAULT_SOCKET_TIMEOUT_MS);
+        int serverSelectionTimeoutMs = getIntProperty(session, catalogAlias, MongoCatalog.SERVER_SELECTION_TIMEOUT_KEY, DEFAULT_SERVER_SELECTION_TIMEOUT_MS);
+
+        String key = cacheKey(connectionString, username, authDatabase, password, connectTimeoutMs, socketTimeoutMs, serverSelectionTimeoutMs);
         final String finalUsername = username;
         final String finalPassword = password;
         final String finalAuthDatabase = authDatabase;
@@ -94,7 +105,7 @@ class MongoClientHolder
         {
             if (holder == null)
             {
-                return new ClientHolder(createClient(connectionString, finalUsername, finalAuthDatabase, finalPassword));
+                return new ClientHolder(createClient(connectionString, finalUsername, finalAuthDatabase, finalPassword, connectTimeoutMs, socketTimeoutMs, serverSelectionTimeoutMs));
             }
             holder.touch();
             return holder;
@@ -112,14 +123,21 @@ class MongoClientHolder
         return connectionString;
     }
 
-    /** Builds a cache key from the connection string and (if present) the authentication identity. Never includes the raw password. */
-    private static String cacheKey(String connectionString, String username, String authDatabase, String password)
+    /** Reads an integer catalog property without relying on the 3-arg default-value overload (a default interface method that is broken under some JDK/Mockito combinations in tests). */
+    private static int getIntProperty(IQuerySession session, String catalogAlias, String key, int defaultValue)
     {
-        if (isBlank(username))
-        {
-            return connectionString;
-        }
-        return connectionString + '|' + username + '|' + authDatabase + '|' + sha256(password);
+        ValueVector v = session.getCatalogProperty(catalogAlias, key);
+        return (v == null
+                || v.isNull(0)) ? defaultValue
+                        : v.getInt(0);
+    }
+
+    /** Builds a cache key from the connection string, (if present) the authentication identity and the effective timeouts. Never includes the raw password. */
+    private static String cacheKey(String connectionString, String username, String authDatabase, String password, int connectTimeoutMs, int socketTimeoutMs, int serverSelectionTimeoutMs)
+    {
+        String credentialPart = isBlank(username) ? ""
+                : "|" + username + "|" + authDatabase + "|" + sha256(password);
+        return connectionString + credentialPart + "|" + connectTimeoutMs + "|" + socketTimeoutMs + "|" + serverSelectionTimeoutMs;
     }
 
     private static String sha256(String value)
@@ -137,10 +155,13 @@ class MongoClientHolder
         }
     }
 
-    private static MongoClient createClient(String connectionString, String username, String authDatabase, String password)
+    private static MongoClient createClient(String connectionString, String username, String authDatabase, String password, int connectTimeoutMs, int socketTimeoutMs, int serverSelectionTimeoutMs)
     {
         MongoClientSettings.Builder builder = MongoClientSettings.builder()
-                .applyConnectionString(new ConnectionString(connectionString));
+                .applyConnectionString(new ConnectionString(connectionString))
+                .applyToSocketSettings(b -> b.connectTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
+                        .readTimeout(socketTimeoutMs, TimeUnit.MILLISECONDS))
+                .applyToClusterSettings(b -> b.serverSelectionTimeout(serverSelectionTimeoutMs, TimeUnit.MILLISECONDS));
 
         if (isNotBlank(username))
         {
