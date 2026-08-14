@@ -38,6 +38,9 @@ public class MongoCatalog extends Catalog
     public static final String AUTH_PASSWORD_KEY = "authPassword";
     public static final String AUTH_DATABASE_KEY = "authDatabase";
     public static final String CACHE_META_TTL_KEY = "cache.meta.ttl";
+    public static final String CONNECT_TIMEOUT_KEY = "connectTimeout";
+    public static final String SOCKET_TIMEOUT_KEY = "socketTimeout";
+    public static final String SERVER_SELECTION_TIMEOUT_KEY = "serverSelectionTimeout";
     static final String ID_COLUMN = "_id";
     /** MongoDB's own internal databases - never surfaced through sys#tables/columns/indices. */
     private static final Set<String> SYSTEM_DATABASES = Set.of("admin", "local", "config");
