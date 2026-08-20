@@ -66,10 +66,12 @@ class RunCommandFunction extends TableFunctionInfo
         String commandJson = String.valueOf(arguments.get(1)
                 .eval(context)
                 .valueAsObject(0));
+        // Validated up front, before acquiring a client, so malformed input fails fast regardless of connection state
+        Document command = parseCommand(commandJson);
 
         MongoClient client = catalog.getClient(context.getSession(), catalogAlias);
         Document result = client.getDatabase(database)
-                .runCommand(Document.parse(commandJson));
+                .runCommand(command);
 
         Schema schema = new Schema(result.keySet()
                 .stream()
@@ -77,5 +79,17 @@ class RunCommandFunction extends TableFunctionInfo
                 .collect(Collectors.toList()));
 
         return TupleIterator.singleton(new MongoTupleVector(schema, List.of(result)));
+    }
+
+    private static Document parseCommand(String commandJson)
+    {
+        try
+        {
+            return Document.parse(commandJson);
+        }
+        catch (Exception e)
+        {
+            throw new IllegalArgumentException("runCommand() command is not a valid JSON object: " + e.getMessage(), e);
+        }
     }
 }
