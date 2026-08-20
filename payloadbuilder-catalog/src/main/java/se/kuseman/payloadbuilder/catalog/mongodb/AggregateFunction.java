@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.catalog.mongodb;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.bson.Document;
@@ -60,23 +61,73 @@ class AggregateFunction extends TableFunctionInfo
             throw new IllegalArgumentException("Expected a two part table name '<database>.<collection>' but got: " + tableName);
         }
         MongoTable table = new MongoTable(parts[0], parts[1]);
+        // Validated up front, before acquiring a client, so malformed input fails fast regardless of connection state
+        List<Document> pipeline = parsePipeline(pipelineJson);
 
         MongoClient client = catalog.getClient(context.getSession(), catalogAlias);
         MongoCollection<Document> collection = client.getDatabase(table.database())
                 .getCollection(table.collection());
 
         int batchSize = context.getBatchSize(data.getOptions());
-        AggregateIterable<Document> aggregateIterable = collection.aggregate(parsePipeline(pipelineJson))
+        AggregateIterable<Document> aggregateIterable = collection.aggregate(pipeline)
                 .batchSize(batchSize);
 
         return new MongoCursorTupleIterator(aggregateIterable.iterator(), batchSize, null, null);
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Parses the pipeline JSON and validates that it's an array of stage <b>objects</b>.
+     *
+     * <pre>
+     * NOTE! Without this validation a malformed stage (eg. a stray nested array instead of a stage document) would pass an unchecked
+     * generics cast here silently, and only fail later as a confusing ClassCastException deep inside the driver's BSON encoding once
+     * the pipeline is actually sent - with no indication of which stage was wrong. Failing fast here with a precise, 1-based stage
+     * index gives a message that's actually actionable.
+     * </pre>
+     */
     private static List<Document> parsePipeline(String pipelineJson)
     {
-        // Wrap the pipeline array in a document so the driver's JSON parser can turn each stage into a Document
-        Document wrapper = Document.parse("{\"pipeline\":" + pipelineJson + "}");
-        return (List<Document>) (List<?>) wrapper.get("pipeline", List.class);
+        Document wrapper;
+        try
+        {
+            // Wrap the pipeline array in a document so the driver's JSON parser can turn each stage into a Document
+            wrapper = Document.parse("{\"pipeline\":" + pipelineJson + "}");
+        }
+        catch (Exception e)
+        {
+            throw new IllegalArgumentException("aggregate() pipeline is not valid JSON: " + e.getMessage(), e);
+        }
+
+        Object rawPipeline = wrapper.get("pipeline");
+        if (!(rawPipeline instanceof List))
+        {
+            throw new IllegalArgumentException("aggregate() pipeline must be a JSON array of stage objects (eg. '[{\"$match\": {...}}]'), got: " + describe(rawPipeline));
+        }
+
+        List<?> rawStages = (List<?>) rawPipeline;
+        List<Document> pipeline = new ArrayList<>(rawStages.size());
+        for (int i = 0; i < rawStages.size(); i++)
+        {
+            Object stage = rawStages.get(i);
+            if (!(stage instanceof Document))
+            {
+                throw new IllegalArgumentException("aggregate() pipeline stage " + (i + 1) + " must be a JSON object (eg. {\"$match\": {...}}), got: " + describe(stage));
+            }
+            pipeline.add((Document) stage);
+        }
+        return pipeline;
+    }
+
+    private static String describe(Object value)
+    {
+        if (value == null)
+        {
+            return "null";
+        }
+        return value.getClass()
+                .getSimpleName()
+               + " ("
+               + value
+               + ")";
     }
 }
