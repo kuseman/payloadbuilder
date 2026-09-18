@@ -21,8 +21,9 @@ class KafkaDatasource implements IDatasource
     private final KafkaPredicateAnalysis predicateAnalysis;
     private final List<Option> options;
     private final KafkaOptions.SortOrder sortOrder;
+    private final boolean hasResidualPredicates;
 
-    KafkaDatasource(int nodeId, String catalogAlias, String topic, KafkaPredicateAnalysis predicateAnalysis, List<Option> options, KafkaOptions.SortOrder sortOrder)
+    KafkaDatasource(int nodeId, String catalogAlias, String topic, KafkaPredicateAnalysis predicateAnalysis, List<Option> options, KafkaOptions.SortOrder sortOrder, boolean hasResidualPredicates)
     {
         this.nodeId = nodeId;
         this.catalogAlias = catalogAlias;
@@ -30,6 +31,7 @@ class KafkaDatasource implements IDatasource
         this.predicateAnalysis = predicateAnalysis;
         this.options = options;
         this.sortOrder = sortOrder;
+        this.hasResidualPredicates = hasResidualPredicates;
     }
 
     @Override
@@ -51,7 +53,7 @@ class KafkaDatasource implements IDatasource
         try
         {
             // Resolve splits (applies predicate-based partition/offset narrowing)
-            List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, topic, kafkaOptions, predicateAnalysis, context);
+            List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, topic, kafkaOptions, predicateAnalysis, context, hasResidualPredicates);
 
             if (splits.isEmpty())
             {

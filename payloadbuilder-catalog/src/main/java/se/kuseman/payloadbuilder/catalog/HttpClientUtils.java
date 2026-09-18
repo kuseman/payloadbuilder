@@ -19,8 +19,8 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.ClientTlsStrategyBuilder;
 import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
-import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactoryBuilder;
 import org.apache.hc.client5.http.ssl.TrustAllStrategy;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -106,12 +106,12 @@ public final class HttpClientUtils
         {
             try
             {
-                manager.setSSLSocketFactory(SSLConnectionSocketFactoryBuilder.create()
+                manager.setTlsSocketStrategy(ClientTlsStrategyBuilder.create()
                         .setSslContext(SSLContextBuilder.create()
                                 .loadTrustMaterial(TrustAllStrategy.INSTANCE)
                                 .build())
                         .setHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                        .build());
+                        .buildClassic());
             }
             catch (KeyManagementException | NoSuchAlgorithmException | KeyStoreException e)
             {

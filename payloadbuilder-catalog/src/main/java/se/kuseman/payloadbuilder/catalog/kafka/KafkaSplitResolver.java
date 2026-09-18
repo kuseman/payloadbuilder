@@ -36,9 +36,12 @@ class KafkaSplitResolver
      * @param options Parsed WITH clause options
      * @param predicateAnalysis Extracted predicates for split narrowing (may be null)
      * @param context Execution context for evaluating predicate expressions (may be null if predicateAnalysis is null)
+     * @param hasResidualPredicates True if the query has predicates that could not be pushed down and will instead be evaluated by the engine on the data this method returns. When true, the "newest"
+     * tail-window narrowing is skipped since it would silently exclude matching records outside the tail window.
      * @return List of bounded KafkaSplits, one per partition. Empty splits are filtered out.
      */
-    static List<KafkaSplit> resolve(KafkaConsumer<byte[], byte[]> consumer, String topic, KafkaOptions options, KafkaPredicateAnalysis predicateAnalysis, IExecutionContext context)
+    static List<KafkaSplit> resolve(KafkaConsumer<byte[], byte[]> consumer, String topic, KafkaOptions options, KafkaPredicateAnalysis predicateAnalysis, IExecutionContext context,
+            boolean hasResidualPredicates)
     {
         requireNonNull(consumer, "consumer");
         requireNonNull(topic, "topic");
@@ -88,7 +91,8 @@ class KafkaSplitResolver
         Map<TopicPartition, Long> endOffsets = new HashMap<>(resolveEndOffsets(consumer, topicPartitions, options));
 
         if (options.mode() == KafkaOptions.ExecutionMode.BATCH
-                && options.sortOrder() == KafkaOptions.SortOrder.NEWEST)
+                && options.sortOrder() == KafkaOptions.SortOrder.NEWEST
+                && !hasResidualPredicates)
         {
             Map<TopicPartition, Long> tailStarts = resolveTailStartOffsets(consumer, topicPartitions, options.tailCount());
             for (TopicPartition tp : topicPartitions)
@@ -130,7 +134,7 @@ class KafkaSplitResolver
     /** Overload without predicate analysis */
     static List<KafkaSplit> resolve(KafkaConsumer<byte[], byte[]> consumer, String topic, KafkaOptions options)
     {
-        return resolve(consumer, topic, options, null, null);
+        return resolve(consumer, topic, options, null, null, false);
     }
 
     private static void applyOffsetPredicates(KafkaConsumer<byte[], byte[]> consumer, Map<TopicPartition, Long> startOffsets, Map<TopicPartition, Long> endOffsets,
@@ -237,7 +241,27 @@ class KafkaSplitResolver
             }
             return result;
         }
-        return resolveOffsets(consumer, topicPartitions, options.end(), false);
+
+        Map<TopicPartition, Long> requested = resolveOffsets(consumer, topicPartitions, options.end(), false);
+        if ("latest".equalsIgnoreCase(options.end()))
+        {
+            // Already the real high watermark, nothing to clamp
+            return requested;
+        }
+
+        // A batch-mode scan is bounded by what's actually in the topic right now. Clamp any requested end
+        // offset (a numeric offset or a resolved timestamp) that lies beyond the current high watermark, so a
+        // too-generous "end" can't turn into an indefinite wait for records that were never going to arrive in
+        // a bounded scan - unlike stream mode, batch mode has no reason to wait for the future.
+        Map<TopicPartition, Long> actualEnd = consumer.endOffsets(topicPartitions);
+        Map<TopicPartition, Long> result = new HashMap<>();
+        for (TopicPartition tp : topicPartitions)
+        {
+            long requestedEnd = requested.getOrDefault(tp, Long.MAX_VALUE);
+            long actual = actualEnd.getOrDefault(tp, requestedEnd);
+            result.put(tp, Math.min(requestedEnd, actual));
+        }
+        return result;
     }
 
     private static Map<TopicPartition, Long> resolveTailStartOffsets(KafkaConsumer<byte[], byte[]> consumer, List<TopicPartition> topicPartitions, int tailCount)
