@@ -173,7 +173,7 @@ class KafkaSplitResolverTest
 
         se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
 
-        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context);
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context, false);
 
         assertEquals(1, splits.size());
         assertEquals(1, splits.get(0)
@@ -198,7 +198,7 @@ class KafkaSplitResolverTest
 
         se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
 
-        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context);
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context, false);
 
         assertEquals(1, splits.size());
         assertEquals(500, splits.get(0)
@@ -225,7 +225,7 @@ class KafkaSplitResolverTest
 
         se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
 
-        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context);
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context, false);
 
         assertEquals(1, splits.size());
         assertEquals(0, splits.get(0)
@@ -254,7 +254,7 @@ class KafkaSplitResolverTest
 
         se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
 
-        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context);
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context, false);
 
         assertEquals(1, splits.size());
         assertEquals(0, splits.get(0)
@@ -284,7 +284,7 @@ class KafkaSplitResolverTest
 
         se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
 
-        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context);
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context, false);
 
         assertTrue(splits.isEmpty(), "Impossible offset range should produce no splits");
     }
@@ -306,6 +306,71 @@ class KafkaSplitResolverTest
 
         assertEquals(2, splits.size());
         assertEquals(new KafkaSplit("orders", 0, 950, 1000), splits.get(0));
+        assertEquals(new KafkaSplit("orders", 1, 100, 120), splits.get(1));
+    }
+
+    @Test
+    void test_numeric_end_beyond_actual_latest_is_clamped()
+    {
+        KafkaConsumer<byte[], byte[]> consumer = mock(KafkaConsumer.class);
+        TopicPartition tp0 = new TopicPartition("orders", 0);
+
+        when(consumer.partitionsFor(any(), any(Duration.class))).thenReturn(List.of(new PartitionInfo("orders", 0, null, null, null)));
+        when(consumer.beginningOffsets(anyCollection())).thenReturn(Map.of(tp0, 0L));
+        when(consumer.endOffsets(anyCollection())).thenReturn(Map.of(tp0, 100L));
+
+        // A batch-mode end offset requested far beyond the real high watermark must be clamped to it, otherwise
+        // the scan would wait forever for records that were never going to be produced within a bounded scan.
+        KafkaOptions options = new KafkaOptions("earliest", "1700000", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
+
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options);
+
+        assertEquals(1, splits.size());
+        assertEquals(new KafkaSplit("orders", 0, 0, 100), splits.get(0));
+    }
+
+    @Test
+    void test_stream_mode_end_offset_is_not_clamped()
+    {
+        KafkaConsumer<byte[], byte[]> consumer = mock(KafkaConsumer.class);
+        TopicPartition tp0 = new TopicPartition("orders", 0);
+
+        when(consumer.partitionsFor(any(), any(Duration.class))).thenReturn(List.of(new PartitionInfo("orders", 0, null, null, null)));
+        when(consumer.beginningOffsets(anyCollection())).thenReturn(Map.of(tp0, 0L));
+        when(consumer.endOffsets(anyCollection())).thenReturn(Map.of(tp0, 100L));
+
+        // Stream mode intentionally tails forever - its end offset must stay unbounded regardless of the real
+        // high watermark, unlike a bounded batch-mode scan.
+        KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.STREAM, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
+
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options);
+
+        assertEquals(1, splits.size());
+        assertEquals(Long.MAX_VALUE, splits.get(0)
+                .endOffset());
+    }
+
+    @Test
+    void test_newest_sort_skips_tail_window_when_residual_predicates_present()
+    {
+        KafkaConsumer<byte[], byte[]> consumer = mock(KafkaConsumer.class);
+        TopicPartition tp0 = new TopicPartition("orders", 0);
+        TopicPartition tp1 = new TopicPartition("orders", 1);
+
+        when(consumer.partitionsFor(any(), any(Duration.class))).thenReturn(List.of(new PartitionInfo("orders", 0, null, null, null), new PartitionInfo("orders", 1, null, null, null)));
+        when(consumer.beginningOffsets(anyCollection())).thenReturn(Map.of(tp0, 0L, tp1, 100L));
+        when(consumer.endOffsets(anyCollection())).thenReturn(Map.of(tp0, 1000L, tp1, 120L));
+
+        KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.NEWEST, 50);
+
+        se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
+
+        // A non-pushable predicate (e.g. a header filter) is still evaluated by the engine after this method
+        // returns, so narrowing to the tail window here would silently drop matching records outside it.
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, new KafkaPredicateAnalysis(), context, true);
+
+        assertEquals(2, splits.size());
+        assertEquals(new KafkaSplit("orders", 0, 0, 1000), splits.get(0));
         assertEquals(new KafkaSplit("orders", 1, 100, 120), splits.get(1));
     }
 }

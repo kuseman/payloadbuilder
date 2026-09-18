@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -56,11 +57,18 @@ class KafkaTupleIterator implements TupleIterator
     static final int COL_HEADERS = 6;
     static final int COL_TOPIC = 7;
 
-    private static final int MAX_EMPTY_POLLS = 3;
+    /**
+     * Number of consecutive empty polls with no partition progress (no completed partition and no fetch position advancing) before a batch-mode scan gives up and fails loudly. A poll returning no
+     * records does not by itself mean there is no more data - Kafka can advance the fetch position past a run of transaction control/marker offsets without ever surfacing a record for them - so
+     * completion/progress is judged by comparing the fetch position against each split's end offset rather than by counting empty polls alone.
+     */
+    private static final int MAX_STALLED_POLLS = 60;
 
     private final KafkaConsumer<byte[], byte[]> consumer;
     private final Map<Integer, KafkaSplit> splitByPartition;
     private final Set<Integer> completedPartitions = new HashSet<>();
+    private final Map<Integer, Long> lastKnownPositions = new HashMap<>();
+    private Iterator<ConsumerRecord<byte[], byte[]>> pendingRecordIterator;
     private final IRecordDeserializer deserializer;
     private final KafkaNodeData nodeData;
     private final int batchSize;
@@ -204,9 +212,9 @@ class KafkaTupleIterator implements TupleIterator
         List<UTF8String> topics = new ArrayList<>(batchSize);
 
         int accumulated = 0;
-        int emptyPollCount = 0;
+        int stalledPollCount = 0;
 
-        while (accumulated < batchSize)
+        while (true)
         {
             if (context.getSession()
                     .abortQuery())
@@ -214,32 +222,49 @@ class KafkaTupleIterator implements TupleIterator
                 return accumulated > 0;
             }
 
-            ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(pollTimeoutMs));
-            nodeData.pollCount++;
-
-            if (records.isEmpty())
+            // A single poll() can return records spanning multiple partitions. If a batch fills up mid-way
+            // through that response, the leftover records must carry over to the next call instead of being
+            // discarded - Kafka won't hand them back, since the fetch position has already moved past them.
+            if (pendingRecordIterator == null
+                    || !pendingRecordIterator.hasNext())
             {
-                if (!streaming
-                        && allSplitsComplete())
-                {
-                    break;
-                }
-                emptyPollCount++;
+                ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(pollTimeoutMs));
+                nodeData.pollCount++;
 
-                // In stream mode: return partial batch if we have data
-                // In batch mode: give up after MAX_EMPTY_POLLS
-                if (accumulated > 0
-                        || (!streaming
-                                && emptyPollCount > MAX_EMPTY_POLLS))
+                if (records.isEmpty())
                 {
-                    break;
+                    boolean progressed = !streaming
+                            && refreshProgress();
+
+                    if (!streaming
+                            && allSplitsComplete())
+                    {
+                        break;
+                    }
+
+                    // In stream mode: return partial batch if we have data
+                    if (accumulated > 0)
+                    {
+                        break;
+                    }
+
+                    if (!streaming)
+                    {
+                        stalledPollCount = progressed ? 0
+                                : stalledPollCount + 1;
+                        failIfStalled(stalledPollCount);
+                    }
+                    continue;
                 }
-                continue;
+
+                stalledPollCount = 0;
+                pendingRecordIterator = records.iterator();
             }
-            emptyPollCount = 0;
 
-            for (ConsumerRecord<byte[], byte[]> record : records)
+            while (pendingRecordIterator.hasNext()
+                    && accumulated < batchSize)
             {
+                ConsumerRecord<byte[], byte[]> record = pendingRecordIterator.next();
                 int partition = record.partition();
                 KafkaSplit split = splitByPartition.get(partition);
 
@@ -286,11 +311,6 @@ class KafkaTupleIterator implements TupleIterator
                         && split.isComplete(record.offset() + 1))
                 {
                     completedPartitions.add(partition);
-                }
-
-                if (accumulated >= batchSize)
-                {
-                    break;
                 }
             }
 
@@ -352,7 +372,7 @@ class KafkaTupleIterator implements TupleIterator
         List<Object> headers = new ArrayList<>();
         List<UTF8String> topics = new ArrayList<>();
 
-        int emptyPollCount = 0;
+        int stalledPollCount = 0;
 
         while (true)
         {
@@ -372,15 +392,19 @@ class KafkaTupleIterator implements TupleIterator
 
             if (records.isEmpty())
             {
-                emptyPollCount++;
-                if (emptyPollCount > MAX_EMPTY_POLLS)
+                boolean progressed = refreshProgress();
+                if (allSplitsComplete())
                 {
                     break;
                 }
+
+                stalledPollCount = progressed ? 0
+                        : stalledPollCount + 1;
+                failIfStalled(stalledPollCount);
                 continue;
             }
 
-            emptyPollCount = 0;
+            stalledPollCount = 0;
 
             for (ConsumerRecord<byte[], byte[]> record : records)
             {
@@ -504,6 +528,63 @@ class KafkaTupleIterator implements TupleIterator
     private boolean allSplitsComplete()
     {
         return completedPartitions.size() >= splitByPartition.size();
+    }
+
+    /**
+     * Refreshes completion status of not-yet-complete partitions by comparing their current fetch position against the split's end offset, and records position movement even when no record was seen
+     * for a partition. Returns true if any partition became complete or its position advanced since the previous call - i.e. the scan made real progress even though the last poll returned no records.
+     */
+    private boolean refreshProgress()
+    {
+        boolean progressed = false;
+        for (Map.Entry<Integer, KafkaSplit> entry : splitByPartition.entrySet())
+        {
+            int partition = entry.getKey();
+            if (completedPartitions.contains(partition))
+            {
+                continue;
+            }
+
+            KafkaSplit split = entry.getValue();
+            long position = consumer.position(new TopicPartition(split.topic(), partition));
+            if (split.isComplete(position))
+            {
+                completedPartitions.add(partition);
+                progressed = true;
+                continue;
+            }
+
+            Long previous = lastKnownPositions.put(partition, position);
+            if (previous == null
+                    || position > previous)
+            {
+                progressed = true;
+            }
+        }
+        return progressed;
+    }
+
+    /** Throws if the scan has made no progress for too many consecutive empty polls, rather than silently returning incomplete results. */
+    private void failIfStalled(int stalledPollCount)
+    {
+        if (stalledPollCount <= MAX_STALLED_POLLS)
+        {
+            return;
+        }
+
+        int incomplete = splitByPartition.size() - completedPartitions.size();
+        String topic = splitByPartition.values()
+                .iterator()
+                .next()
+                .topic();
+        throw new IllegalStateException("Kafka scan of topic '" + topic
+                                        + "' stalled: no progress after "
+                                        + stalledPollCount
+                                        + " consecutive empty polls (~"
+                                        + (stalledPollCount * pollTimeoutMs)
+                                        + "ms) while "
+                                        + incomplete
+                                        + " partition(s) have not reached their target offset. This may indicate a broker or network issue.");
     }
 
     private void pauseCompletedPartitions()

@@ -61,11 +61,16 @@ public class KafkaCatalog extends Catalog
         }
 
         KafkaPredicateAnalysis predicateAnalysis = KafkaPredicateAnalysis.analyze(data.getPredicates());
+        // Predicates left after analysis are evaluated by the engine after data leaves the data source. If any
+        // remain, a "newest" tail-window narrowing would silently drop matching records outside that window,
+        // so the data source must scan the full requested range instead.
+        boolean hasResidualPredicates = !data.getPredicates()
+                .isEmpty();
         KafkaOptions.SortOrder sortOrder = getSortOrder(data.getSortItems());
 
         return switch (entityType.toLowerCase())
         {
-            case "topic" -> new KafkaDatasource(data.getNodeId(), catalogAlias, entityName, predicateAnalysis, data.getOptions(), sortOrder);
+            case "topic" -> new KafkaDatasource(data.getNodeId(), catalogAlias, entityName, predicateAnalysis, data.getOptions(), sortOrder, hasResidualPredicates);
             case "metadata" -> new KafkaMetadataDatasource(catalogAlias, entityName);
             case "consumer_group" -> new KafkaConsumerGroupDatasource(catalogAlias, entityName);
             default -> throw new IllegalArgumentException("Unknown Kafka entity type: '" + entityType + "'. Supported: topic, metadata, consumer_group");
