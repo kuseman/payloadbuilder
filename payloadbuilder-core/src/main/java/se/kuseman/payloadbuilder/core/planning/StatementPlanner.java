@@ -72,6 +72,9 @@ public class StatementPlanner
 
         /** Push down predicates that can be consumed by catalog */
         List<AnalyzePair> predicatePairs = emptyList();
+
+        /** TOP/LIMIT count pushed down from an enclosing Limit operator. -1 = no limit */
+        int topCount = -1;
     }
 
     /** Plans provided query. Produces a runnable query that can be cached */

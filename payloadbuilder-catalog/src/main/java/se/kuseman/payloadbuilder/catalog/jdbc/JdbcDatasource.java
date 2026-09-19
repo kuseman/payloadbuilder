@@ -48,6 +48,7 @@ import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 class JdbcDatasource implements IDatasource
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(JdbcDatasource.class);
+    static final String QUERY = "Query";
     private final JdbcCatalog catalog;
     private final String catalogAlias;
     private final QualifiedName table;
@@ -58,9 +59,10 @@ class JdbcDatasource implements IDatasource
     private final IExpression tableHintsOption;
     private final List<Option> options;
     private final Map<String, ColumnOption> columnOptions;
+    private final int topCount;
 
     JdbcDatasource(JdbcCatalog catalog, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, Projection projection, List<IPredicate> predicates, List<ISortItem> sortItems,
-            IExpression tableHintsOption, List<Option> options)
+            IExpression tableHintsOption, List<Option> options, int topCount)
     {
         this.catalog = catalog;
         this.catalogAlias = catalogAlias;
@@ -72,6 +74,7 @@ class JdbcDatasource implements IDatasource
         this.tableHintsOption = tableHintsOption;
         this.options = options;
         this.columnOptions = ColumnOption.extract(options);
+        this.topCount = topCount;
     }
 
     @Override
@@ -94,7 +97,7 @@ class JdbcDatasource implements IDatasource
                     .collect(joining(",")));
         }
 
-        result.put("Query", buildSql(dialect, context, true));
+        result.put(QUERY, buildSql(dialect, context, true));
 
         return result;
     }
@@ -128,7 +131,16 @@ class JdbcDatasource implements IDatasource
                     .map(c -> "y." + c)
                     .collect(joining(","));
         };
+        // Dialect-specific TOP at the beginning of SELECT (e.g. SQL Server TOP(n)). Computed once and
+        // reused below to decide whether the trailing (LIMIT/FETCH FIRST) form should be used instead.
+        String selectTopN = topCount >= 0 ? dialect.selectTopN(topCount)
+                : "";
+
         StringBuilder sb = new StringBuilder("SELECT ");
+        if (!selectTopN.isEmpty())
+        {
+            sb.append(selectTopN);
+        }
         sb.append(projectionString);
         sb.append(" FROM ");
         sb.append(table.toString())
@@ -266,6 +278,13 @@ class JdbcDatasource implements IDatasource
             }
         }
 
+        // Dialect-specific trailing TOP/LIMIT (e.g. LIMIT n for MySQL/PostgreSQL, FETCH FIRST n ROWS ONLY for ANSI)
+        if (topCount >= 0
+                && selectTopN.isEmpty())
+        {
+            dialect.appendTopN(sb, topCount);
+        }
+
         return sb.toString();
     }
 
@@ -321,6 +340,7 @@ class JdbcDatasource implements IDatasource
             private SchemaResult schemaResult;
             private List<MutableValueVector> vectors;
             private boolean resultSetEnded = false;
+            private boolean exhausted = false;
             private volatile boolean abort = false;
 
             {
@@ -416,6 +436,7 @@ class JdbcDatasource implements IDatasource
                             // No more result, we're done
                             if (rs == null)
                             {
+                                exhausted = true;
                                 return false;
                             }
 
@@ -456,6 +477,12 @@ class JdbcDatasource implements IDatasource
                         .getPrintWriter());
                 JdbcUtils.printWarnings(connection, context.getSession()
                         .getPrintWriter());
+                if (!exhausted)
+                {
+                    // The result set was not fully consumed (e.g. a TOP/LIMIT operator stopped pulling early).
+                    // Cancel the in-progress query so the server stops executing and data transfer halts.
+                    JdbcUtils.cancelQuiet(statement);
+                }
                 JdbcUtils.closeQuiet(connection, statement, rs);
                 schemaResult = null;
                 vectors = null;
@@ -479,6 +506,17 @@ class JdbcDatasource implements IDatasource
                     JdbcUtils.printWarnings(connection, context.getSession()
                             .getPrintWriter());
 
+                    // Some drivers (notably PostgreSQL) silently ignore Statement.setFetchSize() while the
+                    // connection is in auto-commit mode and materialize the whole result set regardless.
+                    // Only disable auto-commit for dialects that actually need it: doing it unconditionally
+                    // left an explicit transaction open for the scan's lifetime, which made SQL Server block
+                    // indefinitely on locks it would not otherwise take. The pool (Hikari) resets auto-commit
+                    // back to its default when the connection is returned.
+                    if (dialect.requiresAutoCommitOffForFetchSize())
+                    {
+                        connection.setAutoCommit(false);
+                    }
+
                     if (dialect.usesSchemaAsDatabase())
                     {
                         connection.setSchema(database);
@@ -501,6 +539,10 @@ class JdbcDatasource implements IDatasource
                     {
                         statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
                     }
+
+                    // Enable streaming so drivers that support it (SQL Server adaptive, MySQL useCursorFetch, etc.) fetch
+                    // rows on demand. Combined with close() → cancel() this stops data transfer as soon as caller is done.
+                    statement.setFetchSize(batchSize);
 
                     JdbcUtils.printWarnings(statement, context.getSession()
                             .getPrintWriter());

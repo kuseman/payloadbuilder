@@ -31,6 +31,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
+import se.kuseman.payloadbuilder.api.expression.ILiteralIntegerExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
@@ -264,6 +265,11 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                         .getDefaultCatalogAlias());
 
         DatasourceData data = new DatasourceData(nodeId, predicatePairs, sortItems, plan.getProjection(), plan.getOptions());
+        if (tableSourcePushDown != null
+                && tableSourcePushDown.topCount >= 0)
+        {
+            data.withTopCount(tableSourcePushDown.topCount);
+        }
 
         if (context.seekPredicate != null)
         {
@@ -584,6 +590,20 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     @Override
     public IPhysicalPlan visit(Limit plan, Context context)
     {
+        // Push a constant TOP count down to a single-table datasource. Only safe when nothing between
+        // the Limit and the table scan can change which/how many rows end up in the result (see
+        // blocksTopPushDown for details), otherwise the SQL-level limit could cut rows before
+        // grouping/filtering/sorting has had a chance to run on the full data set.
+        if (!blocksTopPushDown(plan.getInput())
+                && plan.getLimitExpression() instanceof ILiteralIntegerExpression litInt)
+        {
+            TableSourceReference singleSource = collectSingleTableSource(plan.getInput());
+            if (singleSource != null)
+            {
+                context.tableSourcePushDown.computeIfAbsent(singleSource, k -> new StatementPlanner.TableSourcePushDown()).topCount = litInt.getValue();
+            }
+        }
+
         IPhysicalPlan input = plan.getInput()
                 .accept(this, context);
         return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Limit(context.getNextNodeId(), input, plan.getLimitExpression()));
@@ -690,6 +710,48 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             return new AnalyzeInterceptor(context.getNextNodeId(), plan);
         }
         return plan;
+    }
+
+    /**
+     * Returns true if the logical plan contains a Join, Aggregate, Filter or Sort node at any depth. Any of these can affect which/how many rows end up in the final result (grouping, a predicate the
+     * catalog didn't fully consume, an ordering the catalog didn't fully consume), so a SQL-level TOP/LIMIT must not be pushed past them down to the raw table scan.
+     */
+    private boolean blocksTopPushDown(ILogicalPlan plan)
+    {
+        if (plan instanceof Join
+                || plan instanceof Aggregate
+                || plan instanceof Filter
+                || plan instanceof Sort)
+        {
+            return true;
+        }
+        return plan.getChildren()
+                .stream()
+                .anyMatch(this::blocksTopPushDown);
+    }
+
+    /** Returns the single TableSourceReference in the logical plan, or null if zero or more than one. */
+    private TableSourceReference collectSingleTableSource(ILogicalPlan plan)
+    {
+        Set<TableSourceReference> found = new HashSet<>();
+        collectTableSources(plan, found);
+        return found.size() == 1 ? found.iterator()
+                .next()
+                : null;
+    }
+
+    private void collectTableSources(ILogicalPlan plan, Set<TableSourceReference> result)
+    {
+        if (plan instanceof TableScan scan)
+        {
+            result.add(scan.getTableSource());
+        }
+        else if (plan instanceof TableFunctionScan scan)
+        {
+            result.add(scan.getTableSource());
+        }
+        plan.getChildren()
+                .forEach(child -> collectTableSources(child, result));
     }
 
     /** Visitor that collects table source references */
