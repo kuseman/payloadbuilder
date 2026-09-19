@@ -112,6 +112,16 @@ public interface SqlDialect
         return false;
     }
 
+    /**
+     * Returns true if this dialect's driver requires the connection to be in non-auto-commit mode for {@link java.sql.Statement#setFetchSize(int)} to actually take effect (e.g. PostgreSQL, which
+     * otherwise materializes the whole result set regardless of the fetch size). Only enable this for dialects that actually need it: turning auto-commit off leaves an explicit transaction open for
+     * the lifetime of a scan, which can cause other dialects (e.g. SQL Server, observed to lock up indefinitely) to block on locks that would not be held under auto-commit.
+     */
+    default boolean requiresAutoCommitOffForFetchSize()
+    {
+        return false;
+    }
+
     /** Returns the identifier quote string for this dialect. */
     default String getIdentifierQuoteString(Connection connection) throws SQLException
     {
@@ -323,8 +333,32 @@ public interface SqlDialect
     }
 
     /**
+     * Returns the TOP-N fragment inserted right after "SELECT " in the SELECT clause (SQL Server style). Return empty string if this dialect uses a trailing clause instead.
+     * <p>
+     * Example for SQL Server: {@code "TOP(500) "}
+     * </p>
+     */
+    default String selectTopN(int n)
+    {
+        return "";
+    }
+
+    /**
+     * Appends a trailing row-limiting clause to the query (MySQL/PostgreSQL/ANSI style). Only called when {@link #selectTopN(int)} returns an empty string.
+     * <p>
+     * Default: ANSI SQL {@code FETCH FIRST n ROWS ONLY}.
+     * </p>
+     */
+    default void appendTopN(StringBuilder sb, int n)
+    {
+        sb.append(" FETCH FIRST ")
+                .append(n)
+                .append(" ROWS ONLY");
+    }
+
+    /**
      * Appends join statement for provided seek keys.
-     * 
+     *
      * <pre>
      * This is the SQL that we need
      *
@@ -333,7 +367,7 @@ public interface SqlDialect
      *         SELECT 1 col1, 2 col2
      *   UNION SELECT 2,      4
      *   UNION SELECT 3,      6
-     * 
+     *
      * ) xx
      *   ON xx.col1 = y.col1
      *   AND xx.col2 = y.col2

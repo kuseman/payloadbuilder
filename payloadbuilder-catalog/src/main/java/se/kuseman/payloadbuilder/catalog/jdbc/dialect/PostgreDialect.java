@@ -12,6 +12,19 @@ class PostgreDialect implements SqlDialect
     private static final String TIMESTAMPTZ = "TIMESTAMPTZ";
 
     @Override
+    public void appendTopN(StringBuilder sb, int n)
+    {
+        sb.append(" LIMIT ")
+                .append(n);
+    }
+
+    @Override
+    public boolean requiresAutoCommitOffForFetchSize()
+    {
+        return true;
+    }
+
+    @Override
     public String getIdentifierQuoteString(Connection connection) throws SQLException
     {
         // No quotes for Postgres since then all identifiers needs to be quoted

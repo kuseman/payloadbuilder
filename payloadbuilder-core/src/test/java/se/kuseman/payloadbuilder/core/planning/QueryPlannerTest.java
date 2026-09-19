@@ -1185,6 +1185,90 @@ class QueryPlannerTest extends APhysicalPlanTest
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
+        assertEquals(List.of(100), t.topCounts);
+    }
+
+    /**
+     * Regression test: TOP must not be pushed down when a GROUP BY sits between the Limit and the table scan, otherwise the SQL-level limit would cut rows before aggregation instead of after it.
+     */
+    @Test
+    void test_top_not_pushed_down_with_group_by()
+    {
+        //@formatter:off
+        String query = ""
+                + "select top 100 a.col, count(1) "
+                + "from tableA a "
+                + "group by a.col ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        StatementPlanner.plan(session, queryStatement);
+
+        assertEquals(List.of(-1), t.topCounts);
+    }
+
+    /** Regression test: TOP must not be pushed down when the catalog may not fully consume the WHERE predicate, otherwise a leftover in-memory filter would run on an already-limited row set. */
+    @Test
+    void test_top_not_pushed_down_with_where()
+    {
+        //@formatter:off
+        String query = ""
+                + "select top 100 * "
+                + "from tableA a "
+                + "where a.col = 1 ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        StatementPlanner.plan(session, queryStatement);
+
+        assertEquals(List.of(-1), t.topCounts);
+    }
+
+    /** Regression test: TOP must not be pushed down when the catalog may not fully consume the ORDER BY, otherwise the limited rows would be sorted rather than the sort applied before limiting. */
+    @Test
+    void test_top_not_pushed_down_with_order_by()
+    {
+        //@formatter:off
+        String query = ""
+                + "select top 100 * "
+                + "from tableA a "
+                + "order by a.col ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        StatementPlanner.plan(session, queryStatement);
+
+        assertEquals(List.of(-1), t.topCounts);
+    }
+
+    /** Regression test: TOP must not be pushed down to either side of a join since the join can change how many rows from a single table source end up in the result. */
+    @Test
+    void test_top_not_pushed_down_with_join()
+    {
+        //@formatter:off
+        String query = ""
+                + "select top 100 * "
+                + "from tableA a "
+                + "inner join tableB b "
+                + "  on b.id = a.id ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        StatementPlanner.plan(session, queryStatement);
+
+        assertEquals(List.of(-1, -1), t.topCounts);
     }
 
     @Test
@@ -3147,6 +3231,8 @@ class QueryPlannerTest extends APhysicalPlanTest
         final Map<QualifiedName, List<Triple<QualifiedName, IPredicate.Type, List<IExpression>>>> consumedPredicate = new HashMap<>();
         final List<IDatasource> scanDataSources = new ArrayList<>();
         final List<IDatasource> seekDataSources = new ArrayList<>();
+        /** The topCount seen by each getScanDataSource/getSeekDataSource call, in call order. -1 means no TOP was pushed down. */
+        final List<Integer> topCounts = new ArrayList<>();
 
         public TestCatalog(Map<QualifiedName, Set<String>> predicateColumnsToConsume)
         {
@@ -3169,6 +3255,7 @@ class QueryPlannerTest extends APhysicalPlanTest
 
         private IDatasource getDataSource(IQuerySession session, QualifiedName table, DatasourceData data, ISeekPredicate seekPredicate)
         {
+            topCounts.add(data.getTopCount());
             Set<String> predicateColumnsToConsume = this.predicateColumnsToConsume.getOrDefault(table, emptySet());
 
             Iterator<IPredicate> it = data.getPredicates()
