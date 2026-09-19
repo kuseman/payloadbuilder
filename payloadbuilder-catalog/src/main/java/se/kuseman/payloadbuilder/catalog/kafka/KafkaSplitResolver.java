@@ -59,25 +59,40 @@ class KafkaSplitResolver
                 .map(pi -> new TopicPartition(topic, pi.partition()))
                 .toList();
 
-        // Apply partition filter from predicate analysis
+        // Apply partition filter from predicate analysis. Every predicate is ANDed together so the target set is
+        // the INTERSECTION of each predicate's allowed values, not their union - "partition = 1 AND partition = 2"
+        // must resolve to no partitions at all, not {1, 2}.
         if (predicateAnalysis != null
                 && predicateAnalysis.partitionFilter != null
                 && context != null)
         {
-            Set<Integer> targetPartitions = new HashSet<>();
-            for (IExpression expr : predicateAnalysis.partitionFilter)
+            Set<Integer> targetPartitions = null;
+            for (List<IExpression> group : predicateAnalysis.partitionFilter)
             {
-                ValueVector val = expr.eval(context);
-                if (val != null
-                        && !val.isNull(0))
+                Set<Integer> groupValues = new HashSet<>();
+                for (IExpression expr : group)
                 {
-                    targetPartitions.add(val.getInt(0));
+                    ValueVector val = expr.eval(context);
+                    if (val != null
+                            && !val.isNull(0))
+                    {
+                        groupValues.add(val.getInt(0));
+                    }
+                }
+                if (targetPartitions == null)
+                {
+                    targetPartitions = groupValues;
+                }
+                else
+                {
+                    targetPartitions.retainAll(groupValues);
                 }
             }
-            if (!targetPartitions.isEmpty())
+            if (targetPartitions != null)
             {
+                Set<Integer> finalTargetPartitions = targetPartitions;
                 topicPartitions = topicPartitions.stream()
-                        .filter(tp -> targetPartitions.contains(tp.partition()))
+                        .filter(tp -> finalTargetPartitions.contains(tp.partition()))
                         .toList();
                 if (topicPartitions.isEmpty())
                 {
@@ -140,65 +155,99 @@ class KafkaSplitResolver
     private static void applyOffsetPredicates(KafkaConsumer<byte[], byte[]> consumer, Map<TopicPartition, Long> startOffsets, Map<TopicPartition, Long> endOffsets,
             List<TopicPartition> topicPartitions, KafkaPredicateAnalysis analysis, IExecutionContext context)
     {
-        // Offset lower bound: offset >= N (inclusive) or offset > N (exclusive, +1)
+        // Offset lower bounds: offset >= N (inclusive) or offset > N (exclusive, +1). Every bound is ANDed
+        // together so the strongest (highest) one wins.
         if (analysis.offsetLower != null)
         {
-            long value = evalLong(analysis.offsetLower.expression(), context);
-            long startOffset = analysis.offsetLower.inclusive() ? value
-                    : value + 1;
-            for (TopicPartition tp : topicPartitions)
+            for (KafkaPredicateAnalysis.Bound bound : analysis.offsetLower)
             {
-                startOffsets.merge(tp, startOffset, Math::max);
-            }
-        }
-
-        // Offset upper bound: offset < N (exclusive) or offset <= N (inclusive, +1)
-        if (analysis.offsetUpper != null)
-        {
-            long value = evalLong(analysis.offsetUpper.expression(), context);
-            long endOffset = analysis.offsetUpper.inclusive() ? value + 1
-                    : value;
-            for (TopicPartition tp : topicPartitions)
-            {
-                endOffsets.merge(tp, endOffset, Math::min);
-            }
-        }
-
-        // Timestamp lower bound: use offsetsForTimes to find start offset
-        // offsetsForTimes returns the earliest offset with timestamp >= given timestamp
-        // For >= T: use offsetsForTimes(T)
-        // For > T: use offsetsForTimes(T + 1)
-        if (analysis.timestampLower != null)
-        {
-            long value = evalLong(analysis.timestampLower.expression(), context);
-            long searchTs = analysis.timestampLower.inclusive() ? value
-                    : value + 1;
-            Map<TopicPartition, Long> tsOffsets = resolveTimestampOffsets(consumer, topicPartitions, searchTs);
-            for (TopicPartition tp : topicPartitions)
-            {
-                Long tsOffset = tsOffsets.get(tp);
-                if (tsOffset != null)
+                long value = evalLong(bound.expression(), context);
+                long startOffset = bound.inclusive() ? value
+                        : value + 1;
+                for (TopicPartition tp : topicPartitions)
                 {
-                    startOffsets.merge(tp, tsOffset, Math::max);
+                    startOffsets.merge(tp, startOffset, Math::max);
                 }
             }
         }
 
-        // Timestamp upper bound: use offsetsForTimes to find end offset
+        // Offset upper bounds: offset < N (exclusive) or offset <= N (inclusive, +1). Every bound is ANDed
+        // together so the strongest (lowest) one wins.
+        if (analysis.offsetUpper != null)
+        {
+            for (KafkaPredicateAnalysis.Bound bound : analysis.offsetUpper)
+            {
+                long value = evalLong(bound.expression(), context);
+                long endOffset = bound.inclusive() ? value + 1
+                        : value;
+                for (TopicPartition tp : topicPartitions)
+                {
+                    endOffsets.merge(tp, endOffset, Math::min);
+                }
+            }
+        }
+
+        // Timestamp lower bounds: use offsetsForTimes to find start offset.
+        // offsetsForTimes returns the earliest offset with timestamp >= given timestamp
+        // For >= T: use offsetsForTimes(T)
+        // For > T: use offsetsForTimes(T + 1)
+        // Every bound is ANDed together so the strongest (highest resulting start offset) one wins.
+        if (analysis.timestampLower != null)
+        {
+            Map<TopicPartition, Long> actualEndOffsets = null;
+            for (KafkaPredicateAnalysis.Bound bound : analysis.timestampLower)
+            {
+                long value = evalLong(bound.expression(), context);
+                long searchTs = bound.inclusive() ? value
+                        : value + 1;
+                Map<TopicPartition, Long> tsOffsets = resolveTimestampOffsets(consumer, topicPartitions, searchTs);
+                for (TopicPartition tp : topicPartitions)
+                {
+                    Long tsOffset = tsOffsets.get(tp);
+                    if (tsOffset != null)
+                    {
+                        startOffsets.merge(tp, tsOffset, Math::max);
+                    }
+                    else
+                    {
+                        // No record in this partition has a timestamp at or after the searched value, so the
+                        // partition has nothing to contribute - force it empty by pushing the start to (at
+                        // least) its real end offset rather than leaving the previous, wider start in place.
+                        if (actualEndOffsets == null)
+                        {
+                            actualEndOffsets = consumer.endOffsets(topicPartitions);
+                        }
+                        Long actualEnd = actualEndOffsets.get(tp);
+                        if (actualEnd != null)
+                        {
+                            startOffsets.merge(tp, actualEnd, Math::max);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Timestamp upper bounds: use offsetsForTimes to find end offset.
         // For < T: use offsetsForTimes(T) as end (exclusive)
         // For <= T: use offsetsForTimes(T + 1) as end (exclusive)
+        // Every bound is ANDed together so the strongest (lowest resulting end offset) one wins. When
+        // offsetsForTimes finds no matching record, every record in the partition qualifies, so the end is left
+        // unchanged.
         if (analysis.timestampUpper != null)
         {
-            long value = evalLong(analysis.timestampUpper.expression(), context);
-            long searchTs = analysis.timestampUpper.inclusive() ? value + 1
-                    : value;
-            Map<TopicPartition, Long> tsOffsets = resolveTimestampOffsets(consumer, topicPartitions, searchTs);
-            for (TopicPartition tp : topicPartitions)
+            for (KafkaPredicateAnalysis.Bound bound : analysis.timestampUpper)
             {
-                Long tsOffset = tsOffsets.get(tp);
-                if (tsOffset != null)
+                long value = evalLong(bound.expression(), context);
+                long searchTs = bound.inclusive() ? value + 1
+                        : value;
+                Map<TopicPartition, Long> tsOffsets = resolveTimestampOffsets(consumer, topicPartitions, searchTs);
+                for (TopicPartition tp : topicPartitions)
                 {
-                    endOffsets.merge(tp, tsOffset, Math::min);
+                    Long tsOffset = tsOffsets.get(tp);
+                    if (tsOffset != null)
+                    {
+                        endOffsets.merge(tp, tsOffset, Math::min);
+                    }
                 }
             }
         }

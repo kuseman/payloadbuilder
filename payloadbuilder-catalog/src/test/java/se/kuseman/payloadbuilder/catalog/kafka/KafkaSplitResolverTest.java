@@ -169,7 +169,56 @@ class KafkaSplitResolverTest
         KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
 
         KafkaPredicateAnalysis analysis = new KafkaPredicateAnalysis();
-        analysis.partitionFilter = java.util.List.of(se.kuseman.payloadbuilder.test.IPredicateMock.expression(1));
+        analysis.partitionFilter = java.util.List.of(java.util.List.of(se.kuseman.payloadbuilder.test.IPredicateMock.expression(1)));
+
+        se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
+
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context, false);
+
+        assertEquals(1, splits.size());
+        assertEquals(1, splits.get(0)
+                .partition());
+    }
+
+    @Test
+    void test_partition_filter_intersects_conflicting_equalities_to_no_partitions()
+    {
+        KafkaConsumer<byte[], byte[]> consumer = mock(KafkaConsumer.class);
+
+        when(consumer.partitionsFor(any(), any(Duration.class)))
+                .thenReturn(List.of(new PartitionInfo("orders", 0, null, null, null), new PartitionInfo("orders", 1, null, null, null), new PartitionInfo("orders", 2, null, null, null)));
+
+        KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
+
+        KafkaPredicateAnalysis analysis = new KafkaPredicateAnalysis();
+        // partition = 1 AND partition = 2 -> conjunction, must resolve to NO partitions, not {1, 2}
+        analysis.partitionFilter = java.util.List.of(java.util.List.of(se.kuseman.payloadbuilder.test.IPredicateMock.expression(1)),
+                java.util.List.of(se.kuseman.payloadbuilder.test.IPredicateMock.expression(2)));
+
+        se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
+
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context, false);
+
+        assertTrue(splits.isEmpty(), "Conflicting equalities on the same column must intersect to nothing");
+    }
+
+    @Test
+    void test_partition_filter_intersects_in_with_equals()
+    {
+        KafkaConsumer<byte[], byte[]> consumer = mock(KafkaConsumer.class);
+        TopicPartition tp1 = new TopicPartition("orders", 1);
+
+        when(consumer.partitionsFor(any(), any(Duration.class)))
+                .thenReturn(List.of(new PartitionInfo("orders", 0, null, null, null), new PartitionInfo("orders", 1, null, null, null), new PartitionInfo("orders", 2, null, null, null)));
+        when(consumer.beginningOffsets(anyCollection())).thenReturn(Map.of(tp1, 0L));
+        when(consumer.endOffsets(anyCollection())).thenReturn(Map.of(tp1, 100L));
+
+        KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
+
+        KafkaPredicateAnalysis analysis = new KafkaPredicateAnalysis();
+        // partition IN (0, 1) AND partition = 1 -> intersection is just {1}
+        analysis.partitionFilter = java.util.List.of(java.util.List.of(se.kuseman.payloadbuilder.test.IPredicateMock.expression(0), se.kuseman.payloadbuilder.test.IPredicateMock.expression(1)),
+                java.util.List.of(se.kuseman.payloadbuilder.test.IPredicateMock.expression(1)));
 
         se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
 
@@ -194,7 +243,7 @@ class KafkaSplitResolverTest
         KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
 
         KafkaPredicateAnalysis analysis = new KafkaPredicateAnalysis();
-        analysis.offsetLower = new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(500L), true);
+        analysis.offsetLower = java.util.List.of(new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(500L), true));
 
         se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
 
@@ -205,6 +254,33 @@ class KafkaSplitResolverTest
                 .startOffset());
         assertEquals(1000, splits.get(0)
                 .endOffset());
+    }
+
+    @Test
+    void test_offset_multiple_lower_bounds_keeps_strongest()
+    {
+        KafkaConsumer<byte[], byte[]> consumer = mock(KafkaConsumer.class);
+        TopicPartition tp0 = new TopicPartition("orders", 0);
+
+        when(consumer.partitionsFor(any(), any(Duration.class))).thenReturn(List.of(new PartitionInfo("orders", 0, null, null, null)));
+
+        when(consumer.beginningOffsets(anyCollection())).thenReturn(Map.of(tp0, 0L));
+        when(consumer.endOffsets(anyCollection())).thenReturn(Map.of(tp0, 1000L));
+
+        KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
+
+        KafkaPredicateAnalysis analysis = new KafkaPredicateAnalysis();
+        // offset >= 500 AND offset >= 100 -> conjunction must keep the strongest (500), regardless of order
+        analysis.offsetLower = java.util.List.of(new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(500L), true),
+                new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(100L), true));
+
+        se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
+
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context, false);
+
+        assertEquals(1, splits.size());
+        assertEquals(500, splits.get(0)
+                .startOffset());
     }
 
     @Test
@@ -221,7 +297,7 @@ class KafkaSplitResolverTest
         KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
 
         KafkaPredicateAnalysis analysis = new KafkaPredicateAnalysis();
-        analysis.offsetUpper = new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(200L), false);
+        analysis.offsetUpper = java.util.List.of(new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(200L), false));
 
         se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
 
@@ -248,9 +324,9 @@ class KafkaSplitResolverTest
         KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
 
         KafkaPredicateAnalysis analysis = new KafkaPredicateAnalysis();
-        analysis.partitionFilter = java.util.List.of(se.kuseman.payloadbuilder.test.IPredicateMock.expression(0));
-        analysis.offsetLower = new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(100L), true);
-        analysis.offsetUpper = new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(300L), false);
+        analysis.partitionFilter = java.util.List.of(java.util.List.of(se.kuseman.payloadbuilder.test.IPredicateMock.expression(0)));
+        analysis.offsetLower = java.util.List.of(new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(100L), true));
+        analysis.offsetUpper = java.util.List.of(new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(300L), false));
 
         se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
 
@@ -279,14 +355,40 @@ class KafkaSplitResolverTest
         KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
 
         KafkaPredicateAnalysis analysis = new KafkaPredicateAnalysis();
-        analysis.offsetLower = new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(500L), true);
-        analysis.offsetUpper = new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(100L), false);
+        analysis.offsetLower = java.util.List.of(new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(500L), true));
+        analysis.offsetUpper = java.util.List.of(new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(100L), false));
 
         se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
 
         List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context, false);
 
         assertTrue(splits.isEmpty(), "Impossible offset range should produce no splits");
+    }
+
+    @Test
+    void test_timestamp_lower_bound_with_no_matching_record_empties_partition()
+    {
+        KafkaConsumer<byte[], byte[]> consumer = mock(KafkaConsumer.class);
+        TopicPartition tp0 = new TopicPartition("orders", 0);
+
+        when(consumer.partitionsFor(any(), any(Duration.class))).thenReturn(List.of(new PartitionInfo("orders", 0, null, null, null)));
+        when(consumer.beginningOffsets(anyCollection())).thenReturn(Map.of(tp0, 0L));
+        when(consumer.endOffsets(anyCollection())).thenReturn(Map.of(tp0, 1000L));
+        // offsetsForTimes returning no entry means no record in the partition has a timestamp at or after the
+        // searched value - the whole partition must become empty rather than being scanned from its old start.
+        when(consumer.offsetsForTimes(any(Map.class))).thenReturn(Map.of());
+
+        KafkaOptions options = new KafkaOptions("earliest", "latest", ExecutionMode.BATCH, Format.JSON, OnError.FAIL, 1000, 500, SortOrder.OLDEST, 500);
+
+        KafkaPredicateAnalysis analysis = new KafkaPredicateAnalysis();
+        analysis.timestampLower = java.util.List
+                .of(new se.kuseman.payloadbuilder.catalog.kafka.KafkaPredicateAnalysis.Bound(se.kuseman.payloadbuilder.test.IPredicateMock.expression(1704067200000L), true));
+
+        se.kuseman.payloadbuilder.api.execution.IExecutionContext context = se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext("kafka", Map.of(), 0, null);
+
+        List<KafkaSplit> splits = KafkaSplitResolver.resolve(consumer, "orders", options, analysis, context, false);
+
+        assertTrue(splits.isEmpty(), "No record at/after the timestamp means the partition contributes nothing");
     }
 
     @Test

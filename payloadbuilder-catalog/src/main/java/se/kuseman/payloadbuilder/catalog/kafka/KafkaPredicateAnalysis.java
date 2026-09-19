@@ -21,16 +21,19 @@ class KafkaPredicateAnalysis
     {
     }
 
-    // Partition filtering
-    List<IExpression> partitionFilter;
+    // Partition filtering. Every predicate is ANDed together, so this holds one entry per predicate (an EQUAL
+    // predicate contributes a single-value entry, an IN predicate contributes its full argument list) and the
+    // final set of target partitions is the INTERSECTION of these entries, not their union.
+    List<List<IExpression>> partitionFilter;
 
-    // Offset range [lower, upper)
-    Bound offsetLower;
-    Bound offsetUpper;
+    // Offset range. Every predicate is ANDed together, so all lower bounds must hold simultaneously (the
+    // strongest/highest wins) and likewise all upper bounds (the strongest/lowest wins).
+    List<Bound> offsetLower;
+    List<Bound> offsetUpper;
 
-    // Timestamp range [lower, upper)
-    Bound timestampLower;
-    Bound timestampUpper;
+    // Timestamp range, combined the same way as the offset range above.
+    List<Bound> timestampLower;
+    List<Bound> timestampUpper;
 
     /** Analyze predicates, extracting pushdown-able ones and removing them from the list */
     static KafkaPredicateAnalysis analyze(List<IPredicate> predicates)
@@ -81,29 +84,28 @@ class KafkaPredicateAnalysis
 
     private static boolean extractPartition(IPredicate predicate, KafkaPredicateAnalysis analysis)
     {
+        List<IExpression> values;
         if (predicate.getType() == IPredicate.Type.COMPARISION
                 && predicate.getComparisonType() == IComparisonExpression.Type.EQUAL)
         {
-            if (analysis.partitionFilter == null)
-            {
-                analysis.partitionFilter = new ArrayList<>();
-            }
-            analysis.partitionFilter.add(predicate.getComparisonExpression());
-            return true;
+            values = List.of(predicate.getComparisonExpression());
         }
-
-        if (predicate.getType() == IPredicate.Type.IN)
+        else if (predicate.getType() == IPredicate.Type.IN)
         {
-            if (analysis.partitionFilter == null)
-            {
-                analysis.partitionFilter = new ArrayList<>();
-            }
-            analysis.partitionFilter.addAll(predicate.getInExpression()
-                    .getArguments());
-            return true;
+            values = predicate.getInExpression()
+                    .getArguments();
+        }
+        else
+        {
+            return false;
         }
 
-        return false;
+        if (analysis.partitionFilter == null)
+        {
+            analysis.partitionFilter = new ArrayList<>();
+        }
+        analysis.partitionFilter.add(values);
+        return true;
     }
 
     private static boolean extractRange(IPredicate predicate, KafkaPredicateAnalysis analysis, boolean isOffset)
@@ -122,24 +124,24 @@ class KafkaPredicateAnalysis
         {
             case EQUAL:
                 // offset = N -> lower inclusive N, upper inclusive N
-                setLower(analysis, isOffset, new Bound(expr, true));
-                setUpper(analysis, isOffset, new Bound(expr, true));
+                addLower(analysis, isOffset, new Bound(expr, true));
+                addUpper(analysis, isOffset, new Bound(expr, true));
                 return true;
 
             case GREATER_THAN:
-                setLower(analysis, isOffset, new Bound(expr, false));
+                addLower(analysis, isOffset, new Bound(expr, false));
                 return true;
 
             case GREATER_THAN_EQUAL:
-                setLower(analysis, isOffset, new Bound(expr, true));
+                addLower(analysis, isOffset, new Bound(expr, true));
                 return true;
 
             case LESS_THAN:
-                setUpper(analysis, isOffset, new Bound(expr, false));
+                addUpper(analysis, isOffset, new Bound(expr, false));
                 return true;
 
             case LESS_THAN_EQUAL:
-                setUpper(analysis, isOffset, new Bound(expr, true));
+                addUpper(analysis, isOffset, new Bound(expr, true));
                 return true;
 
             default:
@@ -147,27 +149,43 @@ class KafkaPredicateAnalysis
         }
     }
 
-    private static void setLower(KafkaPredicateAnalysis analysis, boolean isOffset, Bound bound)
+    private static void addLower(KafkaPredicateAnalysis analysis, boolean isOffset, Bound bound)
     {
         if (isOffset)
         {
-            analysis.offsetLower = bound;
+            if (analysis.offsetLower == null)
+            {
+                analysis.offsetLower = new ArrayList<>();
+            }
+            analysis.offsetLower.add(bound);
         }
         else
         {
-            analysis.timestampLower = bound;
+            if (analysis.timestampLower == null)
+            {
+                analysis.timestampLower = new ArrayList<>();
+            }
+            analysis.timestampLower.add(bound);
         }
     }
 
-    private static void setUpper(KafkaPredicateAnalysis analysis, boolean isOffset, Bound bound)
+    private static void addUpper(KafkaPredicateAnalysis analysis, boolean isOffset, Bound bound)
     {
         if (isOffset)
         {
-            analysis.offsetUpper = bound;
+            if (analysis.offsetUpper == null)
+            {
+                analysis.offsetUpper = new ArrayList<>();
+            }
+            analysis.offsetUpper.add(bound);
         }
         else
         {
-            analysis.timestampUpper = bound;
+            if (analysis.timestampUpper == null)
+            {
+                analysis.timestampUpper = new ArrayList<>();
+            }
+            analysis.timestampUpper.add(bound);
         }
     }
 }

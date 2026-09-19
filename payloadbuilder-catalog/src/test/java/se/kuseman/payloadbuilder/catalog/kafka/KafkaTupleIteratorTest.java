@@ -62,7 +62,7 @@ class KafkaTupleIteratorTest
         when(consumer.position(eq(tp0))).thenReturn(1L, 2L, 3L, 4L);
 
         IExecutionContext context = TestUtils.mockExecutionContext("kafka", Map.of(), 0, new KafkaNodeData());
-        KafkaTupleIterator it = new KafkaTupleIterator(consumer, List.of(split), mock(IRecordDeserializer.class), new KafkaNodeData(), 10, false, OnError.FAIL, SortOrder.OLDEST, context, () ->
+        KafkaTupleIterator it = new KafkaTupleIterator(consumer, List.of(split), mock(IRecordDeserializer.class), new KafkaNodeData(), 10, false, OnError.FAIL, SortOrder.OLDEST, null, context, () ->
         {
         }, 1);
 
@@ -86,7 +86,7 @@ class KafkaTupleIteratorTest
         when(consumer.position(eq(tp0))).thenReturn(0L);
 
         IExecutionContext context = TestUtils.mockExecutionContext("kafka", Map.of(), 0, new KafkaNodeData());
-        KafkaTupleIterator it = new KafkaTupleIterator(consumer, List.of(split), mock(IRecordDeserializer.class), new KafkaNodeData(), 10, false, OnError.FAIL, SortOrder.OLDEST, context, () ->
+        KafkaTupleIterator it = new KafkaTupleIterator(consumer, List.of(split), mock(IRecordDeserializer.class), new KafkaNodeData(), 10, false, OnError.FAIL, SortOrder.OLDEST, null, context, () ->
         {
         }, 1);
 
@@ -113,9 +113,10 @@ class KafkaTupleIteratorTest
         when(consumer.poll(any(Duration.class))).thenReturn(records, ConsumerRecords.<byte[], byte[]>empty());
 
         IExecutionContext context = TestUtils.mockExecutionContext("kafka", Map.of(), 0, new KafkaNodeData());
-        KafkaTupleIterator it = new KafkaTupleIterator(consumer, List.of(split0, split1), mock(IRecordDeserializer.class), new KafkaNodeData(), 3, false, OnError.FAIL, SortOrder.OLDEST, context, () ->
-        {
-        }, 1);
+        KafkaTupleIterator it = new KafkaTupleIterator(consumer, List.of(split0, split1), mock(IRecordDeserializer.class), new KafkaNodeData(), 3, false, OnError.FAIL, SortOrder.OLDEST, null, context,
+                () ->
+                {
+                }, 1);
 
         assertTrue(it.hasNext());
         int total = it.next()
@@ -125,6 +126,39 @@ class KafkaTupleIteratorTest
                 .getRowCount();
 
         assertEquals(4, total, "No record from the shared poll() response should be lost across the batch boundary");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void test_on_error_skip_drops_rows_with_malformed_values()
+    {
+        KafkaConsumer<byte[], byte[]> consumer = mock(KafkaConsumer.class);
+        TopicPartition tp0 = new TopicPartition("orders", 0);
+        KafkaSplit split = new KafkaSplit("orders", 0, 0, 3);
+
+        byte[] good = "good".getBytes();
+        byte[] bad = "bad".getBytes();
+
+        ConsumerRecords<byte[], byte[]> records = new ConsumerRecords<>(Map.of(tp0, List.of(new ConsumerRecord<byte[], byte[]>("orders", 0, 0, (byte[]) null, good),
+                new ConsumerRecord<byte[], byte[]>("orders", 0, 1, (byte[]) null, bad), new ConsumerRecord<byte[], byte[]>("orders", 0, 2, (byte[]) null, good))));
+
+        when(consumer.poll(any(Duration.class))).thenReturn(records);
+
+        IRecordDeserializer deserializer = mock(IRecordDeserializer.class);
+        when(deserializer.deserializeValue(good)).thenReturn("ok");
+        when(deserializer.deserializeValue(bad)).thenThrow(new RuntimeException("malformed"));
+
+        KafkaNodeData nodeData = new KafkaNodeData();
+        IExecutionContext context = TestUtils.mockExecutionContext("kafka", Map.of(), 0, nodeData);
+        KafkaTupleIterator it = new KafkaTupleIterator(consumer, List.of(split), deserializer, nodeData, 10, false, OnError.SKIP, SortOrder.OLDEST, null, context, () ->
+        {
+        }, 1);
+
+        assertTrue(it.hasNext());
+        TupleVector batch = it.next();
+        assertEquals(2, batch.getRowCount(), "The malformed row must be dropped entirely, not just nulled out");
+        assertEquals(1, nodeData.deserializationErrors);
+        assertFalse(it.hasNext());
     }
 
     private static ConsumerRecords<byte[], byte[]> recordsOf(TopicPartition tp, long... offsets)
