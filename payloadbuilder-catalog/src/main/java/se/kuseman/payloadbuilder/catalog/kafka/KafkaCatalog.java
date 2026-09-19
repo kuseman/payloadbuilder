@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.catalog.kafka;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -66,67 +67,59 @@ public class KafkaCatalog extends Catalog
         // so the data source must scan the full requested range instead.
         boolean hasResidualPredicates = !data.getPredicates()
                 .isEmpty();
-        KafkaOptions.SortOrder sortOrder = getSortOrder(data.getSortItems());
+        // The exact ORDER BY consumed (if any), kept separate from the WITH-clause sort_order/tail_count feature
+        // in KafkaOptions - the two are unrelated: a pushed ORDER BY only promises the returned rows will be in
+        // that order, it must not narrow which rows are returned.
+        List<KafkaSortColumn> pushedSort = getPushedSort(data.getSortItems());
 
         return switch (entityType.toLowerCase())
         {
-            case "topic" -> new KafkaDatasource(data.getNodeId(), catalogAlias, entityName, predicateAnalysis, data.getOptions(), sortOrder, hasResidualPredicates);
+            case "topic" -> new KafkaDatasource(data.getNodeId(), catalogAlias, entityName, predicateAnalysis, data.getOptions(), pushedSort, hasResidualPredicates);
             case "metadata" -> new KafkaMetadataDatasource(catalogAlias, entityName);
             case "consumer_group" -> new KafkaConsumerGroupDatasource(catalogAlias, entityName);
             default -> throw new IllegalArgumentException("Unknown Kafka entity type: '" + entityType + "'. Supported: topic, metadata, consumer_group");
         };
     }
 
-    private static KafkaOptions.SortOrder getSortOrder(List<? extends ISortItem> sortItems)
+    /**
+     * Determine whether the requested sort items can be satisfied natively (a sequence of {@code offset}/{@code timestamp} columns, all descending) and, if so, consume them and return the exact
+     * column sequence to sort by. Returns {@code null} (consuming nothing) otherwise - all or none of the sort items are ever consumed.
+     */
+    private static List<KafkaSortColumn> getPushedSort(List<? extends ISortItem> sortItems)
     {
         if (sortItems.isEmpty())
         {
             return null;
         }
 
-        KafkaOptions.SortOrder sortOrder = null;
-        boolean hasTimestampOrOffset = false;
+        List<KafkaSortColumn> columns = new ArrayList<>(sortItems.size());
 
         for (ISortItem sortItem : sortItems)
         {
             QualifiedName column = sortItem.getExpression()
                     .getQualifiedColumn();
-            if (column == null)
+            if (column == null
+                    || sortItem.getOrder() != ISortItem.Order.DESC)
             {
                 return null;
             }
 
-            if (!column.equals(OFFSET)
-                    && !column.equals(TIMESTAMP))
+            if (column.equals(OFFSET))
+            {
+                columns.add(KafkaSortColumn.OFFSET);
+            }
+            else if (column.equals(TIMESTAMP))
+            {
+                columns.add(KafkaSortColumn.TIMESTAMP);
+            }
+            else
             {
                 return null;
             }
-
-            hasTimestampOrOffset = true;
-
-            if (sortItem.getOrder() != ISortItem.Order.DESC)
-            {
-                return null;
-            }
-
-            KafkaOptions.SortOrder itemOrder = KafkaOptions.SortOrder.NEWEST;
-            if (sortOrder == null)
-            {
-                sortOrder = itemOrder;
-            }
-            else if (sortOrder != itemOrder)
-            {
-                return null;
-            }
-        }
-
-        if (!hasTimestampOrOffset)
-        {
-            return null;
         }
 
         sortItems.clear();
-        return sortOrder;
+        return columns;
     }
 
     private static String resolveFromCatalogProperty(IQuerySession session, String catalogAlias, String entityType)

@@ -20,17 +20,17 @@ class KafkaDatasource implements IDatasource
     private final String topic;
     private final KafkaPredicateAnalysis predicateAnalysis;
     private final List<Option> options;
-    private final KafkaOptions.SortOrder sortOrder;
+    private final List<KafkaSortColumn> pushedSort;
     private final boolean hasResidualPredicates;
 
-    KafkaDatasource(int nodeId, String catalogAlias, String topic, KafkaPredicateAnalysis predicateAnalysis, List<Option> options, KafkaOptions.SortOrder sortOrder, boolean hasResidualPredicates)
+    KafkaDatasource(int nodeId, String catalogAlias, String topic, KafkaPredicateAnalysis predicateAnalysis, List<Option> options, List<KafkaSortColumn> pushedSort, boolean hasResidualPredicates)
     {
         this.nodeId = nodeId;
         this.catalogAlias = catalogAlias;
         this.topic = topic;
         this.predicateAnalysis = predicateAnalysis;
         this.options = options;
-        this.sortOrder = sortOrder;
+        this.pushedSort = pushedSort;
         this.hasResidualPredicates = hasResidualPredicates;
     }
 
@@ -42,9 +42,14 @@ class KafkaDatasource implements IDatasource
 
         // Parse WITH options (includes batch_size to avoid IExecutionContext default method issues)
         KafkaOptions kafkaOptions = KafkaOptions.from(context, options);
-        if (sortOrder != null)
+
+        // A pushed-down ORDER BY can only be honored by buffering every matching record up front and sorting it
+        // (see KafkaTupleIterator.fetchNewestBatch), which is impossible against an unbounded stream - fail fast
+        // here rather than silently returning stream-mode data in poll order while claiming the order is satisfied.
+        if (pushedSort != null
+                && kafkaOptions.mode() == KafkaOptions.ExecutionMode.STREAM)
         {
-            kafkaOptions = kafkaOptions.withSortOrder(sortOrder);
+            throw new IllegalArgumentException("ORDER BY on offset/timestamp is not supported in stream mode");
         }
 
         // Create viewer-mode consumer
@@ -81,8 +86,8 @@ class KafkaDatasource implements IDatasource
 
             boolean streaming = kafkaOptions.mode() == KafkaOptions.ExecutionMode.STREAM;
 
-            return new KafkaTupleIterator(consumer, splits, deserializer, nodeData, kafkaOptions.batchSize(), streaming, kafkaOptions.onError(), kafkaOptions.sortOrder(), context, abortListener,
-                    kafkaOptions.pollTimeoutMs());
+            return new KafkaTupleIterator(consumer, splits, deserializer, nodeData, kafkaOptions.batchSize(), streaming, kafkaOptions.onError(), kafkaOptions.sortOrder(), pushedSort, context,
+                    abortListener, kafkaOptions.pollTimeoutMs());
         }
         catch (Exception e)
         {

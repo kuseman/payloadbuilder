@@ -51,22 +51,6 @@ record KafkaOptions(String start, String end, ExecutionMode mode, Format format,
         return new KafkaOptions(start, end, mode, format, onError, pollTimeoutMs, batchSize, sortOrder, tailCount);
     }
 
-    KafkaOptions withSortOrder(SortOrder sortOrder)
-    {
-        if (sortOrder == null)
-        {
-            return this;
-        }
-
-        if (mode == ExecutionMode.STREAM
-                && sortOrder == SortOrder.NEWEST)
-        {
-            throw new IllegalArgumentException("sort_order='newest' is not supported in stream mode");
-        }
-
-        return new KafkaOptions(start, end, mode, format, onError, pollTimeoutMs, batchSize, sortOrder, tailCount);
-    }
-
     private static ValueVector evalOption(IExecutionContext context, List<Option> options, QualifiedName name)
     {
         for (Option option : options)

@@ -47,7 +47,9 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.partitionFilter);
-        assertEquals(1, analysis.partitionFilter.size());
+        assertEquals(1, analysis.partitionFilter.size(), "One predicate group");
+        assertEquals(1, analysis.partitionFilter.get(0)
+                .size());
         assertEquals(0, predicates.size(), "Predicate should be removed");
     }
 
@@ -60,7 +62,23 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.partitionFilter);
-        assertEquals(3, analysis.partitionFilter.size());
+        assertEquals(1, analysis.partitionFilter.size(), "One predicate group");
+        assertEquals(3, analysis.partitionFilter.get(0)
+                .size());
+        assertEquals(0, predicates.size());
+    }
+
+    @Test
+    void test_partition_equals_twice_kept_as_separate_groups_for_intersection()
+    {
+        List<IPredicate> predicates = new ArrayList<>();
+        predicates.add(IPredicateMock.eq("partition", 1));
+        predicates.add(IPredicateMock.eq("partition", 2));
+
+        KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
+
+        assertNotNull(analysis.partitionFilter);
+        assertEquals(2, analysis.partitionFilter.size(), "Each predicate must stay its own group so they can be intersected, not unioned");
         assertEquals(0, predicates.size());
     }
 
@@ -75,9 +93,13 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.offsetLower);
-        assertTrue(analysis.offsetLower.inclusive());
+        assertEquals(1, analysis.offsetLower.size());
+        assertTrue(analysis.offsetLower.get(0)
+                .inclusive());
         assertNotNull(analysis.offsetUpper);
-        assertTrue(analysis.offsetUpper.inclusive());
+        assertEquals(1, analysis.offsetUpper.size());
+        assertTrue(analysis.offsetUpper.get(0)
+                .inclusive());
         assertEquals(0, predicates.size());
     }
 
@@ -90,7 +112,8 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.offsetLower);
-        assertFalse(analysis.offsetLower.inclusive());
+        assertFalse(analysis.offsetLower.get(0)
+                .inclusive());
         assertNull(analysis.offsetUpper);
         assertEquals(0, predicates.size());
     }
@@ -104,7 +127,8 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.offsetLower);
-        assertTrue(analysis.offsetLower.inclusive());
+        assertTrue(analysis.offsetLower.get(0)
+                .inclusive());
         assertEquals(0, predicates.size());
     }
 
@@ -117,7 +141,8 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.offsetUpper);
-        assertFalse(analysis.offsetUpper.inclusive());
+        assertFalse(analysis.offsetUpper.get(0)
+                .inclusive());
         assertEquals(0, predicates.size());
     }
 
@@ -130,7 +155,22 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.offsetUpper);
-        assertTrue(analysis.offsetUpper.inclusive());
+        assertTrue(analysis.offsetUpper.get(0)
+                .inclusive());
+        assertEquals(0, predicates.size());
+    }
+
+    @Test
+    void test_offset_multiple_lower_bounds_kept_as_separate_bounds_for_conjunction()
+    {
+        List<IPredicate> predicates = new ArrayList<>();
+        predicates.add(IPredicateMock.gte("offset", 500L));
+        predicates.add(IPredicateMock.gte("offset", 100L));
+
+        KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
+
+        assertNotNull(analysis.offsetLower);
+        assertEquals(2, analysis.offsetLower.size(), "Both bounds must be kept so the strongest can be picked at resolve time");
         assertEquals(0, predicates.size());
     }
 
@@ -145,7 +185,8 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.timestampLower);
-        assertTrue(analysis.timestampLower.inclusive());
+        assertTrue(analysis.timestampLower.get(0)
+                .inclusive());
         assertEquals(0, predicates.size());
     }
 
@@ -158,7 +199,8 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.timestampLower);
-        assertFalse(analysis.timestampLower.inclusive());
+        assertFalse(analysis.timestampLower.get(0)
+                .inclusive());
         assertEquals(0, predicates.size());
     }
 
@@ -171,7 +213,8 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.timestampUpper);
-        assertFalse(analysis.timestampUpper.inclusive());
+        assertFalse(analysis.timestampUpper.get(0)
+                .inclusive());
         assertEquals(0, predicates.size());
     }
 
@@ -184,7 +227,8 @@ class KafkaPredicateAnalysisTest
         KafkaPredicateAnalysis analysis = KafkaPredicateAnalysis.analyze(predicates);
 
         assertNotNull(analysis.timestampUpper);
-        assertTrue(analysis.timestampUpper.inclusive());
+        assertTrue(analysis.timestampUpper.get(0)
+                .inclusive());
         assertEquals(0, predicates.size());
     }
 
@@ -231,9 +275,11 @@ class KafkaPredicateAnalysisTest
 
         assertNotNull(analysis.partitionFilter);
         assertNotNull(analysis.offsetLower);
-        assertTrue(analysis.offsetLower.inclusive());
+        assertTrue(analysis.offsetLower.get(0)
+                .inclusive());
         assertNotNull(analysis.offsetUpper);
-        assertFalse(analysis.offsetUpper.inclusive());
+        assertFalse(analysis.offsetUpper.get(0)
+                .inclusive());
         assertEquals(1, predicates.size(), "Only unpushable predicate should remain");
     }
 }

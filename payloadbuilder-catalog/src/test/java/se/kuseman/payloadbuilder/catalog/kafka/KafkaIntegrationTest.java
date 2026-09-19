@@ -667,7 +667,7 @@ class KafkaIntegrationTest
     }
 
     @Test
-    void test_sort_item_timestamp_desc_pushdown_behaves_like_newest()
+    void test_sort_item_timestamp_desc_pushdown_sorts_by_timestamp()
     {
         assumeTrue(dockerAvailable, "Docker not available");
 
@@ -704,11 +704,14 @@ class KafkaIntegrationTest
 
         assertEquals(0, sortItems.size(), "Sort items should be consumed when pushed down");
         assertEquals(NUM_MESSAGES, rows.size());
-        assertNewestOrder(rows);
+        // A pushed-down "ORDER BY timestamp DESC" only promises timestamp ordering (with partition ASC as a
+        // tie-break) - it must not be conflated with the wider, offset-desc-on-ties "newest" default that
+        // applies when no explicit ORDER BY was pushed.
+        assertTimestampDescOrder(rows);
     }
 
     @Test
-    void test_sort_item_offset_desc_pushdown_behaves_like_newest()
+    void test_sort_item_offset_desc_pushdown_sorts_by_offset()
     {
         assumeTrue(dockerAvailable, "Docker not available");
 
@@ -745,7 +748,10 @@ class KafkaIntegrationTest
 
         assertEquals(0, sortItems.size(), "Sort items should be consumed when pushed down");
         assertEquals(NUM_MESSAGES, rows.size());
-        assertNewestOrder(rows);
+        // A pushed-down "ORDER BY offset DESC" only promises offset ordering, not timestamp ordering - offset is
+        // only comparable within a single partition, but the SQL query asked to sort by the raw column value, so
+        // that's what must be honored (with partition ASC as the tie-break for equal offsets across partitions).
+        assertOffsetDescOrder(rows);
     }
 
     @Test
@@ -805,6 +811,38 @@ class KafkaIntegrationTest
                         || prev.offset == current.offset
                                 && prev.partition <= current.partition,
                         "Rows should be sorted by offset DESC and partition ASC for ties");
+            }
+        }
+    }
+
+    private static void assertTimestampDescOrder(List<RowOrder> rows)
+    {
+        for (int i = 1; i < rows.size(); i++)
+        {
+            RowOrder prev = rows.get(i - 1);
+            RowOrder current = rows.get(i);
+
+            assertTrue(prev.timestamp >= current.timestamp, "Rows should be sorted by timestamp DESC");
+
+            if (prev.timestamp == current.timestamp)
+            {
+                assertTrue(prev.partition <= current.partition, "Rows should be sorted by partition ASC for ties");
+            }
+        }
+    }
+
+    private static void assertOffsetDescOrder(List<RowOrder> rows)
+    {
+        for (int i = 1; i < rows.size(); i++)
+        {
+            RowOrder prev = rows.get(i - 1);
+            RowOrder current = rows.get(i);
+
+            assertTrue(prev.offset >= current.offset, "Rows should be sorted by offset DESC");
+
+            if (prev.offset == current.offset)
+            {
+                assertTrue(prev.partition <= current.partition, "Rows should be sorted by partition ASC for ties");
             }
         }
     }

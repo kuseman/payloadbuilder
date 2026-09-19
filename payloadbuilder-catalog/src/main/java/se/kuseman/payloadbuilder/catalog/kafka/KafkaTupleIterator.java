@@ -75,6 +75,7 @@ class KafkaTupleIterator implements TupleIterator
     private final boolean streaming;
     private final OnError onError;
     private final SortOrder sortOrder;
+    private final List<KafkaSortColumn> pushedSort;
     private final IExecutionContext context;
     private final Runnable abortListener;
     private final long pollTimeoutMs;
@@ -102,6 +103,7 @@ class KafkaTupleIterator implements TupleIterator
             boolean streaming,
             OnError onError,
             SortOrder sortOrder,
+            List<KafkaSortColumn> pushedSort,
             IExecutionContext context,
             Runnable abortListener,
             long pollTimeoutMs)
@@ -119,6 +121,7 @@ class KafkaTupleIterator implements TupleIterator
         this.streaming = streaming;
         this.onError = onError;
         this.sortOrder = sortOrder;
+        this.pushedSort = pushedSort;
         this.context = context;
         this.abortListener = abortListener;
         this.pollTimeoutMs = pollTimeoutMs;
@@ -189,8 +192,12 @@ class KafkaTupleIterator implements TupleIterator
 
     private boolean fetchNextBatch()
     {
+        // A pushed-down ORDER BY (pushedSort) requires the exact requested order, and a WITH-clause
+        // sort_order='newest' requires the default newest-first order when no ORDER BY was pushed - both need
+        // every matching record buffered up front before it can be handed out in the right order.
         if (!streaming
-                && sortOrder == SortOrder.NEWEST)
+                && (pushedSort != null
+                        || sortOrder == SortOrder.NEWEST))
         {
             return fetchNewestBatch();
         }
@@ -290,6 +297,20 @@ class KafkaTupleIterator implements TupleIterator
                         throw new RuntimeException("Key deserialization error at " + partition + ":" + record.offset(), e);
                     }
                     key = null;
+                }
+
+                // SKIP must drop malformed rows entirely, so unlike NULL/FAIL it can't rely on the value being
+                // deserialized lazily - it has to be validated eagerly, before the row is added to the batch.
+                if (onError == OnError.SKIP
+                        && isValueMalformed(record.value()))
+                {
+                    nodeData.deserializationErrors++;
+                    if (split != null
+                            && split.isComplete(record.offset() + 1))
+                    {
+                        completedPartitions.add(partition);
+                    }
+                    continue;
                 }
 
                 keys.add(key);
@@ -433,6 +454,18 @@ class KafkaTupleIterator implements TupleIterator
                     key = null;
                 }
 
+                if (onError == OnError.SKIP
+                        && isValueMalformed(record.value()))
+                {
+                    nodeData.deserializationErrors++;
+                    if (split != null
+                            && split.isComplete(record.offset() + 1))
+                    {
+                        completedPartitions.add(partition);
+                    }
+                    continue;
+                }
+
                 keys.add(key);
                 rawValues.add(record.value());
                 offsets.add(record.offset());
@@ -457,7 +490,7 @@ class KafkaTupleIterator implements TupleIterator
 
         if (!offsets.isEmpty())
         {
-            reorderNewest(keys, rawValues, offsets, partitions, timestamps, timestampTypes, headers, topics);
+            reorderNewest(keys, rawValues, offsets, partitions, timestamps, timestampTypes, headers, topics, pushedSort);
         }
 
         newestKeys = keys;
@@ -485,7 +518,8 @@ class KafkaTupleIterator implements TupleIterator
             List<Long> timestamps,
             List<UTF8String> timestampTypes,
             List<Object> headers,
-            List<UTF8String> topics)
+            List<UTF8String> topics,
+            List<KafkaSortColumn> pushedSort)
     //@formatter:on
     {
         int size = offsets.size();
@@ -500,9 +534,7 @@ class KafkaTupleIterator implements TupleIterator
             order.add(i);
         }
 
-        order.sort(Comparator.comparing((Integer i) -> timestamps.get(i), Comparator.reverseOrder())
-                .thenComparing(i -> offsets.get(i), Comparator.reverseOrder())
-                .thenComparing(i -> partitions.get(i)));
+        order.sort(buildComparator(pushedSort, offsets, timestamps).thenComparing(i -> partitions.get(i)));
 
         reorderList(keys, order);
         reorderList(rawValues, order);
@@ -523,6 +555,45 @@ class KafkaTupleIterator implements TupleIterator
         }
         values.clear();
         values.addAll(sorted);
+    }
+
+    /**
+     * Build the comparator used to physically order buffered rows. A pushed-down ORDER BY (offset/timestamp, always DESC) is honored in exactly the requested column sequence; with no pushed sort -
+     * ie. only the WITH-clause sort_order='newest' was requested - the default is timestamp DESC then offset DESC. Either way partition ASC is applied by the caller as a final tie-breaker.
+     */
+    private static Comparator<Integer> buildComparator(List<KafkaSortColumn> pushedSort, List<Long> offsets, List<Long> timestamps)
+    {
+        List<KafkaSortColumn> columns = (pushedSort != null
+                && !pushedSort.isEmpty()) ? pushedSort
+                        : List.of(KafkaSortColumn.TIMESTAMP, KafkaSortColumn.OFFSET);
+
+        Comparator<Integer> comparator = null;
+        for (KafkaSortColumn column : columns)
+        {
+            Comparator<Integer> next = column == KafkaSortColumn.OFFSET ? Comparator.comparing((Integer i) -> offsets.get(i), Comparator.reverseOrder())
+                    : Comparator.comparing((Integer i) -> timestamps.get(i), Comparator.reverseOrder());
+            comparator = comparator == null ? next
+                    : comparator.thenComparing(next);
+        }
+        return comparator;
+    }
+
+    /** Eagerly validate a raw value payload for on_error='skip', without keeping the deserialized result around (the value column stays lazily deserialized on actual access). */
+    private boolean isValueMalformed(byte[] value)
+    {
+        if (value == null)
+        {
+            return false;
+        }
+        try
+        {
+            deserializer.deserializeValue(value);
+            return false;
+        }
+        catch (Exception e)
+        {
+            return true;
+        }
     }
 
     private boolean allSplitsComplete()
@@ -620,9 +691,16 @@ class KafkaTupleIterator implements TupleIterator
     {
         int rowCount = offsets.size();
 
-        // Build lazy value column
+        // Build lazy value column. on_error='skip' rows never reach here (dropped eagerly while polling), so
+        // this only has to honor 'fail' (rethrow) and 'null' (swallow) on first access.
         byte[][] rawPayloadsArray = rawValues.toArray(new byte[0][]);
-        ValueVector lazyValueVector = new LazyDeserializingValueVector(rawPayloadsArray, deserializer);
+        int[] partitionsArray = partitions.stream()
+                .mapToInt(Integer::intValue)
+                .toArray();
+        long[] offsetsArray = offsets.stream()
+                .mapToLong(Long::longValue)
+                .toArray();
+        ValueVector lazyValueVector = new LazyDeserializingValueVector(rawPayloadsArray, deserializer, onError, partitionsArray, offsetsArray, nodeData);
 
         return new ObjectTupleVector(SCHEMA, rowCount, (row, col) -> switch (col)
         {
