@@ -9,6 +9,7 @@ import java.util.Objects;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** A filter that filters input according to a predicate */
 public class Filter implements ILogicalPlan
@@ -17,6 +18,7 @@ public class Filter implements ILogicalPlan
     private final IExpression predicate;
     /** Table source that is set if this filter is a pushdown filter for a specific table source */
     private final TableSourceReference tableSource;
+    private Location location = Location.EMPTY;
 
     public Filter(ILogicalPlan input, TableSourceReference tableSource, IExpression predicate)
     {
@@ -39,6 +41,17 @@ public class Filter implements ILogicalPlan
     public TableSourceReference getTableSource()
     {
         return tableSource;
+    }
+
+    public Location getLocation()
+    {
+        return location;
+    }
+
+    public Filter withLocation(Location location)
+    {
+        this.location = location;
+        return this;
     }
 
     @Override

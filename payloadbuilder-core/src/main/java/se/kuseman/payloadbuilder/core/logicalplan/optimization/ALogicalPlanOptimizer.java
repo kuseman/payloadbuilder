@@ -379,7 +379,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
             expressions = visit(plan, plan.getExpressions(), context);
         }
         return new Projection(plan.getInput()
-                .accept(this, context), expressions, plan.getParentTableSource());
+                .accept(this, context), expressions, plan.getParentTableSource()).withLocation(plan.getLocation());
     }
 
     protected ILogicalPlan create(Aggregate plan, C context)
@@ -427,7 +427,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
                 .accept(this, context),
                 plan.getInner()
                         .accept(this, context),
-                plan.getType(), plan.getPopulateAlias(), condition, plan.getOuterReferences(), plan.isSwitchedInputs(), plan.getOuterSchema());
+                plan.getType(), plan.getPopulateAlias(), condition, plan.getOuterReferences(), plan.isSwitchedInputs(), plan.getOuterSchema()).withLocation(plan.getLocation());
     }
 
     protected ILogicalPlan create(Sort plan, C context)
@@ -450,7 +450,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
                 .collect(toList());
 
         return new Sort(plan.getInput()
-                .accept(this, context), sortItems);
+                .accept(this, context), sortItems).withLocation(plan.getLocation());
     }
 
     protected ILogicalPlan create(Filter plan, C context)
@@ -465,7 +465,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
             predicate = visit(plan, predicate, context);
         }
         return new Filter(plan.getInput()
-                .accept(this, context), plan.getTableSource(), predicate);
+                .accept(this, context), plan.getTableSource(), predicate).withLocation(plan.getLocation());
     }
 
     protected ILogicalPlan create(SubQuery plan, C context)
