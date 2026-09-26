@@ -27,15 +27,23 @@ record KafkaOptions(String start, String end, ExecutionMode mode, Format format,
     /** Parse options from WITH clause */
     static KafkaOptions from(IExecutionContext context, List<Option> options)
     {
-        String start = getStringOption(context, options, START, DEFAULT_START);
-        String end = getStringOption(context, options, END, DEFAULT_END);
         ExecutionMode mode = parseMode(getStringOption(context, options, MODE, "batch"));
-        Format format = parseFormat(getStringOption(context, options, FORMAT, "json"));
-        OnError onError = parseOnError(getStringOption(context, options, ON_ERROR, "fail"));
-        int pollTimeoutMs = getIntOption(context, options, POLL_TIMEOUT, DEFAULT_POLL_TIMEOUT_MS);
         int batchSize = getIntOption(context, options, IExecutionContext.BATCH_SIZE, IExecutionContext.DEFAULT_BATCH_SIZE);
         SortOrder sortOrder = parseSortOrder(getStringOption(context, options, SORT_ORDER, "oldest"));
-        int tailCount = getIntOption(context, options, TAIL_COUNT, batchSize);
+        Integer explicitTailCount = getOptionalIntOption(context, options, TAIL_COUNT);
+
+        // batch_size and tail_count are unrelated concepts (internal chunk size vs. how far back to read), so
+        // silently reusing batch_size as a tail_count default is a footgun: sort_order='newest' would quietly cap
+        // the read at a value the user never chose. Require it to be explicit instead of guessing.
+        if (sortOrder == SortOrder.NEWEST
+                && explicitTailCount == null)
+        {
+            throw new IllegalArgumentException("tail_count must be specified when sort_order='newest' (e.g. tail_count = 1000). It picks how many of the most recent records per "
+                                               + "partition to read - there is no safe default since it depends on topic size and partition count.");
+        }
+
+        int tailCount = explicitTailCount != null ? explicitTailCount
+                : batchSize;
 
         if (tailCount <= 0)
         {
@@ -47,6 +55,12 @@ record KafkaOptions(String start, String end, ExecutionMode mode, Format format,
         {
             throw new IllegalArgumentException("sort_order='newest' is not supported in stream mode");
         }
+
+        String start = getStringOption(context, options, START, DEFAULT_START);
+        String end = getStringOption(context, options, END, DEFAULT_END);
+        Format format = parseFormat(getStringOption(context, options, FORMAT, "json"));
+        OnError onError = parseOnError(getStringOption(context, options, ON_ERROR, "fail"));
+        int pollTimeoutMs = getIntOption(context, options, POLL_TIMEOUT, DEFAULT_POLL_TIMEOUT_MS);
 
         return new KafkaOptions(start, end, mode, format, onError, pollTimeoutMs, batchSize, sortOrder, tailCount);
     }
@@ -85,6 +99,17 @@ record KafkaOptions(String start, String end, ExecutionMode mode, Format format,
             return v.getInt(0);
         }
         return defaultValue;
+    }
+
+    private static Integer getOptionalIntOption(IExecutionContext context, List<Option> options, QualifiedName name)
+    {
+        ValueVector v = evalOption(context, options, name);
+        if (v != null
+                && !v.isNull(0))
+        {
+            return v.getInt(0);
+        }
+        return null;
     }
 
     private static ExecutionMode parseMode(String value)

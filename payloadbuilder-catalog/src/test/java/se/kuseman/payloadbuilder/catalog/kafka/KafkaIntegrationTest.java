@@ -603,6 +603,7 @@ class KafkaIntegrationTest
         List<Option> options = new ArrayList<>();
         options.add(new Option(KafkaOptions.START, ExpressionTestUtils.createStringExpression("earliest")));
         options.add(new Option(KafkaOptions.SORT_ORDER, ExpressionTestUtils.createStringExpression("newest")));
+        options.add(new Option(KafkaOptions.TAIL_COUNT, ExpressionTestUtils.createIntegerExpression(NUM_MESSAGES)));
 
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("topic", TEST_TOPIC),
                 new DatasourceData(0, new ArrayList<>(), emptyList(), Projection.ALL, options));
@@ -766,6 +767,7 @@ class KafkaIntegrationTest
         List<Option> options = new ArrayList<>();
         options.add(new Option(KafkaOptions.START, ExpressionTestUtils.createStringExpression("earliest")));
         options.add(new Option(KafkaOptions.SORT_ORDER, ExpressionTestUtils.createStringExpression("newest")));
+        options.add(new Option(KafkaOptions.TAIL_COUNT, ExpressionTestUtils.createIntegerExpression(NUM_MESSAGES)));
 
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("topic", TEST_TOPIC),
                 new DatasourceData(0, new ArrayList<>(), sortItems, Projection.ALL, options));
@@ -794,6 +796,87 @@ class KafkaIntegrationTest
         assertEquals(1, sortItems.size(), "Non-pushable sort item should remain for engine sorting");
         assertEquals(NUM_MESSAGES, rows.size());
         assertNewestOrder(rows);
+    }
+
+    @Test
+    void test_order_by_pushdown_returns_every_row_across_many_batches()
+    {
+        assumeTrue(dockerAvailable, "Docker not available");
+
+        // Mirrors a real-world report: a plain "ORDER BY timestamp DESC" with no WITH options at all, on a topic
+        // with more partitions * messages-per-partition than the default batch_size (500), to make sure the
+        // pushed-sort path (KafkaTupleIterator.loadNewestBuffer/fetchNewestBatch) pages through everything rather
+        // than silently stopping after batch_size * partition_count rows.
+        String topic = "large_orders_" + System.nanoTime();
+        int partitionCount = 3;
+        int messagesPerPartition = 600;
+        int totalMessages = partitionCount * messagesPerPartition;
+
+        Properties adminProps = new Properties();
+        adminProps.put(org.apache.kafka.clients.admin.AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        try (org.apache.kafka.clients.admin.AdminClient admin = org.apache.kafka.clients.admin.AdminClient.create(adminProps))
+        {
+            admin.createTopics(List.of(new NewTopic(topic, partitionCount, (short) 1)))
+                    .all()
+                    .get();
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
+        }
+
+        Properties producerProps = new Properties();
+        producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+
+        try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(producerProps))
+        {
+            List<Future<RecordMetadata>> futures = new ArrayList<>();
+            for (int p = 0; p < partitionCount; p++)
+            {
+                for (int i = 0; i < messagesPerPartition; i++)
+                {
+                    String key = "key-" + p + "-" + i;
+                    String value = "{\"orderId\":" + i + "}";
+                    futures.add(producer.send(new ProducerRecord<>(topic, p, key.getBytes(StandardCharsets.UTF_8), value.getBytes(StandardCharsets.UTF_8))));
+                }
+            }
+            for (Future<RecordMetadata> f : futures)
+            {
+                f.get();
+            }
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
+        }
+
+        KafkaCatalog catalog = new KafkaCatalog();
+        IExecutionContext context = createContext();
+
+        List<ISortItem> sortItems = new ArrayList<>(List.of(TestUtils.mockSortItem(QualifiedName.of("timestamp"), ISortItem.Order.DESC)));
+
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("topic", topic),
+                new DatasourceData(0, new ArrayList<>(), sortItems, Projection.ALL, new ArrayList<>()));
+
+        int totalRows = 0;
+        TupleIterator it = ds.execute(context);
+        try
+        {
+            while (it.hasNext())
+            {
+                totalRows += it.next()
+                        .getRowCount();
+            }
+        }
+        finally
+        {
+            it.close();
+        }
+
+        assertEquals(0, sortItems.size(), "Sort item should be consumed when pushed down");
+        assertEquals(totalMessages, totalRows, "Every message should be returned, not just batch_size * partition_count");
     }
 
     private static void assertNewestOrder(List<RowOrder> rows)

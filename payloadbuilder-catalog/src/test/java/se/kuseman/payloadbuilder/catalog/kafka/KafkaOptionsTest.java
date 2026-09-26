@@ -148,9 +148,20 @@ class KafkaOptionsTest
         IExecutionContext context = createContext();
         List<Option> opts = new ArrayList<>();
         opts.add(new Option(KafkaOptions.SORT_ORDER, ExpressionTestUtils.createStringExpression("newest")));
+        opts.add(new Option(KafkaOptions.TAIL_COUNT, ExpressionTestUtils.createIntegerExpression(1000)));
 
         KafkaOptions options = KafkaOptions.from(context, opts);
         assertEquals(SortOrder.NEWEST, options.sortOrder());
+    }
+
+    @Test
+    void test_sort_order_newest_requires_explicit_tail_count()
+    {
+        IExecutionContext context = createContext();
+        List<Option> opts = new ArrayList<>();
+        opts.add(new Option(KafkaOptions.SORT_ORDER, ExpressionTestUtils.createStringExpression("newest")));
+
+        assertThrows(IllegalArgumentException.class, () -> KafkaOptions.from(context, opts));
     }
 
     @Test
