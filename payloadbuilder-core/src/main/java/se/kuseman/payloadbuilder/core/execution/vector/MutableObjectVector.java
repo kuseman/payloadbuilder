@@ -1,7 +1,5 @@
 package se.kuseman.payloadbuilder.core.execution.vector;
 
-import com.fasterxml.jackson.core.internal.shaded.fdp.v2_22_1.JavaFloatParser;
-
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.Decimal;
@@ -147,7 +145,7 @@ class MutableObjectVector extends AMutableVector
         if (type.getType() == Column.Type.String)
         {
             String str = ((UTF8String) buffer[row]).toString();
-            return JavaFloatParser.parseFloat(str);
+            return Float.parseFloat(str);
         }
 
         // Implicit cast
