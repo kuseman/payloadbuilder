@@ -224,6 +224,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.6.0</version>
                     <configuration>
                         <!-- Pin file.encoding explicitly instead of relying on the JDK/OS default: JDK 17 falls back to the
                              platform's native encoding (e.g. Windows Cp1252), while JDK 18+ defaults to UTF-8 (JEP 400).
