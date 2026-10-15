@@ -39,9 +39,18 @@ public class Payloadbuilder
      */
     public static CompiledQuery compile(QuerySession session, String query)
     {
+        return compile(session, query, null);
+    }
+
+    /**
+     * Compile query with a stable name. The name is embedded in coverage reports, allowing test code to register a source file for it via
+     * {@link se.kuseman.payloadbuilder.core.execution.QueryCoverageRegistry#registerQuerySource(String, String)}.
+     */
+    public static CompiledQuery compile(QuerySession session, String query, String queryName)
+    {
         List<CompiledQuery.Warning> warnings = new ArrayList<>();
         QueryStatement queryStatement = PARSER.parseQuery(query, warnings);
-        queryStatement = StatementPlanner.plan(session, queryStatement);
-        return new CompiledQuery(queryStatement, warnings);
+        queryStatement = StatementPlanner.plan(session, queryStatement, queryName);
+        return new CompiledQuery(queryStatement, warnings, queryName);
     }
 }

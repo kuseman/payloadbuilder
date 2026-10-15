@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -37,6 +38,7 @@ import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
@@ -110,7 +112,14 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             parentTableSource = p.getParentTableSource();
         }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, schema, expressions, parentTableSource));
+        if (context.coverageMode)
+        {
+            expressions = expressions.stream()
+                    .map(e -> CoverageExpressionRewriter.rewrite(context, e))
+                    .collect(Collectors.toList());
+        }
+
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, schema, expressions, parentTableSource), plan.getLocation());
     }
 
     @Override
@@ -158,7 +167,14 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             return input;
         }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Sort(context.getNextNodeId(), input, plan.getSortItems()));
+        List<SortItem> sortItems = plan.getSortItems();
+        if (context.coverageMode)
+        {
+            sortItems = sortItems.stream()
+                    .map(si -> new SortItem(CoverageExpressionRewriter.rewrite(context, si.getExpression()), si.getOrder(), si.getNullOrder(), si.getLocation()))
+                    .collect(toList());
+        }
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Sort(context.getNextNodeId(), input, sortItems), plan.getLocation());
     }
 
     @Override
@@ -178,14 +194,22 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         IExpression predicate = plan.getPredicate();
         if (tableSourcePushDown != null)
         {
-            // All predicate pairs was consumed skip filter and return input
+            // All predicate pairs was consumed — normally skip filter, but in coverage mode keep
+            // the full original predicate so AND/OR branches in ON/WHERE clauses can be tracked.
             if (tableSourcePushDown.predicatePairs.isEmpty())
             {
-                return input;
+                if (!context.coverageMode)
+                {
+                    return wrapWithAnalyze(context, input, plan.getLocation());
+                }
+                // Coverage mode: fall through with the full original predicate so that
+                // AND/OR branches in pushed-down ON/WHERE conditions can be instrumented.
             }
-
-            // Construct a new predicate from the pairs that was not consumed
-            predicate = AnalyzeResult.getPredicate(tableSourcePushDown.predicatePairs);
+            else
+            {
+                // Construct a new predicate from the pairs that was not consumed
+                predicate = AnalyzeResult.getPredicate(tableSourcePushDown.predicatePairs);
+            }
         }
 
         // If the catalog did not consume all predicates we will have the non pushable predicates
@@ -197,7 +221,12 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             input = filter.getInput();
         }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Filter(context.getNextNodeId(), input, new ExpressionPredicate(predicate)));
+        if (context.coverageMode)
+        {
+            predicate = CoverageExpressionRewriter.rewrite(context, predicate);
+        }
+
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Filter(context.getNextNodeId(), input, new ExpressionPredicate(predicate)), plan.getLocation());
     }
 
     @Override
@@ -311,7 +340,8 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         return wrapWithAnalyze(context,
                 seekPredicate != null
                         ? new se.kuseman.payloadbuilder.core.physicalplan.IndexSeek(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), seekPredicate, dataSource, plan.getOptions())
-                        : new se.kuseman.payloadbuilder.core.physicalplan.TableScan(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), dataSource, plan.getOptions()));
+                        : new se.kuseman.payloadbuilder.core.physicalplan.TableScan(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), dataSource, plan.getOptions()),
+                plan.getLocation());
     }
 
     @Override
@@ -331,13 +361,14 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         TableFunctionInfo functionInfo = pair.getValue();
         return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.TableFunctionScan(context.getNextNodeId(), plan.getSchema(), plan.getTableSource(), catalogAlias,
-                catalog.getName(), functionInfo, plan.getArguments(), plan.getOptions()));
+                catalog.getName(), functionInfo, plan.getArguments(), plan.getOptions()), plan.getLocation());
     }
 
     @Override
     public IPhysicalPlan visit(ExpressionScan plan, Context context)
     {
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ExpressionScan(context.getNextNodeId(), plan.getTableSource(), plan.getSchema(), plan.getExpression()));
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ExpressionScan(context.getNextNodeId(), plan.getTableSource(), plan.getSchema(), plan.getExpression()),
+                plan.getLocation());
     }
 
     @Override
@@ -488,6 +519,11 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         IPhysicalPlan inner = plan.getInner()
                 .accept(this, context);
 
+        if (context.coverageMode
+                && condition != null)
+        {
+            condition = CoverageExpressionRewriter.rewrite(context, condition);
+        }
         ExpressionPredicate predicate = plan.getCondition() != null ? new ExpressionPredicate(condition)
                 : null;
 
@@ -529,7 +565,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             join = createNestedLoop(plan, context.getNextNodeId(), outer, inner, predicate, pushOuterReference);
         }
 
-        return wrapWithAnalyze(context, join);
+        return wrapWithAnalyze(context, join, plan.getLocation());
     }
 
     @Override
@@ -551,18 +587,18 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     {
         if (ConstantScan.ONE_ROW_EMPTY_SCHEMA.equals(plan))
         {
-            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.CONSTANT));
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.CONSTANT), plan.getLocation());
         }
         else if (ConstantScan.ZERO_ROWS_EMPTY_SCHEMA.equals(plan))
         {
-            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.EMPTY));
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.EMPTY), plan.getLocation());
         }
 
         // Zero row scan with a schema
         if (plan.getRowsExpressions()
                 .isEmpty())
         {
-            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.of(plan.getSchema())));
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.of(plan.getSchema())), plan.getLocation());
         }
 
         // Strip all alias expression here since they are not needed anymore
@@ -581,10 +617,10 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                         .allMatch(IExpression::isConstant)))
         {
             TupleVector vector = se.kuseman.payloadbuilder.core.physicalplan.ConstantScan.vectorize(plan.getSchema(), rowsExpressions, context.context, false);
-            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), vector));
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), vector), plan.getLocation());
         }
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), plan.getSchema(), rowsExpressions));
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), plan.getSchema(), rowsExpressions), plan.getLocation());
     }
 
     @Override
@@ -705,9 +741,19 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
     static IPhysicalPlan wrapWithAnalyze(Context context, IPhysicalPlan plan)
     {
+        return wrapWithAnalyze(context, plan, null);
+    }
+
+    static IPhysicalPlan wrapWithAnalyze(Context context, IPhysicalPlan plan, se.kuseman.payloadbuilder.core.parser.Location location)
+    {
         if (context.analyze)
         {
-            return new AnalyzeInterceptor(context.getNextNodeId(), plan);
+            int nodeId = context.getNextNodeId();
+            if (location != null)
+            {
+                context.nodeLocations.put(nodeId, location);
+            }
+            return new AnalyzeInterceptor(nodeId, plan);
         }
         return plan;
     }

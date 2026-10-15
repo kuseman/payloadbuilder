@@ -12,6 +12,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Projects input with a list of expressions */
 public class Projection implements ILogicalPlan
@@ -21,6 +22,7 @@ public class Projection implements ILogicalPlan
     /** Projection expressions */
     private final List<IExpression> expressions;
     private final TableSourceReference parentTableSource;
+    private Location location = Location.EMPTY;
 
     public Projection(ILogicalPlan input, List<IExpression> expressions, TableSourceReference parentTableSource)
     {
@@ -46,6 +48,17 @@ public class Projection implements ILogicalPlan
     public TableSourceReference getParentTableSource()
     {
         return parentTableSource;
+    }
+
+    public Location getLocation()
+    {
+        return location;
+    }
+
+    public Projection withLocation(Location location)
+    {
+        this.location = requireNonNull(location, "location");
+        return this;
     }
 
     /** Returns true if this projection is a single non qualified asterisk projection. */

@@ -15,6 +15,7 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Logical definition of a join */
 public class Join implements ILogicalPlan
@@ -32,6 +33,7 @@ public class Join implements ILogicalPlan
 
     /** The outer schema if this join is a correlated type */
     private final Schema outerSchema;
+    private Location location = Location.EMPTY;
 
     /** Constructor used during column resolving */
     public Join(ILogicalPlan outer, ILogicalPlan inner, Type type, String populateAlias, IExpression condition, Set<Column> outerReferences, boolean switchedInputs, Schema outerSchema)
@@ -84,6 +86,17 @@ public class Join implements ILogicalPlan
     public Schema getOuterSchema()
     {
         return outerSchema;
+    }
+
+    public Location getLocation()
+    {
+        return location;
+    }
+
+    public Join withLocation(Location location)
+    {
+        this.location = location;
+        return this;
     }
 
     /** Returns true of this join can have outer references otherwise false */
