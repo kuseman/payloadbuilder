@@ -21,7 +21,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.client5.http.config.RequestConfig;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.RequestFailedException;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
@@ -48,7 +47,7 @@ class HttpDataSource implements IDatasource
 {
     static final String GET = "GET";
     private static final IResponseTransformer FALLBACK_TRANSFORMER = new FallbackResponseTransformer();
-    private final CloseableHttpClient httpClient;
+    private final HttpClientProvider httpClientProvider;
     private final String catalogAlias;
     private final String endpoint;
     private final ISeekPredicate seekPredicate;
@@ -56,10 +55,10 @@ class HttpDataSource implements IDatasource
     private final List<IResponseTransformer> responseTransformers;
     private final List<Option> options;
 
-    HttpDataSource(CloseableHttpClient httpClient, String catalogAlias, String endpoint, ISeekPredicate seekPredicate, Request request, List<IResponseTransformer> responseTransformers,
+    HttpDataSource(HttpClientProvider httpClientProvider, String catalogAlias, String endpoint, ISeekPredicate seekPredicate, Request request, List<IResponseTransformer> responseTransformers,
             List<Option> options)
     {
-        this.httpClient = requireNonNull(httpClient);
+        this.httpClientProvider = requireNonNull(httpClientProvider);
         this.catalogAlias = requireNonNull(catalogAlias);
         this.endpoint = requireNonNull(endpoint);
         this.seekPredicate = seekPredicate;
@@ -72,7 +71,7 @@ class HttpDataSource implements IDatasource
     public TupleIterator execute(IExecutionContext context)
     {
         HttpUriRequestBase request = getRequest(context, false);
-        return createIterator(httpClient, request, responseTransformers, context, options);
+        return createIterator(httpClientProvider, catalogAlias, request, responseTransformers, context, options);
     }
 
     @Override
@@ -193,11 +192,23 @@ class HttpDataSource implements IDatasource
     }
 
     /** Creates an {@link TupleIterator} and actual do the http request work. */
-    static TupleIterator createIterator(CloseableHttpClient httpClient, HttpUriRequestBase request, List<IResponseTransformer> responseTransformers, IExecutionContext context, List<Option> options)
+    static TupleIterator createIterator(HttpClientProvider httpClientProvider, String catalogAlias, HttpUriRequestBase request, List<IResponseTransformer> responseTransformers,
+            IExecutionContext context, List<Option> options)
     {
         ValueVector vv = context.getOption(QualifiedName.of(HttpCatalog.FAIL_ON_NON_200), options);
         boolean failOnNon200 = vv == null
                 || vv.isNull(0) ? true
+                        : vv.getBoolean(0);
+
+        vv = context.getOption(HttpCatalog.TRUST_CERTIFICATE, options);
+        if (vv == null
+                || vv.isNull(0))
+        {
+            vv = context.getSession()
+                    .getCatalogProperty(catalogAlias, HttpCatalog.TRUST_CERTIFICATE_KEY);
+        }
+        boolean trustCertificate = vv == null
+                || vv.isNull(0) ? false
                         : vv.getBoolean(0);
 
         vv = context.getOption(QualifiedName.of(HttpCatalog.CONNECT_TIMEOUT), options);
@@ -243,7 +254,8 @@ class HttpDataSource implements IDatasource
         ClassicHttpResponse response = null;
         try
         {
-            response = httpClient.execute(request);
+            response = httpClientProvider.get(trustCertificate)
+                    .execute(request);
             if (printHeaders)
             {
                 for (Header header : response.getHeaders())
