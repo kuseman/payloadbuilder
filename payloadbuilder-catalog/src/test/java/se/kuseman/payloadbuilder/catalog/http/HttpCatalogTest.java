@@ -769,6 +769,73 @@ class HttpCatalogTest
     }
 
     @Test
+    void test_getScanDataSource_https_untrusted_certificate_fails()
+    {
+        mockServer.when(HttpRequest.request("/")
+                .withMethod("get"))
+                .respond(HttpResponse.response("{ \"key\": \"hello world\" }")
+                        .withHeader("Content-Type", "application/json"));
+
+        IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
+        DatasourceData data = new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, emptyList());
+        IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("https://localhost:" + mockServer.getPort()), data);
+
+        try
+        {
+            dataSource.execute(context);
+            fail("Should fail");
+        }
+        catch (RuntimeException e)
+        {
+            assertTrue(e.getCause() instanceof javax.net.ssl.SSLHandshakeException, String.valueOf(e.getCause()));
+        }
+    }
+
+    @Test
+    void test_getScanDataSource_https_trust_certificate_option()
+    {
+        Expectation[] mocks = mockServer.when(HttpRequest.request("/")
+                .withMethod("get"))
+                .respond(HttpResponse.response("{ \"key\": \"hello world\" }")
+                        .withHeader("Content-Type", "application/json"));
+
+        IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
+        DatasourceData data = new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, asList(new Option(HttpCatalog.TRUST_CERTIFICATE, ExpressionTestUtils.createBooleanExpression(true))));
+        IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("https://localhost:" + mockServer.getPort()), data);
+
+        assertHelloWorld(dataSource.execute(context));
+        mockServer.verify(mocks[0].getId());
+    }
+
+    @Test
+    void test_getScanDataSource_https_trust_certificate_catalog_property()
+    {
+        Expectation[] mocks = mockServer.when(HttpRequest.request("/")
+                .withMethod("get"))
+                .respond(HttpResponse.response("{ \"key\": \"hello world\" }")
+                        .withHeader("Content-Type", "application/json"));
+
+        IExecutionContext context = TestUtils.mockExecutionContext("http", Map.of(HttpCatalog.TRUST_CERTIFICATE_KEY, true), 0, null);
+        DatasourceData data = new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, emptyList());
+        IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("https://localhost:" + mockServer.getPort()), data);
+
+        assertHelloWorld(dataSource.execute(context));
+        mockServer.verify(mocks[0].getId());
+    }
+
+    private void assertHelloWorld(TupleIterator it)
+    {
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector v = it.next();
+            VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("key", Type.Any)), List.of(vv(Type.Any, "hello world"))), v);
+            rowCount += v.getRowCount();
+        }
+        assertEquals(1, rowCount);
+    }
+
+    @Test
     void test_getScanDataSource_with_no_placeholders_non_200_repsonse_code()
     {
         String body = "{\"json\":\"value\"}";

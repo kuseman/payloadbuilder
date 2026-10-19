@@ -5,7 +5,6 @@ import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -13,14 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hc.client5.http.config.ConnectionConfig;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.HttpHeaders;
-import org.apache.hc.core5.util.TimeValue;
-import org.apache.hc.core5.util.Timeout;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
@@ -68,6 +60,8 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
  * from http#"http://path/to/endpoint/v1" x with (
  *   method = 'post',                                       // Method of HTTP request
  *   header."Content-Type" = 'application/json',            // Headers to add. All qualifiers that has the first part = 'header' will be added
+ *   trustCertificate = true,                               // Trust all certificates and skip host name verification (ie. self signed certificates). Default false.
+ *                                                          // Can also be set as a catalog property: use http.trustCertificate = true
  *   queryPattern = '/{{id}}?color={{color}}',              // Query pattern that contains place holders for index fields. Names between brackets will be eligable as index fields on table source
  *   bodyPattern = '
  *   {
@@ -153,11 +147,14 @@ public class HttpCatalog extends Catalog
     static final QualifiedName CONNECT_TIMEOUT = QualifiedName.of("connecttimeout");
     static final QualifiedName RECEIVE_TIMEOUT = QualifiedName.of("receivetimeout");
     static final QualifiedName PRINT_HEADERS = QualifiedName.of("printheaders");
+    static final QualifiedName TRUST_CERTIFICATE = QualifiedName.of("trustcertificate");
+    /** Catalog property to enable trust certificate for all requests on a catalog alias */
+    public static final String TRUST_CERTIFICATE_KEY = "trustCertificate";
     static final int DEFAULT_RECIEVE_TIMEOUT = 15000;
     static final int DEFAULT_CONNECT_TIMEOUT = 1500;
 
     private final List<IResponseTransformer> responseTransformers;
-    private final CloseableHttpClient httpClient;
+    private final HttpClientProvider httpClientProvider;
 
     public HttpCatalog()
     {
@@ -168,32 +165,15 @@ public class HttpCatalog extends Catalog
     {
         super(NAME);
         this.responseTransformers = requireNonNull(responseTransformers, "responseTransformers");
+        this.httpClientProvider = new HttpClientProvider();
 
-        PoolingHttpClientConnectionManager manager = PoolingHttpClientConnectionManagerBuilder.create()
-                .setDefaultConnectionConfig(ConnectionConfig.custom()
-                        .setConnectTimeout(Timeout.ofMilliseconds(DEFAULT_CONNECT_TIMEOUT))
-                        .setSocketTimeout(Timeout.ofMilliseconds(DEFAULT_RECIEVE_TIMEOUT))
-                        .build())
-                .build();
-        this.httpClient = HttpClients.custom()
-                .setConnectionManager(manager)
-                .evictExpiredConnections()
-                .evictIdleConnections(TimeValue.ofSeconds(60))
-                .build();
-
-        registerFunction(new QueryFunction(httpClient, responseTransformers));
+        registerFunction(new QueryFunction(httpClientProvider, responseTransformers));
     }
 
     @Override
     public void close()
     {
-        try
-        {
-            httpClient.close();
-        }
-        catch (IOException e)
-        {
-        }
+        httpClientProvider.close();
     }
 
     @Override
@@ -263,7 +243,7 @@ public class HttpCatalog extends Catalog
             throw new CompileException("All request placeholders must be used. Placeholders not processed: " + fields.values());
         }
 
-        return new HttpDataSource(httpClient, catalogAlias, endpoint, seekPredicate, request, responseTransformers, data.getOptions());
+        return new HttpDataSource(httpClientProvider, catalogAlias, endpoint, seekPredicate, request, responseTransformers, data.getOptions());
     }
 
     private Request getRequest(IQuerySession session, List<Option> options, List<IPredicate> predicates, Map<String, String> fields)

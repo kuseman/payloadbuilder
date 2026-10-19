@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -23,13 +22,13 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 class QueryFunction extends TableFunctionInfo
 {
     static final QualifiedName BODY = QualifiedName.of("body");
-    private final CloseableHttpClient httpClient;
+    private final HttpClientProvider httpClientProvider;
     private final List<IResponseTransformer> responseTransformers;
 
-    QueryFunction(CloseableHttpClient httpClient, List<IResponseTransformer> responseTransformers)
+    QueryFunction(HttpClientProvider httpClientProvider, List<IResponseTransformer> responseTransformers)
     {
         super("query");
-        this.httpClient = httpClient;
+        this.httpClientProvider = httpClientProvider;
         this.responseTransformers = responseTransformers;
     }
 
@@ -83,7 +82,7 @@ class QueryFunction extends TableFunctionInfo
             httpRequest.setEntity(new StringEntity(body, StandardCharsets.UTF_8));
         }
 
-        return HttpDataSource.createIterator(httpClient, httpRequest, responseTransformers, context, data.getOptions());
+        return HttpDataSource.createIterator(httpClientProvider, catalogAlias, httpRequest, responseTransformers, context, data.getOptions());
     }
 
     private String getEndpoint(IExecutionContext context, IExpression expression)
