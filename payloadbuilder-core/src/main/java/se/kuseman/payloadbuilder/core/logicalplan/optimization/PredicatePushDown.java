@@ -211,10 +211,20 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
         // If all predicate pairs was used then no filter should be used here, return input
         if (predicate == null)
         {
+            // Propagate the WHERE clause location to the push-down filter so the annotated
+            // SQL gutter can mark the WHERE line when all predicates are fully index-seeked.
+            if (plan.getLocation()
+                    .line() > 0
+                    && input instanceof Filter pushed
+                    && pushed.getLocation()
+                            .line() == 0)
+            {
+                pushed.withLocation(plan.getLocation());
+            }
             return input;
         }
 
-        return new Filter(input, plan.getTableSource(), predicate);
+        return new Filter(input, plan.getTableSource(), predicate).withLocation(plan.getLocation());
     }
 
     @Override
@@ -295,6 +305,7 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
         AnalyzeResult analyzeResult = context.analyzeResults.remove(resultIndex)
                 .getValue();
 
-        return new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), analyzeResult.getPredicate(), plan.getOuterReferences(), plan.isSwitchedInputs(), plan.getOuterSchema());
+        return new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), analyzeResult.getPredicate(), plan.getOuterReferences(), plan.isSwitchedInputs(), plan.getOuterSchema())
+                .withLocation(plan.getLocation());
     }
 }

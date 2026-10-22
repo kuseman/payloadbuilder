@@ -27,6 +27,7 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
+import org.antlr.v4.runtime.tree.TerminalNode;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -672,7 +673,7 @@ public class QueryParser
                 String joinAlias = getIdentifier(joinCtx.tableSource()
                         .identifier());
                 current = new Join(current, joinTableSource, type, populate ? joinAlias
-                        : null, condition, emptySet(), false, Schema.EMPTY);
+                        : null, condition, emptySet(), false, Schema.EMPTY).withLocation(Location.from(joinCtx));
             }
 
             return current;
@@ -832,7 +833,7 @@ public class QueryParser
 
             IExpression elseExpression = getExpression(ctx.elseExpr);
 
-            return new CaseExpression(whenClauses, elseExpression);
+            return new CaseExpression(whenClauses, elseExpression, Location.from(ctx));
         }
 
         @Override
@@ -1108,13 +1109,13 @@ public class QueryParser
         @Override
         public Object visitExpr_and(Expr_andContext ctx)
         {
-            return buildLogicalTree(ILogicalBinaryExpression.Type.AND, ctx.left, ctx.right);
+            return buildLogicalTree(ILogicalBinaryExpression.Type.AND, ctx.left, ctx.right, ctx.AND());
         }
 
         @Override
         public Object visitExpr_or(Expr_orContext ctx)
         {
-            return buildLogicalTree(ILogicalBinaryExpression.Type.OR, ctx.left, ctx.right);
+            return buildLogicalTree(ILogicalBinaryExpression.Type.OR, ctx.left, ctx.right, ctx.OR());
         }
 
         @Override
@@ -1401,7 +1402,7 @@ public class QueryParser
             return result;
         }
 
-        private IExpression buildLogicalTree(ILogicalBinaryExpression.Type type, ParserRuleContext left, List<? extends ParserRuleContext> right)
+        private IExpression buildLogicalTree(ILogicalBinaryExpression.Type type, ParserRuleContext left, List<? extends ParserRuleContext> right, List<TerminalNode> operators)
         {
             IExpression le = getExpression(left);
 
@@ -1411,23 +1412,19 @@ public class QueryParser
                 return le;
             }
 
-            IExpression result = null;
-
             List<IExpression> rightList = right.stream()
                     .map(e -> (IExpression) visit(e))
                     .collect(toList());
 
+            IExpression result = le;
+
             // TODO: This could be kept as a list to avoid building a tree
-            for (IExpression r : rightList)
+            // Each binary node uses its own operator token location so multi-line AND/OR chains
+            // produce per-line condition coverage entries in the annotated SQL report.
+            for (int i = 0; i < rightList.size(); i++)
             {
-                if (result == null)
-                {
-                    result = new LogicalBinaryExpression(type, le, r).fold();
-                }
-                else
-                {
-                    result = new LogicalBinaryExpression(type, result, r).fold();
-                }
+                result = new LogicalBinaryExpression(type, result, rightList.get(i)).withLocation(Location.from(operators.get(i)))
+                        .fold();
             }
 
             return result;
@@ -1573,7 +1570,7 @@ public class QueryParser
                 return ConstantScan.create(expressions, Location.from(ctx.SELECT()));
             }
 
-            return new Projection(plan, expressions, null);
+            return new Projection(plan, expressions, null).withLocation(Location.from(ctx.SELECT()));
         }
 
         private ILogicalPlan wrapSort(ILogicalPlan plan, SelectStatementContext ctx)
@@ -1585,7 +1582,7 @@ public class QueryParser
                         .stream()
                         .map(this::getSortItem)
                         .collect(toList());
-                plan = new Sort(plan, orderBy);
+                plan = new Sort(plan, orderBy).withLocation(Location.from(ctx.sortItem(0)));
             }
             return plan;
         }
@@ -1671,7 +1668,7 @@ public class QueryParser
         {
             if (ctx.where != null)
             {
-                plan = new Filter(plan, null, getExpression(ctx.where));
+                plan = new Filter(plan, null, getExpression(ctx.where)).withLocation(Location.from(ctx.where));
             }
             return plan;
         }
@@ -1680,7 +1677,7 @@ public class QueryParser
         {
             if (ctx.having != null)
             {
-                plan = new Filter(plan, null, getExpression(ctx.having));
+                plan = new Filter(plan, null, getExpression(ctx.having)).withLocation(Location.from(ctx.having));
             }
             return plan;
         }

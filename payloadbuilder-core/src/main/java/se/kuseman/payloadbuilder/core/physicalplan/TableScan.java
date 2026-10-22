@@ -47,6 +47,11 @@ public class TableScan implements IPhysicalPlan
         this.asteriskSchema = SchemaUtils.isAsterisk(schema);
     }
 
+    public TableSourceReference getTableSource()
+    {
+        return tableSource;
+    }
+
     @Override
     public int getNodeId()
     {

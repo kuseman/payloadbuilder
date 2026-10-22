@@ -8,7 +8,9 @@ import static org.apache.commons.lang3.ObjectUtils.getIfNull;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -25,6 +27,7 @@ import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
 /**
  * Analyzes a join predicate
@@ -74,6 +77,9 @@ public class PredicateAnalyzer
         }
 
         List<IExpression> queue = new ArrayList<>();
+        // Maps each right-side child of an AND node to the AND token's source location,
+        // so getPredicate() can reconstruct AND nodes with their original source positions.
+        Map<IExpression, Location> andLocations = new IdentityHashMap<>();
         queue.add(predicate);
         List<AnalyzePair> resultItems = new ArrayList<>();
 
@@ -85,6 +91,12 @@ public class PredicateAnalyzer
                 LogicalBinaryExpression lbe = (LogicalBinaryExpression) e;
                 if (lbe.getLogicalType() == ILogicalBinaryExpression.Type.AND)
                 {
+                    // The right-side child "belongs to" this AND token in source text.
+                    if (lbe.getLocation()
+                            .line() > 0)
+                    {
+                        andLocations.put(lbe.getRight(), lbe.getLocation());
+                    }
                     queue.add(0, lbe.getLeft());
                     queue.add(0, lbe.getRight());
                     continue;
@@ -92,11 +104,19 @@ public class PredicateAnalyzer
             }
             else if (e instanceof NestedExpression)
             {
-                queue.add(0, ((NestedExpression) e).getExpression());
+                IExpression inner = ((NestedExpression) e).getExpression();
+                Location loc = andLocations.get(e);
+                if (loc != null)
+                {
+                    andLocations.put(inner, loc);
+                }
+                queue.add(0, inner);
                 continue;
             }
 
-            resultItems.add(AnalyzePair.of(e));
+            Location andLoc = andLocations.getOrDefault(e, Location.EMPTY);
+            resultItems.add(AnalyzePair.of(e)
+                    .withAndLocation(andLoc));
         }
 
         return new AnalyzeResult(resultItems);
@@ -180,7 +200,7 @@ public class PredicateAnalyzer
                 }
                 else
                 {
-                    result = new LogicalBinaryExpression(ILogicalBinaryExpression.Type.AND, result, pair.getPredicate());
+                    result = new LogicalBinaryExpression(ILogicalBinaryExpression.Type.AND, result, pair.getPredicate()).withLocation(pair.getAndLocation());
                 }
             }
             return result;
@@ -245,6 +265,19 @@ public class PredicateAnalyzer
         private final IComparisonExpression.Type comparisonType;
         private final AnalyzeItem left;
         private final AnalyzeItem right;
+        private Location andLocation = Location.EMPTY;
+
+        Location getAndLocation()
+        {
+            return andLocation;
+        }
+
+        AnalyzePair withAndLocation(Location loc)
+        {
+            this.andLocation = loc != null ? loc
+                    : Location.EMPTY;
+            return this;
+        }
 
         AnalyzePair(IPredicate.Type type, AnalyzeItem left, AnalyzeItem right)
         {
