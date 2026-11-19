@@ -20,7 +20,7 @@ public interface IAggregator
 
     /**
      * Combine the aggregators state into a resulting ValueVector. The resulting vector must contain and be ordered by all the groupId's provided by
-     * {@link #appendGroup(TupleVector, IExecutionContext)}
+     * {@link #appendGroup(TupleVector, ValueVector, ValueVector, IExecutionContext)}
      */
     ValueVector combine(IExecutionContext context);
 

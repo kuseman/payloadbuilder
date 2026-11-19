@@ -44,7 +44,7 @@ public abstract class TableFunctionInfo extends FunctionInfo
      * Execute table function.
      *
      * <pre>
-     * NOTE! If {{@link #getSchema(List,List)} returned a NON empty schema the {@link TupleVector}'s return from this {@link TupleIterator} MUST
+     * NOTE! If {@link #getSchema(IExecutionContext, String, List, List)} returned a NON empty schema the {@link TupleVector}'s return from this {@link TupleIterator} MUST
      * have the same set of columns regarding type and name.
      * </pre>
      *

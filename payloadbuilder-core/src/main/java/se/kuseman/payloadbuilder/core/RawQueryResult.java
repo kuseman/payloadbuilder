@@ -9,7 +9,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 public interface RawQueryResult extends BaseQueryResult
 {
     /**
-     * Returns true if there are more result sets. If true then {@link #consumeResult(TupleVector)} is called with resulting vector
+     * Returns true if there are more result sets. If true then {@link #consumeResult(ResultConsumer)} is called with resulting vector
      */
     @Override
     boolean hasMoreResults();

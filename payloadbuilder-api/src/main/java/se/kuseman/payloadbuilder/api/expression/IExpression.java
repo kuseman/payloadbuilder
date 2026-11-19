@@ -97,7 +97,7 @@ public interface IExpression
      * outer apply (
      *      select *
      *      from tableB b
-     *      where b.col1 = a.col1           <----- Here a.col1 is an outer reference and can be used as a predicate
+     *      where b.col1 = a.col1           &lt;----- Here a.col1 is an outer reference and can be used as a predicate
      *                                             for tableB since inside the subquery that expression can be seen as constant
      * ) x
      *

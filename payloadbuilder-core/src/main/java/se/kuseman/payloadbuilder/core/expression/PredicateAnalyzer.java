@@ -384,10 +384,10 @@ public class PredicateAnalyzer
          * select *
          * from source s
          * inner join article a
-         *   on a.art_id = s.art_id    <--- no push down since we have 2 table sources involved
-         * and a.active_flg            <--- push down for alias 'a'
-         * and internet_flg            <--- push down for what ever alias it belongs to
-         * and a.field > @var          <--- push down for a
+         *   on a.art_id = s.art_id    &lt;--- no push down since we have 2 table sources involved
+         * and a.active_flg            &lt;--- push down for alias 'a'
+         * and internet_flg            &lt;--- push down for what ever alias it belongs to
+         * and a.field > @var          &lt;--- push down for a
          *
          * </pre>
          */
