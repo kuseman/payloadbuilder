@@ -171,7 +171,7 @@ class ElasticQueryBuilderTest
                     } ]
                   }
                 }
-                  """, filterActual.get(2));
+                """, filterActual.get(2));
         assertPredicate("""
                   {
                   "bool" : {
@@ -188,7 +188,7 @@ class ElasticQueryBuilderTest
                     } ]
                   }
                 }
-                  """, filterActual.get(3));
+                """, filterActual.get(3));
     }
 
     @Test

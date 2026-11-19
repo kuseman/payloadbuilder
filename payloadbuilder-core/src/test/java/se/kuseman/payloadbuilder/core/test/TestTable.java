@@ -93,7 +93,7 @@ public class TestTable
                 type = Column.Type.valueOf(str);
                 schema = null;
             }
-            else if (value instanceof Map map)
+            else if (value instanceof Map<?, ?> map)
             {
                 type = Column.Type.valueOf(String.valueOf(map.get("type")));
                 @SuppressWarnings("unchecked")

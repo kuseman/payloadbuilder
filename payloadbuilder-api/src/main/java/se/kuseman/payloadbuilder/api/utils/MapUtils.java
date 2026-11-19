@@ -14,6 +14,7 @@ public class MapUtils
 
     /** Build map out of entries */
     @SafeVarargs
+    @SuppressWarnings("varargs")
     public static <K, V> Map<K, V> ofEntries(SimpleEntry<K, V>... values)
     {
         return ofEntries(false, values);
