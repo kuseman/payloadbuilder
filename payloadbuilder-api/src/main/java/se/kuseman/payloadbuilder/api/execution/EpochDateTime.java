@@ -26,7 +26,7 @@ public class EpochDateTime implements Comparable<EpochDateTime>, ValueVector
 {
     static final ZoneId UTC = ZoneId.of("UTC");
     private static final DateTimeFormatter ISO_DATE_OPTIONAL_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd['T'HH:mm[:ss][.nnnnnnnnn][[.SSS][.SS][.S]][X]]");
-    private static final TemporalQuery<?>[] PARSE_QUERIES = new TemporalQuery[] { LocalDateTime::from, LocalDate::from };
+    private static final TemporalQuery<?>[] PARSE_QUERIES = new TemporalQuery<?>[] { LocalDateTime::from, LocalDate::from };
 
     private final long epoch;
 

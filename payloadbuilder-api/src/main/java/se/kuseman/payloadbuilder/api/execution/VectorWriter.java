@@ -9,4 +9,8 @@ public interface VectorWriter extends AutoCloseable
      * @param vector Vector to write to stream.
      */
     void write(TupleVector vector);
+
+    /** Close the writer. Narrowed from {@link AutoCloseable#close()}: closing a vector writer throws no checked exceptions. */
+    @Override
+    void close();
 }

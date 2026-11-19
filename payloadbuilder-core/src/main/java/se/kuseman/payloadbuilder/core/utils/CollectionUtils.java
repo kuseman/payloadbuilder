@@ -15,6 +15,7 @@ public final class CollectionUtils
 
     /** Create set from provided items */
     @SafeVarargs
+    @SuppressWarnings("varargs")
     public static <T> Set<T> asSet(T... items)
     {
         return new HashSet<>(asList(items));
@@ -22,6 +23,7 @@ public final class CollectionUtils
 
     /** Create set from provided items */
     @SafeVarargs
+    @SuppressWarnings("varargs")
     public static <T> Set<T> asOrderedSet(T... items)
     {
         return new LinkedHashSet<>(asList(items));

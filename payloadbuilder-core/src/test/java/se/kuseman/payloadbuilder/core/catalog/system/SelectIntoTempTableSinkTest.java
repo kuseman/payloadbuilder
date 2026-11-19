@@ -13,7 +13,6 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
-import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
@@ -53,7 +52,8 @@ class SelectIntoTempTableSinkTest extends APhysicalPlanTest
             }
         });
 
-        TemporaryTable table = ((QuerySession) context.getSession()).getTemporaryTable(QualifiedName.of("table"));
+        TemporaryTable table = context.getSession()
+                .getTemporaryTable(QualifiedName.of("table"));
         TupleVector vector = table.getTupleVector();
 
         // The vector must be a materialised TupleVector (from TupleVector.of / TupleVectorBuilder),

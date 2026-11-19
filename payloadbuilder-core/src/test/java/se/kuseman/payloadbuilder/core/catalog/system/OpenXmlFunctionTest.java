@@ -230,7 +230,7 @@ class OpenXmlFunctionTest extends APhysicalPlanTest
 
                                 </records>
                                 `
-                                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")))));
+                """)), new FunctionData(0, List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")))));
 
         int rowCount = 0;
         while (it.hasNext())
