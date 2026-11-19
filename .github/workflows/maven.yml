@@ -22,4 +22,4 @@ jobs:
         cache: 'maven'
         distribution: 'zulu'
     - name: Build with Maven
-      run: mvn -B clean verify test --file pom.xml
+      run: ./mvnw -B -V clean verify

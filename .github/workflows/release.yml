@@ -3,6 +3,14 @@ on:
     # Sequence of patterns matched against refs/tags
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+  # Publish an existing tag again with this (the default branch's) workflow, e.g. after a failed Central validation.
+  # The tag's sources are built; only the workflow steps come from the default branch.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to publish, e.g. v1.15.0'
+        required: true
+        type: string
 
 name: Publish version tags to maven central
 
@@ -11,13 +19,20 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Set version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          echo "VERSION=${TAG/v/}" >> $GITHUB_ENV
-      - run: echo "Will start a Maven Central upload with tag ${VERSION}"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Not a release tag: ${TAG}"
+            exit 1
+          fi
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+          echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+      - run: echo "Will start a Maven Central upload with tag ${TAG} (version ${VERSION})"
       - name: Checkout code
         uses: actions/checkout@v7
         with:
+          ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
       - name: Set up Maven Central Repository
         uses: actions/setup-java@v5
@@ -39,8 +54,12 @@ jobs:
           fi
           echo "FROM_TAG=${FROM_TAG}" >> $GITHUB_OUTPUT
 
+      # Use the Maven wrapper, not the runner's preinstalled mvn: v1.15.0 failed Central validation
+      # ("Bundle has content that does NOT have a .pom file") with the runner's Maven, while the same
+      # tag bundles cleanly with the wrapper's Maven. -V logs the Maven version used.
+      # Run through sh: tags up to v1.15.0 have mvnw without the executable bit.
       - name: Publish package
-        run: mvn --batch-mode clean deploy -DperformRelease=true -DskipTests=true -Dcheckstyle.skip -Dchangelog.fromRef=${{ steps.changelog_range.outputs.FROM_TAG }}
+        run: sh ./mvnw --batch-mode -V clean deploy -DperformRelease=true -DskipTests=true -Dcheckstyle.skip -Dchangelog.fromRef=${{ steps.changelog_range.outputs.FROM_TAG }}
         env:
           MAVEN_USERNAME: ${{ secrets.OSS_SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.OSS_SONATYPE_PASSWORD }}

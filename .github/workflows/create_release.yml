@@ -79,7 +79,7 @@ jobs:
 
       - name: Set release version in pom.xml files
         if: inputs.increment != 'snapshot'
-        run: mvn -B versions:set -DnewVersion=${{ steps.versions.outputs.NEW_VERSION }} -DgenerateBackupPoms=false
+        run: ./mvnw -B versions:set -DnewVersion=${{ steps.versions.outputs.NEW_VERSION }} -DgenerateBackupPoms=false
 
       - name: Update scm tag to release tag
         if: inputs.increment != 'snapshot'
@@ -94,7 +94,7 @@ jobs:
 
       - name: Set next snapshot version in pom.xml files
         if: inputs.increment != 'snapshot'
-        run: mvn -B versions:set -DnewVersion=${{ steps.versions.outputs.NEXT_SNAPSHOT }} -DgenerateBackupPoms=false
+        run: ./mvnw -B versions:set -DnewVersion=${{ steps.versions.outputs.NEXT_SNAPSHOT }} -DgenerateBackupPoms=false
 
       - name: Reset scm tag to HEAD
         if: inputs.increment != 'snapshot'
@@ -114,7 +114,7 @@ jobs:
 
       - name: Deploy snapshot
         if: inputs.increment == 'snapshot'
-        run: mvn --batch-mode deploy -DskipTests=true -Dcheckstyle.skip
+        run: ./mvnw --batch-mode -V deploy -DskipTests=true -Dcheckstyle.skip
         env:
           MAVEN_USERNAME: ${{ secrets.OSS_SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.OSS_SONATYPE_PASSWORD }}
