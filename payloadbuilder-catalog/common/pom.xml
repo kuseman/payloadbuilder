@@ -3,7 +3,7 @@
     <parent>
         <groupId>se.kuseman.payloadbuilder</groupId>
         <artifactId>payloadbuilder-catalog-parent</artifactId>
-        <version>1.15.0-SNAPSHOT</version>
+        <version>1.15.0</version>
     </parent>
     <artifactId>payloadbuilder-catalog-common</artifactId>
     <name>Payloadbuilder :: Catalog :: Common</name>
