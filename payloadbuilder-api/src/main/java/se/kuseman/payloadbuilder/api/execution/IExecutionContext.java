@@ -39,7 +39,7 @@ public interface IExecutionContext
      */
     VectorWriter getVectorWriter(VectorWriterFormat format, OutputStream outputStream, List<Option> options);
 
-    /** Return the vector batch size. This is simply a convenience method for {@link #getOption(String, IExecutionContext)} with option name batch_size */
+    /** Return the vector batch size. This is simply a convenience method for {@link #getOption(QualifiedName, List)} with option name batch_size */
     default int getBatchSize(List<Option> options)
     {
         ValueVector v = getOption(BATCH_SIZE, options);

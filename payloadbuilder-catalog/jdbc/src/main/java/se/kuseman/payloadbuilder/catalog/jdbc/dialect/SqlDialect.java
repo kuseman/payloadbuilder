@@ -98,7 +98,7 @@ public interface SqlDialect
     //@formatter:on
 
     /**
-     * Create connection with provided url and credentials. This connected is intended to be used when inserting data via {@link InsertSink} and if dialect supports special connections for fast
+     * Create connection with provided url and credentials. This connected is intended to be used when inserting data via {@code InsertSink} and if dialect supports special connections for fast
      * inserts it can be applied.
      */
     default Connection createInsertConnection(String url, String username, String password) throws SQLException
