@@ -6,170 +6,202 @@
         <version>1.15.0-SNAPSHOT</version>
     </parent>
     <groupId>se.kuseman.payloadbuilder</groupId>
-    <artifactId>payloadbuilder-catalog</artifactId>
+    <artifactId>payloadbuilder-catalog-parent</artifactId>
+    <packaging>pom</packaging>
     <name>Payloadbuilder :: Catalog</name>
-    <description>Payloadbuilder Catalogs</description>
+    <description>Payloadbuilder Catalogs parent</description>
     <url>https://github.com/kuseman/payloadbuilder</url>
 
+    <modules>
+        <module>common</module>
+        <module>es</module>
+        <module>fs</module>
+        <module>http</module>
+        <module>jdbc</module>
+        <module>kafka</module>
+        <module>mongodb</module>
+    </modules>
+
     <properties>
+        <!-- Overridden in each catalog module to point two levels up -->
         <main.basedir>${project.parent.basedir}</main.basedir>
 
-        <testcontainers-version>2.0.2</testcontainers-version>
+        <httpclient5.version>5.6.3</httpclient5.version>
+        <mustache.version>0.9.10</mustache.version>
+        <hikaricp.version>4.0.3</hikaricp.version>
         <kafka-clients.version>3.9.2</kafka-clients.version>
         <avro.version>1.11.4</avro.version>
         <mongodb-driver.version>5.9.1</mongodb-driver.version>
+        <testcontainers-version>2.0.2</testcontainers-version>
+        <mockserver.version>5.15.0</mockserver.version>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <!-- Keep all Jackson artifacts in step with jackson-databind. Modules that don't declare jackson-databind
+                 (fs, jdbc, mongodb) otherwise get an older jackson-annotations from testcontainers' docker-java-api
+                 on the test class path, which breaks core's ObjectMapper -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Internal -->
+            <dependency>
+                <groupId>se.kuseman.payloadbuilder</groupId>
+                <artifactId>payloadbuilder-api</artifactId>
+                <version>${project.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>se.kuseman.payloadbuilder</groupId>
+                <artifactId>payloadbuilder-api</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>se.kuseman.payloadbuilder</groupId>
+                <artifactId>payloadbuilder-core</artifactId>
+                <version>${project.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>se.kuseman.payloadbuilder</groupId>
+                <artifactId>payloadbuilder-catalog-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>se.kuseman.payloadbuilder</groupId>
+                <artifactId>payloadbuilder-catalog-common</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- External -->
+            <dependency>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>${httpclient5.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.spullara.mustache.java</groupId>
+                <artifactId>compiler</artifactId>
+                <version>${mustache.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.zaxxer</groupId>
+                <artifactId>HikariCP</artifactId>
+                <version>${hikaricp.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-api</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>${kafka-clients.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.avro</groupId>
+                <artifactId>avro</artifactId>
+                <version>${avro.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mongodb</groupId>
+                <artifactId>mongodb-driver-sync</artifactId>
+                <version>${mongodb-driver.version}</version>
+            </dependency>
+
+            <!-- Test -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers</artifactId>
+                <version>${testcontainers-version}</version>
+                <scope>test</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.mock-server</groupId>
+                <artifactId>mockserver-netty-no-dependencies</artifactId>
+                <version>${mockserver.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- JDBC drivers -->
+            <dependency>
+                <groupId>com.microsoft.sqlserver</groupId>
+                <artifactId>mssql-jdbc</artifactId>
+                <version>13.2.1.jre11</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.mariadb.jdbc</groupId>
+                <artifactId>mariadb-java-client</artifactId>
+                <version>3.3.5</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>8.2.0</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>42.7.12</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.oracle.database.jdbc</groupId>
+                <artifactId>ojdbc8</artifactId>
+                <version>23.2.0.0</version>
+                <scope>test</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- Dependencies shared by every catalog module -->
     <dependencies>
-        <!-- Internal -->
         <dependency>
             <groupId>se.kuseman.payloadbuilder</groupId>
             <artifactId>payloadbuilder-api</artifactId>
-            <version>${project.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!--  External -->
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-collections4</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.httpcomponents.client5</groupId>
-            <artifactId>httpclient5</artifactId>
-            <version>5.6.3</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.spullara.mustache.java</groupId>
-            <artifactId>compiler</artifactId>
-            <version>0.9.10</version>
-        </dependency>
-        <dependency>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP</artifactId>
-            <version>4.0.3</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-api</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
-
-        <!-- Kafka -->
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka-clients</artifactId>
-            <version>${kafka-clients.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.avro</groupId>
-            <artifactId>avro</artifactId>
-            <version>${avro.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- MongoDB -->
-        <dependency>
-            <groupId>org.mongodb</groupId>
-            <artifactId>mongodb-driver-sync</artifactId>
-            <version>${mongodb-driver.version}</version>
         </dependency>
 
         <!-- Test -->
         <dependency>
             <groupId>se.kuseman.payloadbuilder</groupId>
             <artifactId>payloadbuilder-api</artifactId>
-            <version>${project.version}</version>
             <type>test-jar</type>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>se.kuseman.payloadbuilder</groupId>
             <artifactId>payloadbuilder-core</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-reload4j</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <version>${testcontainers-version}</version>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>junit</groupId>
-                    <artifactId>junit</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.mock-server</groupId>
-            <artifactId>mockserver-netty-no-dependencies</artifactId>
-            <version>5.15.0</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- JDBC drivers -->
-        <dependency>
-            <groupId>com.microsoft.sqlserver</groupId>
-            <artifactId>mssql-jdbc</artifactId>
-            <version>13.2.1.jre11</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mariadb.jdbc</groupId>
-            <artifactId>mariadb-java-client</artifactId>
-            <version>3.3.5</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
-            <version>8.2.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>42.7.12</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.oracle.database.jdbc</groupId>
-            <artifactId>ojdbc8</artifactId>
-            <version>23.2.0.0</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

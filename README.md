@@ -55,13 +55,32 @@ Maven
     <artifactId>payloadbuilder-core</artifactId>
     <version>${payloadbuilder.version}</version>
   </dependency>
-  <!-- Optionally add bundled catalogs -->
+  <!-- Optionally add bundled catalogs, one artifact per catalog -->
   <dependency>
     <groupId>se.kuseman.payloadbuilder</groupId>
-    <artifactId>payloadbuilder-catalog</artifactId>
+    <artifactId>payloadbuilder-catalog-es</artifactId>
+    <version>${payloadbuilder.version}</version>
+  </dependency>
+  <dependency>
+    <groupId>se.kuseman.payloadbuilder</groupId>
+    <artifactId>payloadbuilder-catalog-fs</artifactId>
     <version>${payloadbuilder.version}</version>
   </dependency>
 ```
+
+Bundled catalog artifacts (all with groupId `se.kuseman.payloadbuilder`):
+
+| Catalog | Artifact |
+|---|---|
+| `ESCatalog` | `payloadbuilder-catalog-es` |
+| `FilesystemCatalog` | `payloadbuilder-catalog-fs` |
+| `HttpCatalog` | `payloadbuilder-catalog-http` |
+| `JdbcCatalog` | `payloadbuilder-catalog-jdbc` |
+| `KafkaCatalog` | `payloadbuilder-catalog-kafka` |
+| `MongoCatalog` | `payloadbuilder-catalog-mongodb` |
+
+Before 1.15.0 all catalogs were published together as `payloadbuilder-catalog`. That artifact is no longer published,
+see the [1.15.0 release notes](documentation/release-notes/1.15.0.md).
 
 ## Getting Started
 
