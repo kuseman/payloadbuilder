@@ -1,8 +1,8 @@
 package se.kuseman.payloadbuilder.catalog.kafka;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,19 +17,15 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.header.Header;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
-import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.catalog.kafka.KafkaOptions.OnError;
 import se.kuseman.payloadbuilder.catalog.kafka.KafkaOptions.SortOrder;
 
@@ -76,19 +72,14 @@ class KafkaTupleIterator implements TupleIterator
     private final OnError onError;
     private final SortOrder sortOrder;
     private final List<KafkaSortColumn> pushedSort;
+    private final KafkaProjection projection;
+    private final UTF8String topic;
     private final IExecutionContext context;
     private final Runnable abortListener;
     private final long pollTimeoutMs;
 
     private TupleVector pendingBatch;
-    private List<Object> newestKeys;
-    private List<byte[]> newestRawValues;
-    private List<Long> newestOffsets;
-    private List<Integer> newestPartitions;
-    private List<Long> newestTimestamps;
-    private List<UTF8String> newestTimestampTypes;
-    private List<Object> newestHeaders;
-    private List<UTF8String> newestTopics;
+    private KafkaRecordBuffer newestBuffer;
     private int newestCursor;
     private boolean newestBufferLoaded;
     private boolean closed;
@@ -104,6 +95,7 @@ class KafkaTupleIterator implements TupleIterator
             OnError onError,
             SortOrder sortOrder,
             List<KafkaSortColumn> pushedSort,
+            KafkaProjection projection,
             IExecutionContext context,
             Runnable abortListener,
             long pollTimeoutMs)
@@ -115,6 +107,11 @@ class KafkaTupleIterator implements TupleIterator
         {
             this.splitByPartition.put(split.partition(), split);
         }
+        // All splits belong to the same topic, share one instance instead of one per record
+        this.topic = splits.isEmpty() ? null
+                : UTF8String.from(splits.get(0)
+                        .topic());
+        this.projection = projection;
         this.deserializer = deserializer;
         this.nodeData = nodeData;
         this.batchSize = batchSize;
@@ -190,6 +187,30 @@ class KafkaTupleIterator implements TupleIterator
                 : -1;
     }
 
+    /**
+     * Upper bound of the rows this scan produces (offset span of all splits - compaction, transaction markers and on_error='skip' can make the actual count lower). Without it the engine treats the
+     * scan as unknown size, and a hash join with a large outer side then hashes this side - ie. buffers the whole topic in memory. Unknown (-1) in stream mode or when any split is unbounded.
+     */
+    @Override
+    public int estimatedRowCount()
+    {
+        if (streaming)
+        {
+            return -1;
+        }
+        long total = 0;
+        for (KafkaSplit split : splitByPartition.values())
+        {
+            long count = split.estimatedRecordCount();
+            if (count < 0)
+            {
+                return -1;
+            }
+            total += count;
+        }
+        return (int) Math.min(total, Integer.MAX_VALUE);
+    }
+
     private boolean fetchNextBatch()
     {
         // A pushed-down ORDER BY (pushedSort) requires the exact requested order, and a WITH-clause
@@ -208,15 +229,7 @@ class KafkaTupleIterator implements TupleIterator
             return false;
         }
 
-        // Accumulation buffers
-        List<Object> keys = new ArrayList<>(batchSize);
-        List<byte[]> rawValues = new ArrayList<>(batchSize);
-        List<Long> offsets = new ArrayList<>(batchSize);
-        List<Integer> partitions = new ArrayList<>(batchSize);
-        List<Long> timestamps = new ArrayList<>(batchSize);
-        List<UTF8String> timestampTypes = new ArrayList<>(batchSize);
-        List<Object> headers = new ArrayList<>(batchSize);
-        List<UTF8String> topics = new ArrayList<>(batchSize);
+        KafkaRecordBuffer buffer = new KafkaRecordBuffer(batchSize, projection);
 
         int accumulated = 0;
         int stalledPollCount = 0;
@@ -313,15 +326,7 @@ class KafkaTupleIterator implements TupleIterator
                     continue;
                 }
 
-                keys.add(key);
-                // Store raw value bytes for lazy deserialization
-                rawValues.add(record.value());
-                offsets.add(record.offset());
-                partitions.add(partition);
-                timestamps.add(record.timestamp());
-                timestampTypes.add(UTF8String.from(record.timestampType().name));
-                headers.add(convertHeaders(record.headers()));
-                topics.add(UTF8String.from(record.topic()));
+                buffer.add(record, key);
 
                 nodeData.recordsPolled++;
                 nodeData.bytesRead += estimateRecordSize(record);
@@ -355,7 +360,7 @@ class KafkaTupleIterator implements TupleIterator
             return false;
         }
 
-        pendingBatch = buildTupleVector(keys, rawValues, offsets, partitions, timestamps, timestampTypes, headers, topics);
+        pendingBatch = buffer.toTupleVector(topic, deserializer, onError, nodeData);
         return true;
     }
 
@@ -367,16 +372,17 @@ class KafkaTupleIterator implements TupleIterator
             newestBufferLoaded = true;
         }
 
-        if (newestOffsets == null
-                || newestCursor >= newestOffsets.size())
+        if (newestBuffer == null
+                || newestCursor >= newestBuffer.size())
         {
+            // Release the buffered records
+            newestBuffer = null;
             return false;
         }
 
-        int toIndex = Math.min(newestCursor + batchSize, newestOffsets.size());
-        pendingBatch = buildTupleVector(slice(newestKeys, newestCursor, toIndex), slice(newestRawValues, newestCursor, toIndex), slice(newestOffsets, newestCursor, toIndex),
-                slice(newestPartitions, newestCursor, toIndex), slice(newestTimestamps, newestCursor, toIndex), slice(newestTimestampTypes, newestCursor, toIndex),
-                slice(newestHeaders, newestCursor, toIndex), slice(newestTopics, newestCursor, toIndex));
+        int toIndex = Math.min(newestCursor + batchSize, newestBuffer.size());
+        pendingBatch = newestBuffer.slice(newestCursor, toIndex)
+                .toTupleVector(topic, deserializer, onError, nodeData);
 
         newestCursor = toIndex;
         return true;
@@ -384,14 +390,7 @@ class KafkaTupleIterator implements TupleIterator
 
     private void loadNewestBuffer()
     {
-        List<Object> keys = new ArrayList<>();
-        List<byte[]> rawValues = new ArrayList<>();
-        List<Long> offsets = new ArrayList<>();
-        List<Integer> partitions = new ArrayList<>();
-        List<Long> timestamps = new ArrayList<>();
-        List<UTF8String> timestampTypes = new ArrayList<>();
-        List<Object> headers = new ArrayList<>();
-        List<UTF8String> topics = new ArrayList<>();
+        KafkaRecordBuffer buffer = new KafkaRecordBuffer(batchSize, projection);
 
         int stalledPollCount = 0;
 
@@ -466,14 +465,7 @@ class KafkaTupleIterator implements TupleIterator
                     continue;
                 }
 
-                keys.add(key);
-                rawValues.add(record.value());
-                offsets.add(record.offset());
-                partitions.add(partition);
-                timestamps.add(record.timestamp());
-                timestampTypes.add(UTF8String.from(record.timestampType().name));
-                headers.add(convertHeaders(record.headers()));
-                topics.add(UTF8String.from(record.topic()));
+                buffer.add(record, key);
 
                 nodeData.recordsPolled++;
                 nodeData.bytesRead += estimateRecordSize(record);
@@ -488,80 +480,39 @@ class KafkaTupleIterator implements TupleIterator
             pauseCompletedPartitions();
         }
 
-        if (!offsets.isEmpty())
+        if (buffer.size() > 1)
         {
-            reorderNewest(keys, rawValues, offsets, partitions, timestamps, timestampTypes, headers, topics, pushedSort);
+            reorderNewest(buffer, pushedSort);
         }
 
-        newestKeys = keys;
-        newestRawValues = rawValues;
-        newestOffsets = offsets;
-        newestPartitions = partitions;
-        newestTimestamps = timestamps;
-        newestTimestampTypes = timestampTypes;
-        newestHeaders = headers;
-        newestTopics = topics;
+        newestBuffer = buffer;
         newestCursor = 0;
     }
 
-    private static <T> List<T> slice(List<T> values, int fromIndex, int toIndex)
+    private static void reorderNewest(KafkaRecordBuffer buffer, List<KafkaSortColumn> pushedSort)
     {
-        return new ArrayList<>(values.subList(fromIndex, toIndex));
-    }
-
-    //@formatter:off
-    private static void reorderNewest(
-            List<Object> keys,
-            List<byte[]> rawValues,
-            List<Long> offsets,
-            List<Integer> partitions,
-            List<Long> timestamps,
-            List<UTF8String> timestampTypes,
-            List<Object> headers,
-            List<UTF8String> topics,
-            List<KafkaSortColumn> pushedSort)
-    //@formatter:on
-    {
-        int size = offsets.size();
-        if (size <= 1)
-        {
-            return;
-        }
-
-        List<Integer> order = new ArrayList<>(size);
+        int size = buffer.size();
+        Integer[] order = new Integer[size];
         for (int i = 0; i < size; i++)
         {
-            order.add(i);
+            order[i] = i;
         }
 
-        order.sort(buildComparator(pushedSort, offsets, timestamps).thenComparing(i -> partitions.get(i)));
+        Arrays.sort(order, buildComparator(pushedSort, buffer).thenComparingInt(buffer::partition));
 
-        reorderList(keys, order);
-        reorderList(rawValues, order);
-        reorderList(offsets, order);
-        reorderList(partitions, order);
-        reorderList(timestamps, order);
-        reorderList(timestampTypes, order);
-        reorderList(headers, order);
-        reorderList(topics, order);
-    }
-
-    private static <T> void reorderList(List<T> values, List<Integer> order)
-    {
-        List<T> sorted = new ArrayList<>(order.size());
-        for (int index : order)
+        int[] rows = new int[size];
+        for (int i = 0; i < size; i++)
         {
-            sorted.add(values.get(index));
+            rows[i] = order[i];
         }
-        values.clear();
-        values.addAll(sorted);
+        buffer.reorder(rows);
     }
 
     /**
      * Build the comparator used to physically order buffered rows. A pushed-down ORDER BY (offset/timestamp, always DESC) is honored in exactly the requested column sequence; with no pushed sort -
      * ie. only the WITH-clause sort_order='newest' was requested - the default is timestamp DESC then offset DESC. Either way partition ASC is applied by the caller as a final tie-breaker.
      */
-    private static Comparator<Integer> buildComparator(List<KafkaSortColumn> pushedSort, List<Long> offsets, List<Long> timestamps)
+    private static Comparator<Integer> buildComparator(List<KafkaSortColumn> pushedSort, KafkaRecordBuffer buffer)
     {
         List<KafkaSortColumn> columns = (pushedSort != null
                 && !pushedSort.isEmpty()) ? pushedSort
@@ -570,8 +521,8 @@ class KafkaTupleIterator implements TupleIterator
         Comparator<Integer> comparator = null;
         for (KafkaSortColumn column : columns)
         {
-            Comparator<Integer> next = column == KafkaSortColumn.OFFSET ? Comparator.comparing((Integer i) -> offsets.get(i), Comparator.reverseOrder())
-                    : Comparator.comparing((Integer i) -> timestamps.get(i), Comparator.reverseOrder());
+            Comparator<Integer> next = column == KafkaSortColumn.OFFSET ? (a, b) -> Long.compare(buffer.offset(b), buffer.offset(a))
+                    : (a, b) -> Long.compare(buffer.timestamp(b), buffer.timestamp(a));
             comparator = comparator == null ? next
                     : comparator.thenComparing(next);
         }
@@ -675,61 +626,6 @@ class KafkaTupleIterator implements TupleIterator
         {
             consumer.pause(toPause);
         }
-    }
-
-    //@formatter:off
-    private TupleVector buildTupleVector(
-            List<Object> keys,
-            List<byte[]> rawValues,
-            List<Long> offsets,
-            List<Integer> partitions,
-            List<Long> timestamps,
-            List<UTF8String> timestampTypes,
-            List<Object> headers,
-            List<UTF8String> topics)
-    //@formatter:on
-    {
-        int rowCount = offsets.size();
-
-        // Build lazy value column. on_error='skip' rows never reach here (dropped eagerly while polling), so
-        // this only has to honor 'fail' (rethrow) and 'null' (swallow) on first access.
-        byte[][] rawPayloadsArray = rawValues.toArray(new byte[0][]);
-        int[] partitionsArray = partitions.stream()
-                .mapToInt(Integer::intValue)
-                .toArray();
-        long[] offsetsArray = offsets.stream()
-                .mapToLong(Long::longValue)
-                .toArray();
-        ValueVector lazyValueVector = new LazyDeserializingValueVector(rawPayloadsArray, deserializer, onError, partitionsArray, offsetsArray, nodeData);
-
-        return new ObjectTupleVector(SCHEMA, rowCount, (row, col) -> switch (col)
-        {
-            case COL_KEY -> keys.get(row);
-            case COL_VALUE -> lazyValueVector.getAny(row);
-            case COL_OFFSET -> offsets.get(row);
-            case COL_PARTITION -> partitions.get(row);
-            case COL_TIMESTAMP -> EpochDateTimeOffset.from(timestamps.get(row));
-            case COL_TIMESTAMPTYPE -> timestampTypes.get(row);
-            case COL_HEADERS -> headers.get(row);
-            case COL_TOPIC -> topics.get(row);
-            default -> throw new IllegalArgumentException("Invalid column: " + col);
-        });
-    }
-
-    private static Map<String, Object> convertHeaders(org.apache.kafka.common.header.Headers kafkaHeaders)
-    {
-        if (kafkaHeaders == null)
-        {
-            return null;
-        }
-        Map<String, Object> result = new HashMap<>();
-        for (Header header : kafkaHeaders)
-        {
-            result.put(header.key(), header.value() != null ? new String(header.value(), StandardCharsets.UTF_8)
-                    : null);
-        }
-        return result.isEmpty() ? null
-                : result;
     }
 
     private static long estimateRecordSize(ConsumerRecord<byte[], byte[]> record)

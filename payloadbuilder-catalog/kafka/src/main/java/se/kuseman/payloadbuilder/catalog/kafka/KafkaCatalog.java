@@ -74,7 +74,8 @@ public class KafkaCatalog extends Catalog
 
         return switch (entityType.toLowerCase())
         {
-            case "topic" -> new KafkaDatasource(data.getNodeId(), catalogAlias, entityName, predicateAnalysis, data.getOptions(), pushedSort, hasResidualPredicates);
+            case "topic" -> new KafkaDatasource(data.getNodeId(), catalogAlias, entityName, predicateAnalysis, data.getOptions(), pushedSort, hasResidualPredicates,
+                    KafkaProjection.from(data.getProjection()));
             case "metadata" -> new KafkaMetadataDatasource(catalogAlias, entityName);
             case "consumer_group" -> new KafkaConsumerGroupDatasource(catalogAlias, entityName);
             default -> throw new IllegalArgumentException("Unknown Kafka entity type: '" + entityType + "'. Supported: topic, metadata, consumer_group");
