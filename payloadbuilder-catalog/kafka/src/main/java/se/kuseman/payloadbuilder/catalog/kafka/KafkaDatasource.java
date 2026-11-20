@@ -22,9 +22,21 @@ class KafkaDatasource implements IDatasource
     private final List<Option> options;
     private final List<KafkaSortColumn> pushedSort;
     private final boolean hasResidualPredicates;
+    private final KafkaProjection projection;
 
-    KafkaDatasource(int nodeId, String catalogAlias, String topic, KafkaPredicateAnalysis predicateAnalysis, List<Option> options, List<KafkaSortColumn> pushedSort, boolean hasResidualPredicates)
+    //@formatter:off
+    KafkaDatasource(
+            int nodeId,
+            String catalogAlias,
+            String topic,
+            KafkaPredicateAnalysis predicateAnalysis,
+            List<Option> options,
+            List<KafkaSortColumn> pushedSort,
+            boolean hasResidualPredicates,
+            KafkaProjection projection)
+    //@formatter:on
     {
+        this.projection = projection;
         this.nodeId = nodeId;
         this.catalogAlias = catalogAlias;
         this.topic = topic;
@@ -86,8 +98,8 @@ class KafkaDatasource implements IDatasource
 
             boolean streaming = kafkaOptions.mode() == KafkaOptions.ExecutionMode.STREAM;
 
-            return new KafkaTupleIterator(consumer, splits, deserializer, nodeData, kafkaOptions.batchSize(), streaming, kafkaOptions.onError(), kafkaOptions.sortOrder(), pushedSort, context,
-                    abortListener, kafkaOptions.pollTimeoutMs());
+            return new KafkaTupleIterator(consumer, splits, deserializer, nodeData, kafkaOptions.batchSize(), streaming, kafkaOptions.onError(), kafkaOptions.sortOrder(), pushedSort, projection,
+                    context, abortListener, kafkaOptions.pollTimeoutMs());
         }
         catch (Exception e)
         {
