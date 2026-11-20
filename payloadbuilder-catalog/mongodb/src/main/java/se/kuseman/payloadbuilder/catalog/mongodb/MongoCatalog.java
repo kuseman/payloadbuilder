@@ -41,6 +41,15 @@ public class MongoCatalog extends Catalog
     public static final String CONNECT_TIMEOUT_KEY = "connectTimeout";
     public static final String SOCKET_TIMEOUT_KEY = "socketTimeout";
     public static final String SERVER_SELECTION_TIMEOUT_KEY = "serverSelectionTimeout";
+    /**
+     * Boolean (or the string "true") catalog property. When true any server certificate and host name is accepted. Only takes effect when TLS is enabled by the connection string ({@code tls=true},
+     * {@code ssl=true} or {@code mongodb+srv://}), it never turns TLS on by itself. Default false.
+     *
+     * <pre>
+     * WARNING! This turns off protection against man-in-the-middle attacks. Only use it for servers you trust, such as local or lab clusters.
+     * </pre>
+     */
+    public static final String TLS_ALLOW_INVALID_CERTIFICATES_KEY = "tlsAllowInvalidCertificates";
     static final String ID_COLUMN = "_id";
     /** MongoDB's own internal databases - never surfaced through sys#tables/columns/indices. */
     private static final Set<String> SYSTEM_DATABASES = Set.of("admin", "local", "config");
