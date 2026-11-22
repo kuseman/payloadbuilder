@@ -56,6 +56,7 @@ abstract class BaseMongoTest
     private static final String CATALOG_ALIAS = "mongo";
     private static final String DATABASE = "testdb";
     private static final String COLLECTION = "testcoll";
+    private static final String VIEW = "testview";
     static final ObjectId ID_1 = new ObjectId("507f1f77bcf86cd799439011");
     static final ObjectId ID_2 = new ObjectId("507f1f77bcf86cd799439012");
     static final ObjectId ID_3 = new ObjectId("507f1f77bcf86cd799439013");
@@ -75,6 +76,9 @@ abstract class BaseMongoTest
         testClient = MongoClients.create(connectionString);
         testClient.getDatabase(DATABASE)
                 .getCollection(COLLECTION)
+                .drop();
+        testClient.getDatabase(DATABASE)
+                .getCollection(VIEW)
                 .drop();
     }
 
@@ -378,6 +382,47 @@ abstract class BaseMongoTest
         }
         // Only '_id' and the indexed "key" field are reported - the non-indexed "name" field is intentionally not sampled/surfaced
         assertEquals(Set.of("_id", "key"), columns);
+    }
+
+    @Test
+    void test_system_columns_and_table_schema_with_a_view()
+    {
+        insertTestData();
+        testClient.getDatabase(DATABASE)
+                .createView(VIEW, COLLECTION, List.of(new Document("$match", new Document("key", new Document("$gt", 200)))));
+        IExecutionContext context = mockContext();
+
+        // listIndexes isn't supported on a view: it must not fail the whole system table
+        IDatasource ds = catalog.getSystemTableDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("columns"),
+                new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, emptyList()));
+        Set<Object> viewColumns = new HashSet<>();
+        Set<Object> collectionColumns = new HashSet<>();
+        for (TupleVector v : drain(ds.execute(context)))
+        {
+            ValueVector tableCol = v.getColumn(indexOf(v, "table"));
+            ValueVector nameCol = v.getColumn(indexOf(v, "name"));
+            for (int i = 0; i < v.getRowCount(); i++)
+            {
+                Object table = tableCol.getAny(i);
+                if ((DATABASE + "." + VIEW).equals(table))
+                {
+                    viewColumns.add(nameCol.getAny(i));
+                }
+                else if ((DATABASE + "." + COLLECTION).equals(table))
+                {
+                    collectionColumns.add(nameCol.getAny(i));
+                }
+            }
+        }
+        assertEquals(Set.of("_id"), viewColumns);
+        assertEquals(Set.of("_id", "key"), collectionColumns);
+
+        // Planning a query against the view reads its indexes too
+        TableSchema viewSchema = catalog.getTableSchema(context, CATALOG_ALIAS, QualifiedName.of(DATABASE, VIEW), emptyList());
+        assertEquals(List.of(List.of("_id")), viewSchema.getIndices()
+                .stream()
+                .map(Index::getColumns)
+                .toList());
     }
 
     @Test

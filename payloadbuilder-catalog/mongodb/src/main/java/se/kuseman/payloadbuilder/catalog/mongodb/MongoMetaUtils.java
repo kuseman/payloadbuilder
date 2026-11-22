@@ -7,6 +7,7 @@ import java.util.Map.Entry;
 
 import org.bson.Document;
 
+import com.mongodb.MongoCommandException;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 
@@ -19,6 +20,8 @@ final class MongoMetaUtils
 {
     private static final QualifiedName CACHE_NAME = QualifiedName.of("Mongo", "Meta");
     private static final int DEFAULT_META_CACHE_TTL_MINUTES = 60;
+    /** MongoDB's CommandNotSupportedOnView: listIndexes on a view */
+    private static final int COMMAND_NOT_SUPPORTED_ON_VIEW = 166;
 
     private MongoMetaUtils()
     {
@@ -45,6 +48,24 @@ final class MongoMetaUtils
                 .getCollection(table.collection());
 
         List<MongoIndex> result = new ArrayList<>();
+        try
+        {
+            collectIndexes(collection, result);
+        }
+        catch (MongoCommandException e)
+        {
+            if (e.getErrorCode() != COMMAND_NOT_SUPPORTED_ON_VIEW)
+            {
+                throw e;
+            }
+            // A view has no indexes of its own: it's scanned, and '_id' is still declared separately
+            return List.of();
+        }
+        return result;
+    }
+
+    private static void collectIndexes(MongoCollection<Document> collection, List<MongoIndex> result)
+    {
         for (Document indexDoc : collection.listIndexes())
         {
             Document key = indexDoc.get("key", Document.class);
@@ -72,7 +93,6 @@ final class MongoMetaUtils
 
             result.add(new MongoIndex(field));
         }
-        return result;
     }
 
     /** Return collection names for provided database. */
