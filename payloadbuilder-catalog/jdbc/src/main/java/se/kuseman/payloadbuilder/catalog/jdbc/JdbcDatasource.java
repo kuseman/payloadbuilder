@@ -342,6 +342,10 @@ class JdbcDatasource implements IDatasource
             private boolean resultSetEnded = false;
             private boolean exhausted = false;
             private volatile boolean abort = false;
+            /** Flag that indicates that the statement has produced any result (result set or update count) */
+            private boolean resultProduced = false;
+            /** Exceptions thrown before any result was produced. These are deferred until we know if the whole statement failed or not */
+            private List<SQLException> pendingExceptions;
 
             {
                 context.getSession()
@@ -429,14 +433,17 @@ class JdbcDatasource implements IDatasource
                         if (rs == null)
                         {
                             boolean first = statement == null;
-                            rs = JdbcUtils.getNextResultSet(e -> context.getSession()
-                                    .handleKnownException(e), context.getSession()
-                                            .getPrintWriter(),
-                                    getStatement(), query, first);
+                            rs = JdbcUtils.getNextResultSet(this::handleException, this::handleResult, context.getSession()
+                                    .getPrintWriter(), getStatement(), query, first);
                             // No more result, we're done
                             if (rs == null)
                             {
                                 exhausted = true;
+                                // The statement failed without producing anything (ie. a syntax error) => fail the query
+                                if (pendingExceptions != null)
+                                {
+                                    throw new StatementFailedException(pendingExceptions);
+                                }
                                 return false;
                             }
 
@@ -461,8 +468,52 @@ class JdbcDatasource implements IDatasource
                         // Close everything here just to be safe
                         // close on iterator should be called but better safe than sorry
                         JdbcUtils.closeQuiet(connection, statement, rs);
+                        if (e instanceof StatementFailedException sfe)
+                        {
+                            throw sfe;
+                        }
+                        // Some drivers (ie. MariaDB) throws non SQLExceptions when traversing results after a failed execute,
+                        // if we have a pending SQL exception that is the real cause
+                        if (pendingExceptions != null)
+                        {
+                            StatementFailedException sfe = new StatementFailedException(pendingExceptions);
+                            sfe.addSuppressed(e);
+                            throw sfe;
+                        }
                         throw new RuntimeException("Error advancing result set", e);
                     }
+                }
+            }
+
+            private void handleException(SQLException e)
+            {
+                // Statement has produced results => treat exceptions as known/non crucial (ie. raiserror in a SQL Server batch that continues execution)
+                if (resultProduced)
+                {
+                    context.getSession()
+                            .handleKnownException(e);
+                    return;
+                }
+                if (pendingExceptions == null)
+                {
+                    pendingExceptions = new ArrayList<>();
+                }
+                pendingExceptions.add(e);
+            }
+
+            private void handleResult()
+            {
+                if (resultProduced)
+                {
+                    return;
+                }
+                resultProduced = true;
+                // Flush deferred exceptions in order now that we know the statement didn't fail as a whole
+                if (pendingExceptions != null)
+                {
+                    pendingExceptions.forEach(e -> context.getSession()
+                            .handleKnownException(e));
+                    pendingExceptions = null;
                 }
             }
 
@@ -551,5 +602,19 @@ class JdbcDatasource implements IDatasource
                 return statement;
             };
         };
+    }
+
+    /** Exception thrown when a statement fails without producing any results */
+    static class StatementFailedException extends RuntimeException
+    {
+        StatementFailedException(List<SQLException> exceptions)
+        {
+            super(exceptions.get(0)
+                    .getMessage(), exceptions.get(0));
+            for (int i = 1; i < exceptions.size(); i++)
+            {
+                addSuppressed(exceptions.get(i));
+            }
+        }
     }
 }
