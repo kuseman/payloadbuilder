@@ -190,6 +190,8 @@
                             <autoPublish>true</autoPublish>
                             <waitUntil>published</waitUntil>
                             <deploymentName>Payloadbuilder</deploymentName>
+                            <!-- Only generate MD5 and SHA1 (required by Central). SHA256/SHA512 doubles the checksum file count which counts towards publishing limits -->
+                            <checksums>required</checksums>
                         </configuration>
                     </plugin>
                 </plugins>
