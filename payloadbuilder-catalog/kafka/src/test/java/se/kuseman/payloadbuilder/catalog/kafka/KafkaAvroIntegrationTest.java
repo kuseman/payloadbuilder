@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.catalog.kafka;
 import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -171,7 +173,13 @@ class KafkaAvroIntegrationTest
 
     private static int registerSchema(String subject, String schemaJson) throws IOException
     {
-        String payload = MAPPER.writeValueAsString(Map.of("schema", schemaJson));
+        return registerSchema(subject, schemaJson, null);
+    }
+
+    private static int registerSchema(String subject, String schemaJson, String schemaType) throws IOException
+    {
+        String payload = MAPPER.writeValueAsString(schemaType == null ? Map.of("schema", schemaJson)
+                : Map.of("schema", schemaJson, "schemaType", schemaType));
         HttpPost post = new HttpPost(schemaRegistryUrl + "/subjects/" + subject + "/versions");
         post.setEntity(new StringEntity(payload, org.apache.hc.core5.http.ContentType.APPLICATION_JSON));
 
@@ -239,6 +247,120 @@ class KafkaAvroIntegrationTest
     private IExecutionContext createContext()
     {
         return TestUtils.mockExecutionContext(CATALOG_ALIAS, Map.of(KafkaCatalog.BOOTSTRAP_SERVERS, bootstrapServers, KafkaCatalog.SCHEMA_REGISTRY_URL, schemaRegistryUrl), 0, new KafkaNodeData());
+    }
+
+    private IExecutionContext createContextWithoutRegistry()
+    {
+        return TestUtils.mockExecutionContext(CATALOG_ALIAS, Map.of(KafkaCatalog.BOOTSTRAP_SERVERS, bootstrapServers), 0, new KafkaNodeData());
+    }
+
+    @Test
+    void test_auto_format_reads_avro_topic_same_as_avro_format()
+    {
+        assumeTrue(available, "Docker/Schema Registry not available");
+
+        List<Option> avroOptions = new ArrayList<>();
+        avroOptions.add(new Option(KafkaOptions.FORMAT, ExpressionTestUtils.createStringExpression("avro")));
+
+        Map<Long, Object> avro = readValuesByOffset(createContext(), AVRO_TOPIC, avroOptions);
+        Map<Long, Object> auto = readValuesByOffset(createContext(), AVRO_TOPIC, new ArrayList<>());
+
+        assertEquals(NUM_MESSAGES, avro.size());
+        assertEquals(avro, auto);
+        assertTrue(auto.get(0L) instanceof Map);
+    }
+
+    @Test
+    void test_auto_format_reads_json_schema_values() throws Exception
+    {
+        assumeTrue(available, "Docker/Schema Registry not available");
+
+        String topic = "json_schema_orders_" + System.nanoTime();
+        int jsonSchemaId = registerSchema(topic + "-value", "{\"type\":\"object\",\"properties\":{\"orderId\":{\"type\":\"integer\"}}}", "JSON");
+        int avroSchemaId = registerSchema(AVRO_TOPIC + "-value", AVRO_SCHEMA_JSON);
+        Schema avroSchema = new Schema.Parser().parse(AVRO_SCHEMA_JSON);
+        GenericRecord record = new GenericData.Record(avroSchema);
+        record.put("orderId", 7);
+        record.put("customer", "customer-7");
+        record.put("amount", 1.5);
+        record.put("active", true);
+
+        produce(topic,
+                List.of(wrapConfluentWireFormat(jsonSchemaId, "{\"orderId\":1}".getBytes(StandardCharsets.UTF_8)),
+                        wrapConfluentWireFormat(jsonSchemaId, "{\"orderId\":2}".getBytes(StandardCharsets.UTF_8)), wrapConfluentWireFormat(avroSchemaId, serializeAvro(record, avroSchema)),
+                        "plain text".getBytes(StandardCharsets.UTF_8)));
+
+        // With a registry: routed on schemaType
+        Map<Long, Object> values = readValuesByOffset(createContext(), topic, new ArrayList<>());
+        assertEquals(4, values.size());
+        assertEquals(Map.of("orderId", 1), values.get(0L));
+        assertEquals(Map.of("orderId", 2), values.get(1L));
+        assertEquals(Map.of("orderId", 7, "customer", UTF8String.from("customer-7"), "amount", 1.5, "active", true), values.get(2L));
+        assertEquals(UTF8String.from("plain text"), values.get(3L));
+
+        // Without a registry: JSON Schema values are still JSON after the header
+        Map<Long, Object> noRegistry = readValuesByOffset(createContextWithoutRegistry(), topic, new ArrayList<>());
+        assertEquals(Map.of("orderId", 1), noRegistry.get(0L));
+        assertTrue(noRegistry.get(2L) instanceof UTF8String);
+
+        // Explicit avro: the JSON Schema value fails with a clear message
+        List<Option> avroOptions = new ArrayList<>();
+        avroOptions.add(new Option(KafkaOptions.FORMAT, ExpressionTestUtils.createStringExpression("avro")));
+        RuntimeException e = assertThrows(RuntimeException.class, () -> readValuesByOffset(createContext(), topic, avroOptions));
+        assertEquals("Value deserialization error at 0:0", e.getMessage());
+        assertEquals("Schema id " + jsonSchemaId + " is JSON, not Avro", e.getCause()
+                .getMessage());
+    }
+
+    private static void produce(String topic, List<byte[]> values) throws Exception
+    {
+        Properties adminProps = new Properties();
+        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        Properties producerProps = new Properties();
+        producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        try (AdminClient admin = AdminClient.create(adminProps); KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(producerProps))
+        {
+            admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1)))
+                    .all()
+                    .get();
+            for (int i = 0; i < values.size(); i++)
+            {
+                producer.send(new ProducerRecord<>(topic, 0, ("key-" + i).getBytes(StandardCharsets.UTF_8), values.get(i)))
+                        .get();
+            }
+        }
+    }
+
+    /** Read every value of the topic, keyed by offset */
+    private static Map<Long, Object> readValuesByOffset(IExecutionContext context, String topic, List<Option> options)
+    {
+        KafkaCatalog catalog = new KafkaCatalog();
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("topic", topic),
+                new DatasourceData(0, new ArrayList<>(), emptyList(), Projection.ALL, options));
+
+        Map<Long, Object> result = new HashMap<>();
+        TupleIterator it = ds.execute(context);
+        try
+        {
+            while (it.hasNext())
+            {
+                TupleVector batch = it.next();
+                for (int i = 0; i < batch.getRowCount(); i++)
+                {
+                    long offset = batch.getColumn(KafkaTupleIterator.COL_OFFSET)
+                            .getLong(i);
+                    result.put(offset, batch.getColumn(KafkaTupleIterator.COL_VALUE)
+                            .getAny(i));
+                }
+            }
+        }
+        finally
+        {
+            it.close();
+        }
+        return result;
     }
 
     @Test

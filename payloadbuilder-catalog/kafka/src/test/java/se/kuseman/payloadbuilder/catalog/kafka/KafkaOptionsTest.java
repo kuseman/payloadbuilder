@@ -36,7 +36,7 @@ class KafkaOptionsTest
         assertEquals("earliest", options.start());
         assertEquals("latest", options.end());
         assertEquals(ExecutionMode.BATCH, options.mode());
-        assertEquals(Format.JSON, options.format());
+        assertEquals(Format.AUTO, options.format());
         assertEquals(OnError.FAIL, options.onError());
         assertEquals(1000, options.pollTimeoutMs());
         assertEquals(SortOrder.OLDEST, options.sortOrder());
@@ -96,6 +96,30 @@ class KafkaOptionsTest
 
         KafkaOptions options = KafkaOptions.from(context, opts);
         assertEquals(Format.AVRO, options.format());
+    }
+
+    @Test
+    void test_format_auto()
+    {
+        IExecutionContext context = createContext();
+        for (String value : new String[] { "auto", "AUTO", "Auto" })
+        {
+            List<Option> opts = new ArrayList<>();
+            opts.add(new Option(KafkaOptions.FORMAT, ExpressionTestUtils.createStringExpression(value)));
+            assertEquals(Format.AUTO, KafkaOptions.from(context, opts)
+                    .format());
+        }
+    }
+
+    @Test
+    void test_format_json()
+    {
+        IExecutionContext context = createContext();
+        List<Option> opts = new ArrayList<>();
+        opts.add(new Option(KafkaOptions.FORMAT, ExpressionTestUtils.createStringExpression("json")));
+
+        KafkaOptions options = KafkaOptions.from(context, opts);
+        assertEquals(Format.JSON, options.format());
     }
 
     @Test
@@ -192,7 +216,8 @@ class KafkaOptionsTest
         List<Option> opts = new ArrayList<>();
         opts.add(new Option(KafkaOptions.FORMAT, ExpressionTestUtils.createStringExpression("invalid")));
 
-        assertThrows(IllegalArgumentException.class, () -> KafkaOptions.from(context, opts));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> KafkaOptions.from(context, opts));
+        assertEquals("Invalid format: 'invalid'. Supported: auto, json, avro, raw", e.getMessage());
     }
 
     @Test

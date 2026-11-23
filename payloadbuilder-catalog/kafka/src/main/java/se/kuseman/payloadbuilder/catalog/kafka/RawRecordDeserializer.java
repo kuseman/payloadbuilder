@@ -14,7 +14,7 @@ class RawRecordDeserializer implements IRecordDeserializer
         {
             return null;
         }
-        return UTF8String.from(new String(keyBytes, StandardCharsets.UTF_8));
+        return toText(keyBytes);
     }
 
     @Override
@@ -24,6 +24,12 @@ class RawRecordDeserializer implements IRecordDeserializer
         {
             return null;
         }
-        return UTF8String.from(new String(valueBytes, StandardCharsets.UTF_8));
+        return toText(valueBytes);
+    }
+
+    /** Decode bytes as a UTF-8 string */
+    static UTF8String toText(byte[] bytes)
+    {
+        return UTF8String.from(new String(bytes, StandardCharsets.UTF_8));
     }
 }

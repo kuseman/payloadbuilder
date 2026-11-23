@@ -58,7 +58,7 @@ record KafkaOptions(String start, String end, ExecutionMode mode, Format format,
 
         String start = getStringOption(context, options, START, DEFAULT_START);
         String end = getStringOption(context, options, END, DEFAULT_END);
-        Format format = parseFormat(getStringOption(context, options, FORMAT, "json"));
+        Format format = parseFormat(getStringOption(context, options, FORMAT, "auto"));
         OnError onError = parseOnError(getStringOption(context, options, ON_ERROR, "fail"));
         int pollTimeoutMs = getIntOption(context, options, POLL_TIMEOUT, DEFAULT_POLL_TIMEOUT_MS);
 
@@ -132,7 +132,7 @@ record KafkaOptions(String start, String end, ExecutionMode mode, Format format,
         }
         catch (IllegalArgumentException e)
         {
-            throw new IllegalArgumentException("Invalid format: '" + value + "'. Supported: json, avro, raw");
+            throw new IllegalArgumentException("Invalid format: '" + value + "'. Supported: auto, json, avro, raw");
         }
     }
 
@@ -170,6 +170,8 @@ record KafkaOptions(String start, String end, ExecutionMode mode, Format format,
     /** Value deserialization format */
     enum Format
     {
+        /** Detect per value: schema-registry wire format, JSON or text */
+        AUTO,
         JSON,
         AVRO,
         RAW
