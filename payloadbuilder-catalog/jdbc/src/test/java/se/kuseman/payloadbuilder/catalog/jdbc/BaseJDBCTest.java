@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -328,6 +329,52 @@ abstract class BaseJDBCTest
                 error 1
                 0 row(s) affected
                 """.replaceAll("[\\n\\r]", System.lineSeparator()), writer.toString());
+    }
+
+    @Test
+    void test_failing_statement_throws()
+    {
+        StringWriter writer = new StringWriter();
+        IExecutionContext context = mockExecutionContext(writer);
+        QueryFunction query = new QueryFunction(catalog);
+
+        TupleIterator it = query.execute(context, CATALOG_ALIAS, asList(ExpressionTestUtils.createStringExpression("select * frm asdasd")), new FunctionData(0, emptyList()));
+        try
+        {
+            assertThrows(JdbcDatasource.StatementFailedException.class, () -> it.hasNext());
+        }
+        finally
+        {
+            it.close();
+        }
+        // Exception should not be reported as a known exception
+        assertEquals("", writer.toString());
+    }
+
+    @Test
+    void test_sql_server_error_before_first_result_is_known_exception()
+    {
+        // Multi statement queries is not supported by all rdbms:es
+        assumeTrue(jdbcUrl.contains("sqlserver"));
+
+        StringWriter writer = new StringWriter();
+        IExecutionContext context = mockExecutionContext(writer);
+        QueryFunction query = new QueryFunction(catalog);
+
+        TupleIterator it = query.execute(context, CATALOG_ALIAS, asList(ExpressionTestUtils.createStringExpression("""
+                raiserror('error 1', 16, 1);
+                select 'done'
+                """)), new FunctionData(0, emptyList()));
+
+        int batchCount = 0;
+        while (it.hasNext())
+        {
+            it.next();
+            batchCount++;
+        }
+        it.close();
+        assertEquals(1, batchCount);
+        assertEquals("error 1" + System.lineSeparator(), writer.toString());
     }
 
     @Test

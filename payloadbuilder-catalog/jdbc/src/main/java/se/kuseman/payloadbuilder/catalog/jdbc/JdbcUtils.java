@@ -323,7 +323,13 @@ final class JdbcUtils
         }
     }
 
-    static ResultSet getNextResultSet(Consumer<SQLException> exceptionHandler, Writer messageWriter, Statement statement, String query, boolean first) throws Exception
+    /**
+     * Traverse statement results until a result set is found or there are no more results.
+     *
+     * @param exceptionHandler Handler for SQL exceptions thrown during traversal. Exceptions are not propagated since some RDBMS:es (ie. SQL Server) continues executing a batch after an error
+     * @param resultHandler Called each time the statement produces a result (result set or update count) before that result is processed
+     */
+    static ResultSet getNextResultSet(Consumer<SQLException> exceptionHandler, Runnable resultHandler, Writer messageWriter, Statement statement, String query, boolean first) throws Exception
     {
         // Skip a while loop here to protect against bugs/bad drivers etc.
         // Traverse until we have a result set or there are no more result sets
@@ -352,6 +358,7 @@ final class JdbcUtils
                 JdbcUtils.printWarnings(statement, messageWriter);
                 if (isResultSet)
                 {
+                    resultHandler.run();
                     ResultSet rs = statement.getResultSet();
                     JdbcUtils.printWarnings(statement, messageWriter);
                     return rs;
@@ -365,6 +372,7 @@ final class JdbcUtils
                         return null;
                     }
 
+                    resultHandler.run();
                     messageWriter.append(String.valueOf(updateCount))
                             .append(" row(s) affected")
                             .append(System.lineSeparator());
