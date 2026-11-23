@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.catalog.kafka;
 import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -44,6 +45,7 @@ import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.catalog.TestUtils;
 import se.kuseman.payloadbuilder.test.ExpressionTestUtils;
 
@@ -877,6 +879,101 @@ class KafkaIntegrationTest
 
         assertEquals(0, sortItems.size(), "Sort item should be consumed when pushed down");
         assertEquals(totalMessages, totalRows, "Every message should be returned, not just batch_size * partition_count");
+    }
+
+    @Test
+    void test_auto_format_is_default_and_decodes_mixed_topic()
+    {
+        assumeTrue(dockerAvailable, "Docker not available");
+
+        String topic = "mixed_" + System.nanoTime();
+        produceToSinglePartition(topic, List.of("{\"orderId\":1}", "Customer 0", "[1,2]", "{not json", "42", "", "42 apples"));
+
+        // No format option: auto
+        Map<Long, Object> values = readValuesByOffset(topic, new ArrayList<>());
+
+        assertEquals(7, values.size());
+        assertEquals(Map.of("orderId", 1), values.get(0L));
+        assertEquals(UTF8String.from("Customer 0"), values.get(1L));
+        assertEquals(List.of(1, 2), values.get(2L));
+        assertEquals(UTF8String.from("{not json"), values.get(3L));
+        assertEquals(42, values.get(4L));
+        assertEquals(UTF8String.from(""), values.get(5L));
+        assertEquals(UTF8String.from("42 apples"), values.get(6L));
+    }
+
+    @Test
+    void test_explicit_json_format_still_fails_on_text()
+    {
+        assumeTrue(dockerAvailable, "Docker not available");
+
+        String topic = "mixed_json_" + System.nanoTime();
+        produceToSinglePartition(topic, List.of("{\"orderId\":1}", "Customer 0"));
+
+        List<Option> options = new ArrayList<>();
+        options.add(new Option(KafkaOptions.FORMAT, ExpressionTestUtils.createStringExpression("json")));
+
+        RuntimeException e = assertThrows(RuntimeException.class, () -> readValuesByOffset(topic, options));
+        assertEquals("Value deserialization error at 0:1", e.getMessage());
+        assertEquals("Failed to deserialize JSON value", e.getCause()
+                .getMessage());
+    }
+
+    private static void produceToSinglePartition(String topic, List<String> values)
+    {
+        Properties adminProps = new Properties();
+        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        Properties producerProps = new Properties();
+        producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        try (AdminClient admin = AdminClient.create(adminProps); KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(producerProps))
+        {
+            admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1)))
+                    .all()
+                    .get();
+            for (int i = 0; i < values.size(); i++)
+            {
+                producer.send(new ProducerRecord<>(topic, 0, ("key-" + i).getBytes(StandardCharsets.UTF_8), values.get(i)
+                        .getBytes(StandardCharsets.UTF_8)))
+                        .get();
+            }
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /** Read every value of the topic, keyed by offset */
+    private Map<Long, Object> readValuesByOffset(String topic, List<Option> options)
+    {
+        KafkaCatalog catalog = new KafkaCatalog();
+        IExecutionContext context = createContext();
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("topic", topic),
+                new DatasourceData(0, new ArrayList<>(), emptyList(), Projection.ALL, options));
+
+        Map<Long, Object> result = new HashMap<>();
+        TupleIterator it = ds.execute(context);
+        try
+        {
+            while (it.hasNext())
+            {
+                TupleVector batch = it.next();
+                for (int i = 0; i < batch.getRowCount(); i++)
+                {
+                    long offset = batch.getColumn(KafkaTupleIterator.COL_OFFSET)
+                            .getLong(i);
+                    result.put(offset, batch.getColumn(KafkaTupleIterator.COL_VALUE)
+                            .getAny(i));
+                }
+            }
+        }
+        finally
+        {
+            it.close();
+        }
+        return result;
     }
 
     private static void assertNewestOrder(List<RowOrder> rows)

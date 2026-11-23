@@ -6,18 +6,24 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
 import org.junit.jupiter.api.Test;
 
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.catalog.kafka.SchemaRegistryClient.RegisteredSchema;
 
 /** Test of {@link AvroRecordDeserializer} */
 class AvroRecordDeserializerTest
@@ -166,7 +172,7 @@ class AvroRecordDeserializerTest
     @Test
     void test_missing_schema_registry_url()
     {
-        assertThrows(IllegalArgumentException.class, () -> new AvroRecordDeserializer(null));
+        assertThrows(IllegalArgumentException.class, () -> new AvroRecordDeserializer((String) null));
         assertThrows(IllegalArgumentException.class, () -> new AvroRecordDeserializer(""));
         assertThrows(IllegalArgumentException.class, () -> new AvroRecordDeserializer("  ,  , "));
     }
@@ -199,5 +205,50 @@ class AvroRecordDeserializerTest
         // Trailing slashes should be stripped to avoid double-slash in URL path
         AvroRecordDeserializer deserializer = new AvroRecordDeserializer("http://localhost:8081/");
         assertNotNull(deserializer);
+    }
+
+    @Test
+    void test_decode_with_schema_lookup() throws Exception
+    {
+        String schemaJson = "{\"type\":\"record\",\"name\":\"Order\",\"fields\":[{\"name\":\"orderId\",\"type\":\"int\"},{\"name\":\"customer\",\"type\":\"string\"}]}";
+        Schema schema = new Schema.Parser().parse(schemaJson);
+        GenericRecord record = new GenericData.Record(schema);
+        record.put("orderId", 42);
+        record.put("customer", new Utf8("Alice"));
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(0);
+        out.write(ByteBuffer.allocate(4)
+                .putInt(17)
+                .array());
+        BinaryEncoder encoder = EncoderFactory.get()
+                .binaryEncoder(out, null);
+        new GenericDatumWriter<GenericRecord>(schema).write(record, encoder);
+        encoder.flush();
+
+        List<Integer> lookups = new ArrayList<>();
+        try (AvroRecordDeserializer deserializer = new AvroRecordDeserializer(id ->
+        {
+            lookups.add(id);
+            return new RegisteredSchema(id, "AVRO", schemaJson);
+        }))
+        {
+            Object result = deserializer.deserializeValue(out.toByteArray());
+            assertEquals(Map.of("orderId", 42, "customer", UTF8String.from("Alice")), result);
+            deserializer.deserializeValue(out.toByteArray());
+        }
+        // Parsed schema is cached per id
+        assertEquals(List.of(17), lookups);
+    }
+
+    @Test
+    void test_schema_that_is_not_avro()
+    {
+        try (AvroRecordDeserializer deserializer = new AvroRecordDeserializer(id -> new RegisteredSchema(id, "JSON", "{\"type\":\"object\"}")))
+        {
+            byte[] value = { 0, 0, 0, 0, 4, '{', '}' };
+            RuntimeException e = assertThrows(RuntimeException.class, () -> deserializer.deserializeValue(value));
+            assertEquals("Schema id 4 is JSON, not Avro", e.getMessage());
+        }
     }
 }

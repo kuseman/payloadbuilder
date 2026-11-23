@@ -15,16 +15,19 @@ class RecordDeserializerFactory
     {
         return switch (format)
         {
+            case AUTO -> new AutoRecordDeserializer(getSchemaRegistryUrl(session, catalogAlias));
             case JSON -> new JsonRecordDeserializer();
             case RAW -> new RawRecordDeserializer();
-            case AVRO ->
-            {
-                ValueVector registryUrl = session.getCatalogProperty(catalogAlias, KafkaCatalog.SCHEMA_REGISTRY_URL);
-                String url = (registryUrl != null
-                        && !registryUrl.isNull(0)) ? registryUrl.valueAsString(0)
-                                : null;
-                yield new AvroRecordDeserializer(url);
-            }
+            case AVRO -> new AvroRecordDeserializer(getSchemaRegistryUrl(session, catalogAlias));
         };
+    }
+
+    /** Return the catalog's schema registry URL, or null if it isn't set */
+    private static String getSchemaRegistryUrl(IQuerySession session, String catalogAlias)
+    {
+        ValueVector registryUrl = session.getCatalogProperty(catalogAlias, KafkaCatalog.SCHEMA_REGISTRY_URL);
+        return (registryUrl != null
+                && !registryUrl.isNull(0)) ? registryUrl.valueAsString(0)
+                        : null;
     }
 }
