@@ -14,13 +14,20 @@ import se.kuseman.payloadbuilder.core.statement.QueryStatement;
  */
 public class CompiledQuery
 {
+    private final String name;
     private final QueryStatement query;
     private final List<Warning> warnings;
 
-    CompiledQuery(QueryStatement query, List<Warning> warnings)
+    CompiledQuery(QueryStatement query, List<Warning> warnings, String name)
     {
+        this.name = name;
         this.query = requireNonNull(query);
         this.warnings = warnings;
+    }
+
+    public String getName()
+    {
+        return name;
     }
 
     /** Execute this query with provided session */

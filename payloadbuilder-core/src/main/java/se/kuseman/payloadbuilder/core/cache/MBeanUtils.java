@@ -26,6 +26,10 @@ public class MBeanUtils
                             : "",
                     name));
             MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+            if (mbs.isRegistered(objectName))
+            {
+                mbs.unregisterMBean(objectName);
+            }
             mbs.registerMBean(new CacheMBeanImpl(cache), objectName);
         }
         catch (Exception e)

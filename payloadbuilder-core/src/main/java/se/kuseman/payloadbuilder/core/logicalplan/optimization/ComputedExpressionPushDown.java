@@ -114,7 +114,7 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                 .accept(this, context);
         List<SortItem> result = planData.sortItems;
         planData.sortItems = emptyList();
-        return new Sort(sortInput, result);
+        return new Sort(sortInput, result).withLocation(plan.getLocation());
     }
 
     @Override
@@ -187,7 +187,7 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
         if (planData.sortItems.isEmpty())
         {
             return new Projection(plan.getInput()
-                    .accept(this, context), projectionExpressions, plan.getParentTableSource());
+                    .accept(this, context), projectionExpressions, plan.getParentTableSource()).withLocation(plan.getLocation());
         }
 
         List<IExpression> newProjectionExpressions = new ArrayList<>(projectionExpressions);
@@ -342,7 +342,7 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
 
-        return new Projection(input, newProjectionExpressions, plan.getParentTableSource());
+        return new Projection(input, newProjectionExpressions, plan.getParentTableSource()).withLocation(plan.getLocation());
     }
 
     @Override
@@ -367,7 +367,7 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                 return input;
             }
 
-            return new Filter(input, plan.getTableSource(), filterPredicate);
+            return new Filter(input, plan.getTableSource(), filterPredicate).withLocation(plan.getLocation());
         }
 
         return super.create(plan, context);
