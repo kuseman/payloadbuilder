@@ -73,12 +73,12 @@ public final class HttpClientUtils
         });
     }
 
-    /** Get password from object (String or char[]) */
+    /** Get password from object: a String, a UTF8String (as a query's {@code use} statement sets it) or a char[] */
     public static String getPassword(Object password)
     {
-        if (password instanceof String)
+        if (password instanceof CharSequence)
         {
-            return (String) password;
+            return password.toString();
         }
         else if (password instanceof char[])
         {
